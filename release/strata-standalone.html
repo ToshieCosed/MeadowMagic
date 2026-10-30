@@ -236,6 +236,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
   .sx-list{grid-template-columns:repeat(auto-fill,28px);grid-auto-rows:28px}.sx-list button{width:28px;height:28px}
   #sxSearch{position:fixed;left:max(6px,env(safe-area-inset-left,0px));right:calc(31vw + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
   .sx-tools{display:none}}
+body{position:fixed;inset:0;width:100%;margin:0}
+#sx.sx-typing #sxSearch{position:fixed!important;left:max(8px,env(safe-area-inset-left,0px))!important;right:auto!important;top:calc(env(safe-area-inset-top,0px) + 8px)!important;bottom:auto!important;width:min(60vw,420px)!important;z-index:20;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.5);border-color:#f0b548}
+#sx.sx-typing .sx-win{visibility:hidden}
 #sx.sx-store .sx-side,#sx.sx-store .sx-tools,#sx.sx-store #sxSearch{display:none!important}
 #sx.sx-store .sx-center{left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;max-height:none!important}
 #sx.sx-store .sx-win{overflow:hidden}
@@ -4544,6 +4547,16 @@ document.getElementById('sxLayout').addEventListener('click',()=>{ const k=SX&&S
 document.querySelectorAll('.layoutBtn').forEach(b=>b.addEventListener('click',()=>{ setLayout('split');
   if(!document.getElementById('store').hidden&&sui){ document.getElementById('store').hidden=true; sxOpen('store'); } else { document.getElementById('inv').hidden=true; sxOpen('inv'); } }));
 document.getElementById('sxSearch').addEventListener('input',e=>{ if(SX){ SX.q=e.target.value.trim().toLowerCase(); renderSXSide(); } });
+// typing: the box jumps to the top (above the keyboard) so the browser never scrolls the page to reach it
+{ const q=document.getElementById('sxSearch'), sx=document.getElementById('sx');
+  q.addEventListener('focus',()=>{ sx.classList.add('sx-typing'); lockScroll(); });
+  q.addEventListener('blur',()=>{ sx.classList.remove('sx-typing'); lockScroll(); });
+  q.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key==='Escape') q.blur(); });
+  sx.addEventListener('pointerdown',e=>{ if(document.activeElement===q&&e.target!==q) q.blur(); },true); }
+// the page itself never scrolls, in menus or in the game view
+function lockScroll(){ if(scrollX||scrollY) scrollTo(0,0); const se=document.scrollingElement; if(se&&(se.scrollTop||se.scrollLeft)){ se.scrollTop=0; se.scrollLeft=0; } if(document.body.scrollTop) document.body.scrollTop=0; }
+addEventListener('scroll',lockScroll,{passive:true}); document.addEventListener('scroll',lockScroll,{passive:true,capture:true});
+if(window.visualViewport){ visualViewport.addEventListener('resize',()=>{ lockScroll(); setTimeout(lockScroll,60); setTimeout(lockScroll,300); }); visualViewport.addEventListener('scroll',lockScroll); }
 // quick move (tap): send a stack to the other box
 function sxQuick(arr,i){ const st=arr[i]; if(!st) return;
   if(arr===inv.slots){
