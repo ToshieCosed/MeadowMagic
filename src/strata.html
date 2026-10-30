@@ -226,7 +226,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
 .sx-tools .sv{padding:5px 6px;border-radius:7px;font-size:11px;text-align:left;background:rgba(24,33,42,.85);border:1px solid rgba(255,255,255,.14)}.sx-tools .sv.full{border-color:#7ad38a}
 #sxGhost{position:fixed;width:40px;height:40px;pointer-events:none;z-index:9;transform:translate(-50%,-60%);filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
 @media (max-width:760px){.sx-tools{display:none}.sx-side{width:clamp(120px,calc(100vw - 9*var(--sxs) - 60px),260px)}.sx-center{left:calc((100vw - clamp(120px,calc(100vw - 9*var(--sxs) - 60px),260px))/2 - 4px)}}
-@media (orientation:portrait){#sx{--sxs:clamp(26px,9vw,36px)}.sx-center{top:8px;transform:translateX(-50%);left:50%}.sx-side{left:8px;right:8px;width:auto;top:auto;height:38%}.sx-tools{display:none}}
+@media (orientation:portrait){
+  #sx{--sxs:clamp(18px,calc((100vw - 31vw - 52px)/9),34px)}
+  .sx-center{position:absolute;left:max(6px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 6px);transform:none;max-height:calc(100% - 70px)}
+  .sx-win{padding:6px;gap:4px}.sx-box{padding:4px}.sx-top b{font-size:12px}.sx-top button{padding:3px 8px;font-size:11px}
+  .sx-side{left:auto;right:max(6px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 6px);bottom:calc(env(safe-area-inset-bottom,0px) + 6px);width:31vw;height:auto}
+  .sx-tabs button{width:24px;height:24px}
+  .sx-list{grid-template-columns:repeat(auto-fill,28px);grid-auto-rows:28px}.sx-list button{width:28px;height:28px}
+  #sxSearch{position:fixed;left:max(6px,env(safe-area-inset-left,0px));right:calc(31vw + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
+  .sx-tools{display:none}}
 #mapHud{opacity:.88;position:fixed;z-index:3;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);width:150px;height:150px;image-rendering:pixelated;border:3px solid #c9b48a;border-radius:6px;background:#e8dcb8;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 #mapHud.big{width:min(70vw,70vh);height:min(70vw,70vh)}
 .paintBody{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;justify-content:center;padding:8px;overflow:auto}
@@ -4606,7 +4614,7 @@ function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs
   if(!tabs.some(t=>t[0]===SX.tab)) SX.tab='all';
   for(const [k,l] of tabs){ const b=document.createElement('button'); b.title=l; b.setAttribute('aria-label',l); b.setAttribute('aria-pressed',SX.tab===k); sxIcon(b,SX_TAB_ICON[k]()); b.addEventListener('click',()=>{ SX.tab=k; SX.page=0; renderSXSide(); }); T.appendChild(b); }
   // how many icons fit: the panel never scrolls, it pages
-  const r=L.getBoundingClientRect(); const cols=Math.max(1,Math.floor((r.width+2)/32)), rows=Math.max(1,Math.floor((r.height+2)/32)); sxPerPage=cols*rows;
+  const r=L.getBoundingClientRect(), cell=(L.firstElementChild?0:0)||(matchMedia('(orientation:portrait)').matches?30:32); const cols=Math.max(1,Math.floor((r.width+2)/cell)), rows=Math.max(1,Math.floor((r.height+2)/cell)); sxPerPage=cols*rows;
   let entries;
   if(cre) entries=Object.keys(ITEMS).map(Number).filter(id=>(SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q))).map(id=>({id}));
   else { entries=RECIPES.filter(r=>!r.hidden&&recipeOK(r)&&(SX.tab==='all'||SX.tab==='can'||r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))).map(r=>({id:r.out,r,ok:canCraft(r)}));
@@ -4614,10 +4622,11 @@ function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs
   const pages=Math.max(1,Math.ceil(entries.length/sxPerPage)); SX.page=Math.max(0,Math.min(pages-1,SX.page||0));
   document.getElementById('sxPage').textContent=`${SX.page+1}/${pages}`;
   for(const en of entries.slice(SX.page*sxPerPage,(SX.page+1)*sxPerPage)){ const id=en.id, b=document.createElement('button'); sxIcon(b,id); b.title=ITEMS[id].name+(en.r&&en.r.n>1?' ×'+en.r.n:''); b.setAttribute('aria-label',b.title);
-    if(!cre){ if(!en.ok) b.classList.add('no'); b.addEventListener('click',()=>{ if(en.ok){ craftFromBook(en.r,b); renderSX(); } else { const need=Object.entries(needs(en.r)).map(([k,n])=>`${n} ${ITEMS[keyOf(en.r,k)[0]].name.toLowerCase()}`).join(', '); toast(`${ITEMS[id].name}: needs ${need}`); } }); L.appendChild(b); continue; }
-    let t=null, held=false; b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){} held=false; t=setTimeout(()=>{ held=true; inv.cursor=mkStack(id,ITEMS[id].stack); showGhost(e.clientX,e.clientY); sxHoldText(); },280); });
-    b.addEventListener('pointermove',e=>{ if(held) moveGhost(e.clientX,e.clientY); });
+    if(!cre){ if(!en.ok) b.classList.add('no'); b.addEventListener('click',()=>{ if(SXG.moved) return; if(en.ok){ craftFromBook(en.r,b); renderSX(); } else { const need=Object.entries(needs(en.r)).map(([k,n])=>`${n} ${ITEMS[keyOf(en.r,k)[0]].name.toLowerCase()}`).join(', '); toast(`${ITEMS[id].name}: needs ${need}`); } }); L.appendChild(b); continue; }
+    let t=null, held=false; b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){} held=false; SXG.held=false; t=setTimeout(()=>{ if(SXG.moved) return; held=true; SXG.held=true; inv.cursor=mkStack(id,ITEMS[id].stack); showGhost(e.clientX,e.clientY); sxHoldText(); },280); });
+    b.addEventListener('pointermove',e=>{ if(held) moveGhost(e.clientX,e.clientY); else if(SXG.moved) clearTimeout(t); });
     b.addEventListener('pointerup',e=>{ clearTimeout(t); hideGhost(); if(held){ const el=document.elementFromPoint(e.clientX,e.clientY), tgt=el&&el.closest&&el.closest('.sx-slot'); if(tgt&&tgt.sxArr) sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); renderSX(); return; }
+      if(SXG.moved) return; // it was a swipe, not a tap
       if(inv.cursor){ inv.cursor=null; renderSX(); return; } addItem(id,ITEMS[id].stack); invChanged(); renderSX(); });
     b.addEventListener('pointercancel',()=>{ clearTimeout(t); hideGhost(); });
     L.appendChild(b); }
@@ -4626,7 +4635,15 @@ addEventListener('resize',()=>{ if(SX&&!document.getElementById('sx').hidden) re
 document.getElementById('sxPrev').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)-1; if(SX.page<0) SX.page=1e9; renderSXSide(); } });
 document.getElementById('sxNext').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)+1; const n=+document.getElementById('sxPage').textContent.split('/')[1]; if(SX.page>=n) SX.page=0; renderSXSide(); } });
 // swipe the item panel left/right to turn pages
-{ let x0=null; const L=document.getElementById('sxList'); L.addEventListener('touchstart',e=>{ x0=e.touches[0].clientX; },{passive:true}); L.addEventListener('touchend',e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0; x0=null; if(Math.abs(dx)>50) document.getElementById(dx<0?'sxNext':'sxPrev').click(); },{passive:true}); }
+// one gesture tracker for the whole panel: moving past 10px makes it a swipe (turns the page, never adds an item)
+const SXG={x:0,y:0,moved:false,held:false,on:false};
+{ const L=document.getElementById('sxList'); L.style.touchAction='none';
+  L.addEventListener('pointerdown',e=>{ SXG.x=e.clientX; SXG.y=e.clientY; SXG.moved=false; SXG.held=false; SXG.on=true; },true);
+  L.addEventListener('pointermove',e=>{ if(SXG.on&&!SXG.held&&Math.hypot(e.clientX-SXG.x,e.clientY-SXG.y)>10) SXG.moved=true; },true);
+  const up=e=>{ if(!SXG.on) return; SXG.on=false; if(SXG.held||!SXG.moved) return; const dx=e.clientX-SXG.x, dy=e.clientY-SXG.y;
+    if(Math.max(Math.abs(dx),Math.abs(dy))>36){ const next=Math.abs(dx)>Math.abs(dy)?dx<0:dy<0; setTimeout(()=>document.getElementById(next?'sxNext':'sxPrev').click(),0); } };
+  L.addEventListener('pointerup',up); L.addEventListener('pointercancel',()=>{ SXG.on=false; });
+  L.addEventListener('wheel',e=>{ e.preventDefault(); document.getElementById(e.deltaY>0?'sxNext':'sxPrev').click(); },{passive:false}); }
 // left column: trash, time, heal, magnet, clear, and seven saved inventories (creative)
 function renderSXTools(){ const el=document.getElementById('sxTools'); el.innerHTML=''; const cre=creative();
   const row=document.createElement('div'); row.className='tr'; el.appendChild(row);
