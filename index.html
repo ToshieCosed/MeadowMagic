@@ -205,6 +205,24 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
 .fw-signbox{display:flex;flex-wrap:wrap;gap:8px;background:rgba(24,33,42,.95);padding:10px;border-radius:12px}.fw-signbox input{flex:1;min-width:140px;background:#1d2530;color:#fff;border:1px solid #445;border-radius:7px;padding:8px}
 #sgText{width:100%;box-sizing:border-box;background:#1d2530;color:#fff;border:1px solid #445;border-radius:8px;padding:8px;font:15px system-ui}.sgrow{display:flex;gap:10px;flex-wrap:wrap}.sgrow select{background:#1d2530;color:#fff;border:1px solid #445;border-radius:6px;padding:4px}
 .sgcols{display:flex;flex-wrap:wrap;gap:5px}.sgcols button{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid rgba(255,255,255,.3)}.sgcols button[aria-pressed=true]{border-color:#fff;box-shadow:0 0 0 2px #f0b548}
+#sx{position:fixed;inset:0;z-index:7;display:flex;flex-direction:column;background:rgba(14,19,25,.86);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  padding:calc(env(safe-area-inset-top,0px) + 8px) max(10px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 8px) max(10px,env(safe-area-inset-left,0px));gap:8px;user-select:none;-webkit-user-select:none}
+.sx-top{display:flex;gap:8px;align-items:center}.sx-top b{font-size:15px}.sx-top button{padding:7px 12px;border-radius:9px}
+.sx-body{flex:1;min-height:0;display:flex;gap:10px}.sx-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto}
+.sx-box{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px}.sx-box h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted);display:flex;gap:8px;align-items:center}.sx-box h4 button{padding:3px 8px;border-radius:7px;font-size:11px}
+.sx-grid{display:grid;grid-template-columns:repeat(9,var(--sxs));gap:3px}.sx-grid.w3{grid-template-columns:repeat(3,var(--sxs))}
+#sx{--sxs:clamp(30px,min(5.2vw,8.8vh),46px)}
+.sx-slot{width:var(--sxs);height:var(--sxs);position:relative;padding:0;border-radius:7px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;touch-action:none}
+.sx-slot img{width:76%;height:76%;pointer-events:none}.sx-slot .n{position:absolute;right:2px;bottom:0;font-size:10px;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}.sx-slot .dur{position:absolute;left:12%;right:12%;bottom:2px;height:3px;border-radius:2px;background:rgba(0,0,0,.55);pointer-events:none}.sx-slot .dur i{display:block;height:100%;border-radius:2px}
+.sx-slot.sel{border-color:#f0b548}.sx-slot.hot{outline:2px solid #f0b548}.sx-slot.out{border-color:#7ad38a}.sx-slot .lbl{font-size:9px;color:var(--muted);pointer-events:none}
+.sx-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sx-arrow{font-size:20px;color:var(--muted)}
+.sx-side{width:clamp(180px,30vw,330px);display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px;min-height:0}
+.sx-tabs{display:flex;flex-wrap:wrap;gap:3px}.sx-tabs button{padding:4px 7px;border-radius:7px;font-size:11px}.sx-tabs button[aria-pressed=true]{background:#f0b548;color:#111}
+.sx-list{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:2px;align-content:start}
+.sx-list button{aspect-ratio:1;padding:0;border-radius:6px;background:rgba(0,0,0,.3);border:1px solid transparent;display:grid;place-items:center;touch-action:none}.sx-list button img{width:80%;height:80%;pointer-events:none}.sx-list button.no{opacity:.35}
+#sxSearch{background:#1d2530;color:#fff;border:1px solid #445;border-radius:8px;padding:7px}
+#sxGhost{position:fixed;width:44px;height:44px;pointer-events:none;z-index:9;transform:translate(-50%,-60%);filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+@media (orientation:portrait){.sx-body{flex-direction:column}.sx-side{width:auto;height:34%}#sx{--sxs:clamp(28px,9.4vw,44px)}}
 #mapHud{opacity:.88;position:fixed;z-index:3;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);width:150px;height:150px;image-rendering:pixelated;border:3px solid #c9b48a;border-radius:6px;background:#e8dcb8;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 #mapHud.big{width:min(70vw,70vh);height:min(70vw,70vh)}
 .paintBody{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;justify-content:center;padding:8px;overflow:auto}
@@ -354,7 +372,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
     <img id="poPrev" alt="Poster preview"></div>
 </section>
 <section id="store" class="panel" aria-label="Storage" hidden>
-  <header><h2>Chest</h2><span id="sholding" class="holding"></span><button class="ghost" id="sStore">Store all</button><button class="ghost" id="sTake">Take all</button><button class="primary" id="storeClose">Done</button></header>
+  <header><h2>Chest</h2><span id="sholding" class="holding"></span><button class="ghost" id="sStore">Store all</button><button class="ghost" id="sTake">Take all</button><button class="ghost layoutBtn">Split layout</button><button class="primary" id="storeClose">Done</button></header>
   <div class="invBody">
     <div class="stack"><div><h3>Contents <small id="sCount" class="hint"></small></h3><div class="grid9" id="sGrid"></div></div></div>
     <div class="stack"><div><h3>Hotbar</h3><div class="grid9" id="shot"></div></div><div><h3>Backpack</h3><div class="grid9" id="sbag"></div></div></div>
@@ -383,8 +401,14 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
     </div>
   </div>
 </section>
+<section id="sx" hidden aria-label="Inventory">
+  <div class="sx-top"><b id="sxTitle">Inventory</b><span id="sxHold" class="hint"></span><span style="flex:1"></span><button class="ghost" id="sxLayout" title="Switch inventory layout">Classic layout</button><button class="primary" id="sxClose">Done</button></div>
+  <div class="sx-body"><div class="sx-main"><div class="sx-box" id="sxA"></div><div class="sx-box" id="sxB"></div></div>
+    <aside class="sx-side" id="sxSide"><div class="sx-tabs" id="sxTabs"></div><div class="sx-list" id="sxList"></div><input id="sxSearch" placeholder="Search" autocomplete="off"></aside></div>
+  <img id="sxGhost" alt="" hidden>
+</section>
 <section id="inv" class="panel" aria-label="Inventory and crafting" hidden>
-  <header><h2>Inventory</h2><span id="holding"><small class="hint">Tap an item, then tap another slot to move or swap it</small></span><div id="craftMsg" aria-live="polite"></div><button class="ghost" id="one" aria-pressed="false">Place 1</button><button class="primary" id="invClose">Done</button></header>
+  <header><h2>Inventory</h2><span id="holding"><small class="hint">Tap an item, then tap another slot to move or swap it</small></span><div id="craftMsg" aria-live="polite"></div><button class="ghost" id="one" aria-pressed="false">Place 1</button><button class="ghost layoutBtn">Split layout</button><button class="primary" id="invClose">Done</button></header>
   <div class="seg viewtabs" id="invTabs" hidden><button data-v="catalog" aria-pressed="true">Creative items</button><button data-v="craft">Crafting</button></div>
   <div class="invBody">
     <div class="stack" id="catalogView" hidden>
@@ -2748,7 +2772,7 @@ function takeOutput(){
 function patHTML(rc){ const ro=Math.floor((3-rc.pat.length)/2), co=Math.floor((3-rc.pat[0].length)/2);
   let h=''; for(let r=0;r<3;r++)for(let c=0;c<3;c++){ const row=rc.pat[r-ro], ch=row&&row[c-co];
     h+= ch&&ch!=='.'?`<i><img alt="" src="${iconURL(keyOf(rc,ch)[0])}"></i>`:'<i></i>'; } return h; }
-function renderInv(){
+function renderInv(){ if(SX&&!document.getElementById('sx').hidden){ renderSX(); return; }
   const mk=(arr,i,el)=>{ const b=document.createElement('button'); b.className='islot'+(arr===inv.slots&&i===inv.sel?' sel':''); b.innerHTML=slotHTML(arr[i]); b.setAttribute('aria-label',slotLabel(arr[i])); b.addEventListener('click',()=>clickSlot(arr,i)); el.appendChild(b); };
   const hot=document.getElementById('hotGrid'), bagG=document.getElementById('bagGrid'), cg=document.getElementById('cgrid');
   hot.innerHTML=''; bagG.innerHTML=''; cg.innerHTML='';
@@ -2790,11 +2814,11 @@ function renderArmor(){ const el=document.getElementById('armorRow'); el.innerHT
   inv.armor.forEach((a,i)=>{ const b=document.createElement('button'); b.className='islot'+(a?'':' ghostslot'); b.innerHTML=a?slotHTML(a):`<span class="lbl">${names[i]}</span>`; b.setAttribute('aria-label',names[i]+': '+slotLabel(a));
     b.addEventListener('click',()=>{ const c=inv.cursor; if(c&&ITEMS[c.id].armor!==i){ toast(`Only ${names[i].toLowerCase()} go there`); return; } inv.armor[i]=c||null; inv.cursor=a||null; invChanged(); renderInv(); }); el.appendChild(b); });
   document.getElementById('armorVal').textContent=`${armorTotal()} points · blocks ${Math.round(armorCut()*100)}% of damage`; }
-function openInv(){ if(mode!=='play'||!game()) return; document.getElementById('invTabs').hidden=!creative(); if(creative()&&!invView) invView='catalog'; if(!creative()) invView='craft'; syncInvView(); mining=null; mode='inv'; recLimit=40; document.getElementById('inv').hidden=false; renderInv(); }
+function openInv(){ if(mode!=='play'||!game()) return; if(splitOn2()){ mining=null; mode='inv'; sxOpen('inv'); return; } document.getElementById('invTabs').hidden=!creative(); if(creative()&&!invView) invView='catalog'; if(!creative()) invView='craft'; syncInvView(); mining=null; mode='inv'; recLimit=40; document.getElementById('inv').hidden=false; renderInv(); }
 function closeInv(){
-  for(let i=0;i<9;i++) if(inv.grid[i]){ const s=inv.grid[i]; inv.grid[i]=null; const l=addItem(s.id,s.n,s.d); if(l) spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d); }
-  if(inv.cursor){ const s=inv.cursor; inv.cursor=null; const l=addItem(s.id,s.n,s.d); if(l) spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d); }
-  document.getElementById('inv').hidden=true; mode='play'; last=performance.now(); renderHotbar();
+  for(let i=0;i<9;i++) if(inv.grid[i]){ const s=inv.grid[i]; inv.grid[i]=null; returnStack(s); }
+  if(inv.cursor){ const s=inv.cursor; inv.cursor=null; returnStack(s); }
+  document.getElementById('inv').hidden=true; document.getElementById('sx').hidden=true; SX=null; mode='play'; last=performance.now(); renderHotbar();
 }
 
 /* =====================================================================
@@ -3190,13 +3214,13 @@ function renderHolding(id){ const el=document.getElementById(id); if(!el) return
 
 /* ---------- chests and backpacks share one storage panel ---------- */
 let sui=null;   // {arr, key?, title, bagSlot?}
-function openStore(arr,title,key){ mining=null; sui={arr,title,key}; mode='store'; document.getElementById('store').hidden=false; document.querySelector('#store h2').textContent=title; renderStore(); }
+function openStore(arr,title,key){ mining=null; sui={arr,title,key}; mode='store'; if(splitOn2()){ sxOpen('store'); return; } document.getElementById('store').hidden=false; document.querySelector('#store h2').textContent=title; renderStore(); }
 function closeStore(){
-  if(inv.cursor){ const s=inv.cursor; inv.cursor=null; const l=addItem(s.id,s.n,s.d,s.bag); if(l) spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d,s.bag); }
-  document.getElementById('store').hidden=true; sui=null; if(mode==='store'){ mode='play'; last=performance.now(); } invChanged(); renderHotbar(); }
+  if(inv.cursor){ const s=inv.cursor; inv.cursor=null; returnStack(s); }
+  document.getElementById('store').hidden=true; document.getElementById('sx').hidden=true; SX=null; sui=null; if(mode==='store'){ mode='play'; last=performance.now(); } invChanged(); renderHotbar(); }
 const noBagInBag=(arr,c)=>!(sui&&sui.isBag&&arr===sui.arr&&c&&ITEMS[c.id].bag);
 function renderStore(){
-  if(!sui) return;
+  if(!sui) return; if(SX&&!document.getElementById('sx').hidden){ renderSX(); return; }
   const grid=document.getElementById('sGrid'); grid.innerHTML='';
   sui.arr.forEach((_,i)=>{ const b=document.createElement('button'); b.className='islot'; b.innerHTML=slotHTML(sui.arr[i]); b.setAttribute('aria-label',slotLabel(sui.arr[i]));
     b.addEventListener('click',()=>{ if(!noBagInBag(sui.arr,inv.cursor)){ toast('A backpack cannot go inside a backpack'); return; } clickSlot(sui.arr,i,true); renderStore(); }); grid.appendChild(b); });
@@ -4481,6 +4505,109 @@ function placeSign(sx,sy){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap a wa
   else { const f=faceFrame(r.hit,r.prev,1,1); e=Object.assign({kind:'sign'},f,{h:.6}); }
   e.text=''; e.frame='wood'; e.bg='planks'; world.decor.push(e); world.changed=true; const s=held(); if(s&&!creative()){ s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); } openSign(e); }
 
+
+/* =====================================================================
+   Split inventory layout (optional): Minecraft-style boxes · tap = quick move · hold = pick up · drag & drop · NEI-style side bar
+   ===================================================================== */
+const prefsGet=()=>store.get('strata:prefs')||{};
+const splitOn=()=>prefsGet().invLayout==='split';
+function setLayout(v){ const p=prefsGet(); p.invLayout=v; store.set('strata:prefs',p); if(!store.get('strata:prefs')) window.__layout=v; }
+const splitOn2=()=>splitOn()||window.__layout==='split';
+let SX=null;   // {kind:'inv'|'store', bag:openedBackpackStack, tab, q}
+function returnStack(s){ const l=addItem(s.id,s.n,s.d,s.bag); if(!l&&s.x) inv.slots[inv.landed].x=s.x; if(l){ spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d,s.bag); if(s.x) drops[drops.length-1].x=s.x; } }
+function sxOpen(kind){ SX={kind,tab:SX&&SX.tab||'all',q:'',bag:null}; document.getElementById('sx').hidden=false; document.getElementById('sxSearch').value=''; renderSX(); }
+function sxClose(){ const k=SX&&SX.kind; document.getElementById('sx').hidden=true; SX=null; if(k==='store') closeStore(); else closeInv(); }
+document.getElementById('sxClose').addEventListener('click',sxClose);
+document.getElementById('sxLayout').addEventListener('click',()=>{ const k=SX&&SX.kind; setLayout('classic'); document.getElementById('sx').hidden=true; SX=null;
+  if(k==='store'&&sui){ document.getElementById('store').hidden=false; renderStore(); } else { document.getElementById('inv').hidden=false; renderInv(); } });
+document.querySelectorAll('.layoutBtn').forEach(b=>b.addEventListener('click',()=>{ setLayout('split');
+  if(!document.getElementById('store').hidden&&sui){ document.getElementById('store').hidden=true; sxOpen('store'); } else { document.getElementById('inv').hidden=true; sxOpen('inv'); } }));
+document.getElementById('sxSearch').addEventListener('input',e=>{ if(SX){ SX.q=e.target.value.trim().toLowerCase(); renderSXSide(); } });
+// quick move (tap): send a stack to the other box
+function sxQuick(arr,i){ const st=arr[i]; if(!st) return;
+  if(arr===inv.slots){
+    if(SX.kind==='store'&&sui){ if(sui.isBag&&ITEMS[st.id].bag){ toast('A backpack cannot go inside a backpack'); return; } const left=addTo(sui.arr,st); if(left===st.n){ toast('No room'); return; } if(left) st.n=left; else arr[i]=null; }
+    else if(SX.bag){ if(ITEMS[st.id].bag){ toast('A backpack cannot go inside a backpack'); return; } const left=addTo(SX.bag.bag,st); if(left===st.n){ toast('That backpack is full'); return; } if(left) st.n=left; else arr[i]=null; }
+    else { // hotbar ⇄ bag, like shift-click
+      const range=i<9?[9,36]:[0,9]; let n=st.n; const max=ITEMS[st.id].stack;
+      for(let k=range[0];k<range[1]&&n;k++){ const t=inv.slots[k]; if(t&&t.id===st.id&&max>1&&t.n<max){ const q=Math.min(n,max-t.n); t.n+=q; n-=q; } }
+      for(let k=range[0];k<range[1]&&n;k++) if(!inv.slots[k]){ inv.slots[k]={...st,n}; n=0; }
+      if(n===st.n){ toast('No room'); return; } if(n) st.n=n; else arr[i]=null; } }
+  else { // from a container, the crafting grid or a backpack back into the inventory
+    const l=addItem(st.id,st.n,st.d,st.bag); if(l===st.n){ toast('Inventory full'); return; } if(!l){ if(st.x) inv.slots[inv.landed].x=st.x; arr[i]=null; } else st.n=l; }
+  invChanged(); renderSX(); }
+// slots: tap = move (or drop what you're holding), hold = pick up, hold and drag = drag & drop
+let sxDrag=null;
+function sxSlot(arr,i,el,opts){ const b=document.createElement('button'); b.className='sx-slot'+(opts&&opts.cls?' '+opts.cls:''); b.innerHTML=arr[i]?slotHTML(arr[i]):(opts&&opts.lbl?`<span class="lbl">${opts.lbl}</span>`:'');
+  b.setAttribute('aria-label',slotLabel(arr[i])); b.sxArr=arr; b.sxI=i; b.sxOpts=opts||{};
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){}
+    const d={b,arr,i,x0:e.clientX,y0:e.clientY,t0:performance.now(),held:false,timer:null};
+    d.timer=setTimeout(()=>{ if(sxDrag!==d) return; if(!inv.cursor&&arr[i]&&!(opts&&opts.output)){ if(opts&&opts.accept&&false) return; clickSlot(arr,i,true); d.held=true; showGhost(e.clientX,e.clientY); try{ navigator.vibrate&&navigator.vibrate(12); }catch(_){} b.innerHTML=''; sxHoldText(); } },280);
+    sxDrag=d; });
+  b.addEventListener('pointermove',e=>{ const d=sxDrag; if(!d||d.b!==b) return; if(d.held) moveGhost(e.clientX,e.clientY); else if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)>12){ clearTimeout(d.timer); sxDrag=null; } });
+  const up=e=>{ const d=sxDrag; if(!d||d.b!==b) return; clearTimeout(d.timer); sxDrag=null; hideGhost();
+    if(d.held){ const t=document.elementFromPoint(e.clientX,e.clientY), tgt=t&&t.closest&&t.closest('.sx-slot'), side=t&&t.closest&&t.closest('#sxSide');
+      if(tgt&&tgt!==b&&tgt.sxArr){ sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); }
+      else if(side&&creative()&&inv.cursor){ inv.cursor=null; toast('Deleted'); }
+      renderSX(); return; }
+    if(e.type!=='pointerup') return;
+    if(opts&&opts.output){ takeOutput(); renderSX(); return; }
+    if(inv.cursor){ sxDrop(arr,i,opts); renderSX(); return; }
+    if(arr[i]&&ITEMS[arr[i].id].bag&&arr===inv.slots&&SX.kind==='inv'){ // backpacks open in the top box, one at a time
+      const st=arr[i]; if(!st.bag) st.bag=new Array(ITEMS[st.id].bag).fill(null); SX.bag=SX.bag===st?null:st; renderSX(); return; }
+    if(opts&&opts.armor!=null){ if(arr[i]){ returnStack(arr[i]); arr[i]=null; invChanged(); } renderSX(); return; }
+    sxQuick(arr,i); };
+  b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
+  el.appendChild(b); return b; }
+function sxDrop(arr,i,opts){ const c=inv.cursor; if(!c) return;
+  if(opts&&opts.armor!=null){ if(ITEMS[c.id].armor!==opts.armor){ toast('That does not go there'); return; } const old=arr[i]; arr[i]=c; inv.cursor=old||null; invChanged(); return; }
+  if(SX&&SX.bag&&arr===SX.bag.bag&&ITEMS[c.id].bag){ toast('A backpack cannot go inside a backpack'); return; }
+  if(sui&&sui.isBag&&arr===sui.arr&&ITEMS[c.id].bag){ toast('A backpack cannot go inside a backpack'); return; }
+  clickSlot(arr,i,true); }
+const ghost=()=>document.getElementById('sxGhost');
+function showGhost(x,y){ const c=inv.cursor; if(!c) return; const g=ghost(); g.src=iconURL(c.id); g.hidden=false; moveGhost(x,y); }
+function moveGhost(x,y){ const g=ghost(); g.style.left=x+'px'; g.style.top=y+'px'; }
+function hideGhost(){ ghost().hidden=true; }
+function sxHoldText(){ document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to put it down':'Tap: move · Hold: pick up · Hold and drag: drop anywhere'; }
+function renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=document.getElementById('sxB'); A.innerHTML=''; Bx.innerHTML='';
+  document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to put it down':'Tap: move · Hold: pick up · Hold and drag: drop anywhere';
+  const head=(el,t,btns)=>{ const h=document.createElement('h4'); h.textContent=t; for(const [lbl,fn] of btns||[]){ const b=document.createElement('button'); b.className='ghost'; b.textContent=lbl; b.addEventListener('click',()=>{ fn(); renderSX(); }); h.appendChild(b); } el.appendChild(h); };
+  // top box: the chest / backpack / crafting
+  if(SX.kind==='store'&&sui){ document.getElementById('sxTitle').textContent=sui.title; head(A,`${sui.title} · ${sui.arr.filter(Boolean).length}/${sui.arr.length}`,[['Take all',()=>takeAll()],['Store all',()=>storeAll()]]);
+    const g=document.createElement('div'); g.className='sx-grid'; for(let i=0;i<sui.arr.length;i++) sxSlot(sui.arr,i,g); A.appendChild(g); }
+  else if(SX.bag){ document.getElementById('sxTitle').textContent='Inventory'; head(A,`${ITEMS[SX.bag.id].name} · ${SX.bag.bag.filter(Boolean).length}/${SX.bag.bag.length}`,[['Close backpack',()=>{ SX.bag=null; }]]);
+    const g=document.createElement('div'); g.className='sx-grid'; for(let i=0;i<SX.bag.bag.length;i++) sxSlot(SX.bag.bag,i,g); A.appendChild(g); }
+  else { document.getElementById('sxTitle').textContent='Inventory'; stationCache=null; const st=stations();
+    head(A,'Crafting'+(st.tier>=2?' · '+BLOCKS[TABLE_OF[st.tier]].name.toLowerCase():' · by hand')+(st.tan?' · tanning':''));
+    const row=document.createElement('div'); row.className='sx-row'; const g=document.createElement('div'); g.className='sx-grid w3'; for(let i=0;i<9;i++) sxSlot(inv.grid,i,g); row.appendChild(g);
+    const ar=document.createElement('span'); ar.className='sx-arrow'; ar.textContent='→'; row.appendChild(ar); const rc=matchGrid(); const outArr=[rc?mkStack(rc.out,rc.n):null]; sxSlot(outArr,0,row,{output:1,cls:'out'});
+    const arm=document.createElement('div'); arm.className='sx-grid w3'; arm.style.gridTemplateColumns='repeat(4,var(--sxs))'; arm.style.marginLeft='auto'; ['Head','Body','Legs','Feet'].forEach((l,k)=>sxSlot(inv.armor,k,arm,{armor:k,lbl:l})); row.appendChild(arm);
+    A.appendChild(row); }
+  // bottom box: your inventory
+  head(Bx,'Inventory'+(creative()?' · drag onto the side bar to delete':''));
+  const bag=document.createElement('div'); bag.className='sx-grid'; for(let i=9;i<36;i++) sxSlot(inv.slots,i,bag,{cls:inv.slots[i]&&ITEMS[inv.slots[i].id].bag&&SX.bag===inv.slots[i]?'hot':''}); Bx.appendChild(bag);
+  const hot=document.createElement('div'); hot.className='sx-grid'; hot.style.marginTop='6px'; for(let i=0;i<9;i++) sxSlot(inv.slots,i,hot,{cls:(i===inv.sel?'sel':'')+(inv.slots[i]&&SX.bag===inv.slots[i]?' hot':'')}); Bx.appendChild(hot);
+  renderSXSide(); renderHotbar(); invDirty=false; }
+// the side bar: every item (creative) or recipes (survival), with tabs and search
+function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs'), L=document.getElementById('sxList'); T.innerHTML=''; L.innerHTML='';
+  const cre=creative(), tabs=cre?[['all','All'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['travel','Travel'],['items','Items']]:[['all','All'],['can','Can make'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['storage','Storage'],['travel','Travel'],['items','Items']];
+  if(!tabs.some(t=>t[0]===SX.tab)) SX.tab='all';
+  for(const [k,l] of tabs){ const b=document.createElement('button'); b.className='ghost'; b.textContent=l; b.setAttribute('aria-pressed',SX.tab===k); b.addEventListener('click',()=>{ SX.tab=k; renderSXSide(); }); T.appendChild(b); }
+  const io=window.__catIO||(window.__catIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ const im=e.target; im.src=iconURL(+im.dataset.id); window.__catIO.unobserve(im); } },{rootMargin:'200px'}));
+  const icon=(b,id)=>{ if(iconCache[id]) b.innerHTML=`<img alt="" src="${iconCache[id]}">`; else { b.innerHTML=`<img alt="" data-id="${id}">`; if(io) io.observe(b.firstChild); else b.firstChild.src=iconURL(id); } };
+  if(cre){ const ids=Object.keys(ITEMS).map(Number).filter(id=>(SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q)));
+    for(const id of ids){ const b=document.createElement('button'); icon(b,id); b.title=ITEMS[id].name; b.setAttribute('aria-label',ITEMS[id].name);
+      let t=null, held=false; b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){} held=false; t=setTimeout(()=>{ held=true; inv.cursor=mkStack(id,ITEMS[id].stack); showGhost(e.clientX,e.clientY); sxHoldText(); },280); });
+      b.addEventListener('pointermove',e=>{ if(held) moveGhost(e.clientX,e.clientY); });
+      b.addEventListener('pointerup',e=>{ clearTimeout(t); hideGhost(); if(held){ const el=document.elementFromPoint(e.clientX,e.clientY), tgt=el&&el.closest&&el.closest('.sx-slot'); if(tgt&&tgt.sxArr) sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); renderSX(); return; }
+        if(inv.cursor){ inv.cursor=null; renderSX(); return; } addItem(id,ITEMS[id].stack); invChanged(); renderSX(); toast(ITEMS[id].name); });
+      b.addEventListener('pointercancel',()=>{ clearTimeout(t); hideGhost(); });
+      L.appendChild(b); } }
+  else { const list=RECIPES.filter(r=>!r.hidden&&(SX.tab==='all'||SX.tab==='can'?true:r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))&&recipeOK(r));
+    list.sort((a,b)=>(canCraft(b)?1:0)-(canCraft(a)?1:0));
+    for(const r of list.slice(0,300)){ const b=document.createElement('button'), ok=canCraft(r); icon(b,r.out); if(!ok) b.classList.add('no'); b.title=ITEMS[r.out].name+(r.n>1?' ×'+r.n:'');
+      b.addEventListener('click',()=>{ if(ok){ craftFromBook(r,b); renderSX(); } else { const need=Object.entries(needs(r)).map(([k,n])=>`${n} ${ITEMS[keyOf(r,k)[0]].name.toLowerCase()}`).join(', '); toast(`${ITEMS[r.out].name}: needs ${need}`); } }); L.appendChild(b); } } }
+
 /* ---------- stage 6: decor entities ---------- */
 const b64=u=>{ let s=''; for(let i=0;i<u.length;i+=8192) s+=String.fromCharCode.apply(null,u.subarray(i,i+8192)); return btoa(s); };
 const unb64=t=>{ const s=atob(t), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; };
@@ -4983,7 +5110,7 @@ function toggleCave(){
   cam.caveMode=cam.caveMode==='chase'?'reframe':'chase'; cam.occT=0;
   if(cam.caveMode==='reframe'&&cam.chase){ const c=cam.chase; cam.chase=null; cam.zoom=c.zoom; cam.tyaw=angLerp(cam.tyaw,c.yaw,1); cam.userYaw=c.yaw; }
   if(cam.caveMode==='chase'){ cam.autoActive=false; cam.autoPitch=null; cam.tyaw=angLerp(cam.tyaw,cam.userYaw,1); }
-  store.set('strata:prefs',{caveMode:cam.caveMode}); syncCave();
+  store.set('strata:prefs',{...prefsGet(),caveMode:cam.caveMode}); syncCave();
   toast(cam.caveMode==='chase'?'When hidden: close follow cam':'When hidden: swing the view (default)');
 }
 function syncCave(){ document.getElementById('cave').setAttribute('aria-pressed',cam.caveMode==='chase'); }
