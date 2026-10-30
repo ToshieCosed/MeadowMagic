@@ -22,7 +22,11 @@ Saves live in the browser's local storage, per device.
 - **Crafting and tools:**
   - Survival crafting from weak tools up through tin → diamond tiers.
   - Smelters and alloys, armor, chests, backpacks and storage drawers.
-- **Building:** slabs and stairs in 23 materials, doors, trapdoors, gates and pressure plates (with a proximity activation system), lanterns, wool and furniture.
+- **Woods:** eleven woods (oak, birch, spruce, jungle, dark oak, acacia, mangrove, cherry, pale oak, crimson, warped), each with logs, stripped logs, wood, planks, leaves, saplings, and the full set of building pieces. Four saplings in a square grow a giant tree.
+- **Stone:** andesite, diorite, granite, tuff, calcite, deepslate and smooth stone, with polished and brick forms, slabs and stairs.
+- **Farming:** hoes in every tier, farmland that stays moist near water, wheat, carrots, potatoes, beetroots, melons, pumpkins, sugar cane, cactus, cocoa, sweet berries and bone meal. Also bread, cake, cookies, pies and stews, eggs from chickens, and milk from cows.
+- **Resource packs:** import a Minecraft Java resource pack (.zip) for a world from the pause menu. Textures for blocks and items Strata has are used, including animated water and lava; the rest are skipped. See [docs/minecraft-parity.md](docs/minecraft-parity.md) for which Minecraft blocks are covered.
+- **Building:** slabs and stairs in 60+ materials, doors, trapdoors, gates and pressure plates (with a proximity activation system), lanterns, wool and furniture.
 - **Water and lava:** both flow, they make obsidian and cobblestone where they meet, and buckets pick up and place either.
 - **Creatures:**
   - Animals: cows, pigs, chickens, horses, sheep, tamable wolves and bats.
