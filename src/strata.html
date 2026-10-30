@@ -479,7 +479,12 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
       <button class="size" role="radio" aria-checked="false" data-size="1000"><i>Large</i><b>1,000 × 1,000</b><em>3,969 chunks</em></button>
       <button class="size" role="radio" aria-checked="false" data-size="10000"><i>Full</i><b>10,000 × 10,000</b><em>390,625 chunks</em></button>
     </div>
-    <p class="note">50 blocks deep. Only the seed and your edits are saved; unexplored land is generated around you as you move.</p>
+    <div class="sizes" role="radiogroup" aria-label="World depth" id="depths">
+      <button class="size" role="radio" aria-checked="false" data-depth="mini"><i>Mini</i><b>64 tall</b><em>Sea level 19</em></button>
+      <button class="size" role="radio" aria-checked="true" data-depth="classic"><i>Classic</i><b>128 tall</b><em>Surface at 64</em></button>
+      <button class="size" role="radio" aria-checked="false" data-depth="full"><i>Full world</i><b>256 tall</b><em>Big mountains</em></button>
+    </div>
+    <p class="note">Caves, caverns, ravines and underground lakes in every new world. Only the seed and your edits are saved; unexplored land is generated around you as you move.</p>
     <button class="primary" id="forge">Forge world</button>
   </div>
   <div>
@@ -490,7 +495,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.16.2</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.17.0</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -524,7 +529,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
    occlusion cutaway · player physics: walk/run/dash/crouch/jump/climb.
    ===================================================================== */
 const CS = 16;                       // chunk width (x/z)
-const SEA = 19;
+let SEA = 19;   // sea level of the current overworld (19 in Mini worlds, 63 in Classic and Full)
 const B = {AIR:0,GRASS:1,DIRT:2,STONE:3,SAND:4,WATER:5,LOG:6,LEAVES:7,PLANKS:8,BEDROCK:9,BRICK:10,FLOWER_R:11,FLOWER_Y:12,TALLGRASS:13,SNOW:14,PEBBLE:15,GLASS:16,GLASS_R:17,GLASS_Y:18,GLASS_B:19,TABLE:20,CRUCIBLE:21,CRUCIBLE_LIT:22,TORCH:23,FLOWER_B:24,
   ORE_COAL:25,ORE_TIN:26,ORE_COPPER:27,ORE_BAUXITE:28,ORE_GOLD:29,ORE_IRON:30,ORE_TITANIUM:31,ORE_PLATINUM:32,ORE_DIAMOND:33,
   TABLE_TIN:34,TABLE_BRONZE:35,TABLE_ALU:36,TABLE_GOLD:37,TABLE_IRON:38,TABLE_STEEL:39,TABLE_TITANIUM:40,TABLE_PLATINUM:41,TABLE_DIAMOND:42,
@@ -1078,12 +1083,65 @@ const FLOWERS_ALL=[...FLOWERS_COMMON,B.FLOWER_P,B.FLOWER_L];
 const VINE_OF={'0,-1':B.VINE_N,'1,0':B.VINE_E,'0,1':B.VINE_S,'-1,0':B.VINE_W};
 const BANDS=[B.TERRACOTTA,B.TERRA_O,B.TERRA_O,B.TERRA_Y,B.TERRACOTTA,B.TERRA_BR,B.TERRA_O,B.TERRA_R,B.TERRA_W,B.TERRACOTTA,B.TERRA_LG,B.TERRA_O,B.TERRA_Y,B.TERRA_R,B.TERRACOTTA,B.TERRA_W];
 
+
+/* ---------- stage 17: world depth presets and caves ---------- */
+const DEPTHS={mini:{height:64,sea:19,ha:1,ma:1,oa:1,name:'Mini'},classic:{height:128,sea:63,ha:1.5,ma:2.1,oa:2,name:'Classic'},full:{height:256,sea:63,ha:2.2,ma:5.6,oa:2.4,name:'Full'}};
+// improved Perlin noise in 3D, roughly -1…1
+function makeNoise3(seed){ const r=mulberry32(seed), q=[]; for(let i=0;i<256;i++) q[i]=i; for(let i=255;i>0;i--){ const j=(r()*(i+1))|0, t=q[i]; q[i]=q[j]; q[j]=t; }
+  const p=new Uint8Array(512); for(let i=0;i<512;i++) p[i]=q[i&255];
+  const fade=t=>t*t*t*(t*(t*6-15)+10), L=(a,b,t)=>a+t*(b-a), G=(h,x,y,z)=>{ h&=15; const u=h<8?x:y, v=h<4?y:(h===12||h===14?x:z); return ((h&1)?-u:u)+((h&2)?-v:v); };
+  return (x,y,z)=>{ const fx=Math.floor(x), fy=Math.floor(y), fz=Math.floor(z), X=fx&255, Y=fy&255, Z=fz&255; x-=fx; y-=fy; z-=fz; const u=fade(x), v=fade(y), w=fade(z);
+    const A=p[X]+Y, AA=p[A]+Z, AB=p[A+1]+Z, B2=p[X+1]+Y, BA=p[B2]+Z, BB=p[B2+1]+Z;
+    return L(L(L(G(p[AA],x,y,z),G(p[BA],x-1,y,z),u),L(G(p[AB],x,y-1,z),G(p[BB],x-1,y-1,z),u),v),L(L(G(p[AA+1],x,y,z-1),G(p[BA+1],x-1,y,z-1),u),L(G(p[AB+1],x,y-1,z-1),G(p[BB+1],x-1,y-1,z-1),u),v),w); }; }
+// Caves in the spirit of 1.16 carvers plus 1.18 noise caves, kept underground: big "cheese" caverns (more of them deeper down),
+// long "spaghetti" tunnels, thin "noodle" passages, the odd ravine, flooded caverns (aquifers) and lava lakes near the bottom.
+// The surface stays as it was except for occasional cave mouths, and nothing is carved close under oceans or rivers.
+function carveCaves(g,ch,b,H,x0,z0,hAt,size){
+  if(!g.c3){ const s=g.seed; g.c3={ch:makeNoise3(s+301),ch2:makeNoise3(s+311),sa:makeNoise3(s+302),sb:makeNoise3(s+303),na:makeNoise3(s+304),nb:makeNoise3(s+305),m:makeNoise3(s+306)}; g.cEnt=makeNoise(s+307); g.cRav=makeNoise(s+308); g.cRavM=makeNoise(s+309); g.cAq=makeNoise(s+310); }
+  const N=g.c3, S=SEA, idx=(x,y,z)=>(y*CS+z)*CS+x;
+  let top=0; for(let z=0;z<CS;z++) for(let x=0;x<CS;x++) top=Math.max(top,hAt(x,z)); top=Math.min(H-2,top);
+  const NY=(top>>2)+2, lat=new Float32Array(5*5*NY);
+  const lavaY=Math.max(3,Math.round(S*.16)), deepK=S*.75;
+  for(let k=0;k<NY;k++) for(let j=0;j<5;j++) for(let i=0;i<5;i++){ const x=x0+i*4, y=k*4, z=z0+j*4;
+    const deep=sat((deepK-y)/deepK);
+    const cheese=(N.ch(x*.016,y*.03,z*.016)*.7+N.ch2(x*.045,y*.07,z*.045)*.3)-(.34-.16*deep);
+    const a=N.sa(x*.011,y*.021,z*.011), c=N.sb(x*.011,y*.021,z*.011), rad=.066+.025*N.m(x*.008,y*.012,z*.008);
+    const spag=(rad-Math.sqrt(a*a+c*c))*5;
+    const na=N.na(x*.03,y*.045,z*.03), nb=N.nb(x*.03,y*.045,z*.03), nood=(.035-Math.sqrt(na*na+nb*nb))*4;
+    lat[(k*5+j)*5+i]=Math.max(cheese,spag,nood); }
+  const LV=(i,j,k)=>lat[(k*5+j)*5+i];
+  for(let z=0;z<CS;z++) for(let x=0;x<CS;x++){ const wx=x0+x, wz=z0+z; if(wx>=size||wz>=size) continue; const h=hAt(x,z);
+    // keep well clear of seas, lakes and rivers nearby, and of the surface unless this is a cave mouth
+    let hmin=h; for(let dz=-2;dz<=2;dz++) for(let dx=-2;dx<=2;dx++){ const n=hAt(x+dx,z+dz); if(n>=0&&n<hmin) hmin=n; }
+    const wet=hmin<S, mouth=!wet&&g.cEnt(wx*.018,wz*.018)>.6, roof=wet?hmin-7:mouth?h+1:h-5;
+    // lakes: each 48×48 region either holds a flat water table, a lava lake at the bottom, or neither; stone walls separate neighbours below their levels
+    const RS=48, rx=Math.floor(wx/RS), rz=Math.floor(wz/RS), mx=wx-rx*RS, mz=wz-rz*RS;
+    const wl=(a,c)=>hash2(a,c,g.seed+77)<.3?Math.floor(S*.2+hash2(a,c,g.seed+78)*S*.22):-1, ll=(a,c)=>hash2(a,c,g.seed+79)<.45?lavaY:-1;
+    const aq=wl(rx,rz), lv=ll(rx,rz); let wall=-1;
+    if(mx<2||mx>RS-3||mz<2||mz>RS-3){ const nx=rx+(mx<2?-1:mx>RS-3?1:0), nz=rz+(mz<2?-1:mz>RS-3?1:0);
+      for(const [a,c] of [[nx,rz],[rx,nz],[nx,nz]]) if(a!==rx||c!==rz){ const o=Math.max(wl(a,c),ll(a,c)); if(o!==Math.max(aq,lv)) wall=Math.max(wall,o,aq,lv); } }
+    // ravines: a narrow 2D crack, deepest in the middle
+    const rv=Math.abs(g.cRav(wx*.0045,wz*.0045)), rm=g.cRavM(wx*.003+17,wz*.003-5), ravW=rm>.45&&!wet?.014:0, ravD=Math.round((18+rm*30)*(g.ky>1?1.6:1));
+    const ix=x>>2, fx=(x&3)/4, iz=z>>2, fz=(z&3)/4, ymax=Math.min(ravW?Math.max(h,roof):roof,top);
+    for(let y=2;y<=ymax;y++){ const ik=y>>2, fy=(y&3)/4;
+      const c00=LV(ix,iz,ik)+(LV(ix+1,iz,ik)-LV(ix,iz,ik))*fx, c10=LV(ix,iz+1,ik)+(LV(ix+1,iz+1,ik)-LV(ix,iz+1,ik))*fx;
+      const c01=LV(ix,iz,ik+1)+(LV(ix+1,iz,ik+1)-LV(ix,iz,ik+1))*fx, c11=LV(ix,iz+1,ik+1)+(LV(ix+1,iz+1,ik+1)-LV(ix,iz+1,ik+1))*fx;
+      let c=(c00+(c10-c00)*fz)+((c01+(c11-c01)*fz)-(c00+(c10-c00)*fz))*fy;
+      if(y<5) c-=(5-y)*.08;                                         // the floor of the world stays mostly solid
+      let cut=c>0&&y<=roof;
+      if(!cut&&ravW&&y>h-ravD&&y<=h){ const t=(h-y)/ravD; cut=rv<ravW*(1-t*t)*(1+.4*(y>h-3)); }
+      if(!cut||y<=wall) continue; const i=idx(x,y,z), cur=b[i]; if(cur===B.BEDROCK||cur===B.WATER||cur===0&&y>h) continue;
+      b[i]=y<=lv?B.LAVA:(y<=aq&&y<h-6)?B.WATER:B.AIR;
+      if(y===h){ const up=idx(x,y+1,z); if(y+1<H&&b[up]&&BLOCKS[b[up]].replace) b[up]=B.AIR; } }
+  } }
+
+const cloudH=()=>Math.min(world.H+16,SEA+130);
 class Generator2{
   constructor(seed,size,H){
     this.seed=seed; this.size=size; this.H=H; this.v2=true;
     const N=k=>makeNoise(seed+k*1013);
     this.nC=N(1);this.nH=N(2);this.nM=N(3);this.nR=N(4);this.nRv=N(5);this.nT=N(6);this.nU=N(7);this.nV=N(8);this.nF=N(9);this.nE=N(10);this.nW=N(11);this.nX=N(12);
-    this.b=0; this.river=false;
+    this.b=0; this.river=false; this.ha=1; this.ma=1; this.oa=1; this.ky=1; this.caves=false;
   }
   // terrain height of one column; also leaves the biome in this.b
   sample(x,z){
@@ -1096,18 +1154,18 @@ class Generator2{
     const mm=sat((fbm(this.nM,x*.0042+5,z*.0042-3,2)-.05)/.3);           // mountain ranges
     const T0=fbm(this.nT,x*.0021,z*.0021,2)*1.3+.14, M=fbm(this.nU,x*.0024+40,z*.0024-40,2)*1.3, vr=this.nV(x*.006,z*.006);
     let h;
-    if(c<0){ const d=sat(-c/.45); h=SEA-1.5-d*12+det*.8+hills*1.6; }
+    if(c<0){ const d=sat(-c/.45); h=SEA-(1.5+d*12-det*.8-hills*1.6)*this.oa; }
     else {
       const land=sat(c/.22), rg=mm>0?1-Math.abs(fbm(this.nR,x*.012,z*.012,3)):0;
-      h=SEA+1+land*(2.5+hills*5+Math.max(0,hills)*4+det*1.2)+mm*land*(rg*rg*25+hills*4);
+      h=SEA+1+land*(2.5+hills*5+Math.max(0,hills)*4+det*1.2)*this.ha+mm*land*(rg*rg*25+hills*4)*this.ma;
       const m=sat((this.nE(x*.0065,z*.0065)+.1)/.25)*(1-mm)*land;          // terraced cliffs to climb
       if(m>0){ const st=5, t=h/st, fl=Math.floor(t), fr=t-fl, ter=(fl+(fr>.72?1:fr/.72*.25))*st; h+=(ter-h)*m; }
     }
-    let T=T0-Math.max(0,h-SEA-10)*.035;
+    let T=T0-Math.max(0,(h-SEA)/this.ma-10)*.035;
     // swamps flatten to the waterline; badlands rise into stepped plateaus
     let sw=0, bad=0;
     if(c>.04&&T>-.15&&T<.42){ sw=sat((M-.42)/.12)*sat((c-.04)/.12)*(1-mm); if(sw>0) h+=(SEA+(det>.3?1:det<-.25?-1:0)+.3-h)*sw; }
-    if(T>=.42&&M<-.12&&vr>.28&&c>.06){ bad=sat((vr-.28)/.14)*sat((-.12-M)/.12)*sat((c-.06)/.1); if(bad>0){ const pl=Math.max(0,fbm(this.nX,x*.018,z*.018,2)+.25)*26; h+=bad*Math.floor(pl/4)*4; } }
+    if(T>=.42&&M<-.12&&vr>.28&&c>.06){ bad=sat((vr-.28)/.14)*sat((-.12-M)/.12)*sat((c-.06)/.1); if(bad>0){ const pl=Math.max(0,fbm(this.nX,x*.018,z*.018,2)+.25)*26; h+=bad*Math.floor(pl*this.ha/4)*4; } }
     // rivers carve valleys through the land
     let river=false;
     if(c>.02){ const rv=Math.abs(fbm(this.nRv,x*.0032+3,z*.0032+9,2)), rw=.02+.012*(1-mm), vw=.06+mm*.05;
@@ -1116,11 +1174,11 @@ class Generator2{
     const hi=Math.max(3,Math.min(this.H-6,Math.floor(h)));
     let b;
     if(river) b=T<-.45?BI.frozen_river:BI.river;
-    else if(hi<SEA&&c<.04) b=T<-.45?BI.frozen_ocean:T<-.15?BI.cold_ocean:T>.55?BI.warm_ocean:T>.28?BI.lukewarm_ocean:hi<SEA-8?BI.deep_ocean:BI.ocean;
+    else if(hi<SEA&&c<.04) b=T<-.45?BI.frozen_ocean:T<-.15?BI.cold_ocean:T>.55?BI.warm_ocean:T>.28?BI.lukewarm_ocean:hi<SEA-8*this.oa?BI.deep_ocean:BI.ocean;
     else if(sw>.5) b=BI.swamp;
     else if(this.nW(x*.01,z*.01)>.68&&c<.35&&c>.04) b=BI.mushroom_fields;
     else if(hi<=SEA+1&&c<.1) b=T<-.45?BI.snowy_beach:mm>.3?BI.stone_shore:BI.beach;
-    else if(mm>.4&&hi>SEA+12) b=hi>SEA+25||T<-.5?BI.snowy_peaks:T<-.1?BI.wooded_mountains:vr>.35?BI.gravelly_mountains:BI.mountains;
+    else if(mm>.4&&hi>SEA+12*this.ma) b=hi>SEA+25*this.ma||T<-.5?BI.snowy_peaks:T<-.1?BI.wooded_mountains:vr>.35?BI.gravelly_mountains:BI.mountains;
     else if(bad>.5) b=BI.badlands;
     else if(T<-.45) b=M>0?BI.snowy_taiga:vr>.5?BI.ice_spikes:BI.snowy_tundra;
     else if(T<-.15) b=M>.25?BI.mega_taiga:BI.taiga;
@@ -1130,7 +1188,7 @@ class Generator2{
   }
   height(x,z){ return this.sample(x,z); }
   biomeAt(x,z){ this.sample(x,z); return this.b; }
-  spawnOK(x,z){ const h=this.sample(x,z), bd=BIO[this.b]; return h>SEA+1&&h<SEA+16&&!bd.sea&&!bd.mountain?h:0; }
+  spawnOK(x,z){ const h=this.sample(x,z), bd=BIO[this.b]; return h>SEA+1&&h<SEA+16*this.ha&&!bd.sea&&!bd.mountain?h:0; }
   fill(ch){
     const {H,size,seed}=this, x0=ch.cx*CS, z0=ch.cz*CS, M=5, E=CS+2*M, b=ch.blocks;
     const hm=new Int16Array(E*E), bm=new Uint8Array(E*E);
@@ -1153,12 +1211,12 @@ class Generator2{
         if((bd.river||bi===BI.swamp)&&hash2(wx,wz,seed+41)<.18) top=B.CLAY; if(bi===BI.swamp) top=fill=B.DIRT; }
       else if(bd.mountain){ if(bd.peak){ top=slope>=3?B.STONE:B.SNOW; fill=B.STONE; if(this.nF(wx*.08,wz*.08)>.45) top=B.PACKED_ICE; }
         else if(bd.gravel&&this.nF(wx*.06,wz*.06)>-.1){ top=fill=B.GRAVEL; }
-        else if(slope>=3||h>SEA+22){ top=fill=B.STONE; } }
+        else if(slope>=3*this.ha||h>SEA+22*this.ma){ top=fill=B.STONE; } }
       else if(bd.podzol&&this.nF(wx*.07,wz*.07)>-.05) top=B.PODZOL;
-      else if(slope>=4&&top===B.GRASS&&h>SEA+6&&hash2(wx,wz,seed+9)<.7) top=B.STONE, fill=B.STONE;
+      else if(slope>=4*this.ha&&top===B.GRASS&&h>SEA+6*this.ha&&hash2(wx,wz,seed+9)<.7) top=B.STONE, fill=B.STONE;
       for(let y=0;y<=h;y++){
         let v;
-        if(y===0) v=B.BEDROCK;
+        if(y===0||this.ky>1&&y<4&&hash2(wx*3+y,wz*7-y,seed+y)<(4-y)/4.5) v=B.BEDROCK;
         else if(bd.mesa&&y>SEA-3) v=(y===h&&slope<2)?B.RED_SAND:BANDS[(y+((this.nX(wx*.02,wz*.02)*3)|0)+32)%BANDS.length];
         else if(y===h) v=top;
         else if(y>h-dd) v=fill;
@@ -1190,18 +1248,19 @@ class Generator2{
           if(pr<(tp===B.STONE||tp===B.GRAVEL?.035:tp===B.SAND?.02:.012)) set(lx,h+1,lz,B.PEBBLE); }
       }
     }
+    if(this.caves) carveCaves(this,ch,b,H,x0,z0,H_,size);
     // ore veins: random walks through stone, rarer and deeper for harder ores [ore, min y, max y, veins per chunk, size]
     const orng=mulberry32((seed^Math.imul(ch.cx+7,73856093)^Math.imul(ch.cz+13,19349663))>>>0);
     for(const [id,y0,y1,nv,sz] of [[B.ORE_COAL,5,44,8,6],[B.ORE_TIN,4,34,6,5],[B.ORE_COPPER,4,34,6,5],[B.ORE_BAUXITE,3,28,3.5,5],[B.ORE_GOLD,2,22,2,4],
         [B.ORE_IRON,2,30,4,5],[B.ORE_SILVER,2,26,2,4],[B.ORE_TITANIUM,1,16,1.2,4],[B.ORE_PLATINUM,1,12,.7,3],[B.ORE_DIAMOND,1,9,.35,3]])
-      for(let v=0,nn=Math.floor(nv)+(orng()<nv%1?1:0);v<nn;v++){ let x=orng()*CS|0, z=orng()*CS|0, y=y0+(orng()*(y1-y0)|0); const n=2+(orng()*sz|0);
+      for(let v=0,nv2=nv*this.ky,nn=Math.floor(nv2)+(orng()<nv2%1?1:0);v<nn;v++){ let x=orng()*CS|0, z=orng()*CS|0, y=Math.floor((y0+orng()*(y1-y0))*this.ky); const n=2+(orng()*sz|0);
         for(let k=0;k<n;k++){ if(x>=0&&z>=0&&x<CS&&z<CS&&y>0&&y<H){ const i=idx(x,y,z); if(b[i]===B.STONE) b[i]=id; }
           const r=orng()*6|0; if(r===0)x++; else if(r===1)x--; else if(r===2)z++; else if(r===3)z--; else if(r===4)y++; else y--; } }
     if(this.v3){   // stage 14: stone blobs, a deepslate floor, sugar cane, tall grass, berries, pumpkins and melons
       for(const [id,y0,y1,nv] of [[B.ANDESITE,4,52,2.2],[B.DIORITE,4,52,2],[B.GRANITE,4,52,2],[B.TUFF,2,18,1.2],[B.CALCITE,20,50,.25]])
-        for(let v=0,nn=Math.floor(nv)+(orng()<nv%1?1:0);v<nn;v++){ const cx=orng()*CS, cy=y0+orng()*(y1-y0), cz=orng()*CS, r=1.6+orng()*1.8;
+        for(let v=0,nn=Math.floor(nv)+(orng()<nv%1?1:0);v<nn;v++){ const cx=orng()*CS, cy=(y0+orng()*(y1-y0))*this.ky, cz=orng()*CS, r=1.6+orng()*1.8;
           for(let dy=-3;dy<=3;dy++)for(let dz=-3;dz<=3;dz++)for(let dx=-3;dx<=3;dx++){ if(dx*dx+dy*dy*1.4+dz*dz>r*r) continue; const X=(cx+dx)|0, Y=(cy+dy)|0, Z=(cz+dz)|0; if(X<0||Z<0||X>=CS||Z>=CS||Y<1||Y>=H) continue; const i=idx(X,Y,Z); if(b[i]===B.STONE) b[i]=id; } }
-      for(let y=1;y<9;y++) for(let z=0;z<CS;z++) for(let x=0;x<CS;x++){ const i=idx(x,y,z); if(b[i]===B.STONE&&(y<6||hash2(x0+x,z0+z,seed+y)<(9-y)/4)) b[i]=B.DEEPSLATE; }
+      const DL=Math.round(9+(this.ky-1)*5); for(let y=1;y<DL;y++) for(let z=0;z<CS;z++) for(let x=0;x<CS;x++){ const i=idx(x,y,z); if(b[i]===B.STONE&&(y<DL-3||hash2(x0+x,z0+z,seed+y)<(DL-y)/4)) b[i]=B.DEEPSLATE; }
       for(let lz=0;lz<CS;lz++)for(let lx=0;lx<CS;lx++){ const wx=x0+lx, wz=z0+lz; if(wx>=size||wz>=size) continue; const h=H_(lx,lz); if(h<SEA||h+3>=H) continue;
         const bd=BIO[bm[(lz+M)*E+lx+M]], tp=b[idx(lx,h,lz)], ab=b[idx(lx,h+1,lz)], r=hash2(wx,wz,seed+141);
         if(h===SEA&&ab===B.AIR&&(tp===B.SAND||tp===B.GRASS||tp===B.DIRT)&&r<.14){ let wet=false; for(const [dx,dz] of DIRS){ const n=H_(lx+dx,lz+dz); if(n>=0&&n<SEA) wet=true; }
@@ -1212,7 +1271,7 @@ class Generator2{
         if((k==='taiga'||k==='mega_taiga'||k==='snowy_taiga')&&r<.012) set(lx,h+1,lz,BERRY[3]);
         else if((k==='plains'||k==='taiga'||k==='mega_taiga'||k==='forest')&&r>.9982) set(lx,h+1,lz,B.PUMPKIN);
         else if((k==='jungle'||k==='jungle_edge')&&r>.996) set(lx,h+1,lz,B.MELON); } }
-    for(let v=0;v<2;v++){ let x=orng()*CS|0, z=orng()*CS|0, y=2+(orng()*6|0); for(let k=0;k<7;k++){ if(x>=0&&z>=0&&x<CS&&z<CS){ const i=idx(x,y,z); if(b[i]===B.STONE&&y<H) b[i]=B.LAVA; } const r=orng()*4|0; if(r===0)x++; else if(r===1)x--; else if(r===2)z++; else z--; } }
+    for(let v=0;v<2;v++){ let x=orng()*CS|0, z=orng()*CS|0, y=Math.floor((2+orng()*6)*this.ky); for(let k=0;k<7;k++){ if(x>=0&&z>=0&&x<CS&&z<CS){ const i=idx(x,y,z); if(b[i]===B.STONE&&y<H) b[i]=B.LAVA; } const r=orng()*4|0; if(r===0)x++; else if(r===1)x--; else if(r===2)z++; else z--; } }
     { const bi=bm[(8+M)*E+8+M], k=BIO[bi].k, h=hm[(8+M)*E+8+M]; if((k==='desert'||k==='badlands'||k==='mountains'||k==='gravelly_mountains')&&hash2(ch.cx,ch.cz,seed+66)<.08&&h>SEA+1){
       for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){ const lx=8+dx, lz=8+dz, hh=hm[(lz+M)*E+lx+M]; if(Math.abs(hh-h)>1) continue; const edge=dx*dx+dz*dz>3; set(lx,h,lz,edge?B.STONE:B.LAVA); set(lx,h-1,lz,B.STONE); if(!edge) for(let y=h+1;y<h+4;y++) set(lx,y,lz,B.AIR); } } }
     // waterfalls: a spring in a cliff face spills down the drop into a pool
@@ -1602,7 +1661,7 @@ const isW=b=>b>0&&WATERY[b]===1;
 const SKYC=new Uint8Array(16), BLKC=new Uint8Array(16);
 for(let l=0;l<16;l++){ SKYC[l]=Math.round(255*Math.pow(.8,15-l)*(l?1:0)); BLKC[l]=Math.round(255*Math.pow(l/15,1.5)); }
 const LM=8, PP=CS+2*LM;    // light is solved over the chunk plus an 8-block apron
-let pad=null, SR,SG,SBL,BR,BG,BBL,LQ, qh=0, qt=0;
+let pad=null, SR,SG,SBL,BR,BG,BBL,LQ, qh=0, qt=0, LHg=64; const LOWC=new Int16Array(PP*PP);
 const pI=(x,y,z)=>(y*PP+(z+LM))*PP+(x+LM);
 function lqPush(i){LQ[qt]=i;qt++;if(qt===LQ.length)qt=0;}
 function flood(R,G,Bc,dec){
@@ -1614,7 +1673,7 @@ function flood(R,G,Bc,dec){
       let j;
       if(k===0){if(x===PP-1)continue;j=i+1;} else if(k===1){if(x===0)continue;j=i-1;}
       else if(k===2){if(z===PP-1)continue;j=i+PP;} else if(k===3){if(z===0)continue;j=i-PP;}
-      else if(k===4){if(y===world.H-1)continue;j=i+PP2;} else {if(y===0)continue;j=i-PP2;}
+      else if(k===4){if(y>=LHg-1)continue;j=i+PP2;} else {if(y===0)continue;j=i-PP2;}
       const id=pad[j]; if(LOPQ[id]) continue;
       const d=dec+LATT[id]; let nr=r-d,ng=g-d,nb=b-d; const tn=TINT[id]; if(tn){nr=nr*tn[0]|0;ng=ng*tn[1]|0;nb=nb*tn[2]|0;}
       let ch=false; if(nr>R[j]){R[j]=nr;ch=true;} if(ng>G[j]){G[j]=ng;ch=true;} if(nb>Bc[j]){Bc[j]=nb;ch=true;}
@@ -1623,11 +1682,14 @@ function flood(R,G,Bc,dec){
   }
 }
 function solveLight(H){
-  const N=PP*PP*H; SR.fill(0);SG.fill(0);SBL.fill(0);BR.fill(0);BG.fill(0);BBL.fill(0); qh=qt=0;
-  for(let z=0;z<PP;z++)for(let x=0;x<PP;x++){ let r=15,g=15,b=15;
-    for(let y=H-1;y>=0;y--){ const i=(y*PP+z)*PP+x, id=pad[i]; if(LOPQ[id]) break;
+  const N=PP*PP*H; SR.fill(0,0,N);SG.fill(0,0,N);SBL.fill(0,0,N);BR.fill(0,0,N);BG.fill(0,0,N);BBL.fill(0,0,N); qh=qt=0;
+  for(let z=0;z<PP;z++)for(let x=0;x<PP;x++){ let r=15,g=15,b=15, y=H-1;
+    for(;y>=0;y--){ const i=(y*PP+z)*PP+x, id=pad[i]; if(LOPQ[id]) break;
       const a=LATT[id]; if(a){r=Math.max(0,r-a);g=Math.max(0,g-a);b=Math.max(0,b-a);} const tn=TINT[id]; if(tn){r=r*tn[0]|0;g=g*tn[1]|0;b=b*tn[2]|0;}
-      SR[i]=r;SG[i]=g;SBL[i]=b; if(r|g|b) lqPush(i); } }
+      SR[i]=r;SG[i]=g;SBL[i]=b; } LOWC[z*PP+x]=y+1; }
+  // only sky cells that can still spread sideways (a neighbouring column is shaded at that height) or are dimmed need the flood
+  for(let z=0;z<PP;z++)for(let x=0;x<PP;x++){ const lo=LOWC[z*PP+x]; let mx=0; if(x>0) mx=Math.max(mx,LOWC[z*PP+x-1]); if(x<PP-1) mx=Math.max(mx,LOWC[z*PP+x+1]); if(z>0) mx=Math.max(mx,LOWC[(z-1)*PP+x]); if(z<PP-1) mx=Math.max(mx,LOWC[(z+1)*PP+x]);
+    for(let y=lo;y<H;y++){ const i=(y*PP+z)*PP+x; const full=SR[i]===15&&SG[i]===15&&SBL[i]===15; if(y>=mx&&full) break; if(SR[i]|SG[i]|SBL[i]) lqPush(i); } }
   flood(SR,SG,SBL,1);
   qh=qt=0;
   const PP2=PP*PP; for(let i=0;i<N;i++){ const id=pad[i], e=EMIT[id]; if(e){ if(LAVAID[id]&&i+PP2<N&&LAVAID[pad[i+PP2]]) continue; BR[i]=e[0];BG[i]=e[1];BBL[i]=e[2];lqPush(i);} }
@@ -1635,7 +1697,7 @@ function solveLight(H){
 }
 // light of one cell as bytes [sky r,g,b, block r,g,b] (x,z chunk-local, may reach into the apron)
 function cellLight(x,y,z,o){
-  if(y>=world.H){o[0]=o[1]=o[2]=255;o[3]=o[4]=o[5]=0;return true;} if(y<0) return false;
+  if(y>=LHg){o[0]=o[1]=o[2]=255;o[3]=o[4]=o[5]=0;return true;} if(y<0) return false;
   const i=pI(x,y,z); if(LOPQ[pad[i]]&&!EMIT[pad[i]]) return false;
   o[0]=SKYC[SR[i]];o[1]=SKYC[SG[i]];o[2]=SKYC[SBL[i]];o[3]=BLKC[BR[i]];o[4]=BLKC[BG[i]];o[5]=BLKC[BBL[i]]; return true;
 }
@@ -1668,6 +1730,7 @@ const isLiquid=b=>b===B.WATER||b===B.FALL;
 
 function meshChunk(world,ch){
   const H=world.H, N=PP*PP*H;
+  let LH=0; for(let dz=-1;dz<=1;dz++) for(let dx=-1;dx<=1;dx++){ const n=world.chunk(ch.cx+dx,ch.cz+dz); LH=Math.max(LH,n?(n.top??H):0); } LH=Math.min(H,LH+2); LHg=LH;
   if(!pad||pad.length!==N){ pad=new Uint16Array(N); SR=new Uint8Array(N);SG=new Uint8Array(N);SBL=new Uint8Array(N);BR=new Uint8Array(N);BG=new Uint8Array(N);BBL=new Uint8Array(N); LQ=new Int32Array(N*3); }
   // copy the chunk plus an 8-block apron from its neighbours (air outside the world)
   for(let z=-LM;z<CS+LM;z++)for(let x=-LM;x<CS+LM;x++){
@@ -1677,17 +1740,17 @@ function meshChunk(world,ch){
     if(!src){ for(let y=0;y<H;y++) pad[y*PP2+base]=0; continue; }
     const sb=src.blocks; for(let y=0;y<H;y++) pad[y*PP2+base]=sb[(y*CS+lz)*CS+lx];
   }
-  solveLight(H);
+  solveLight(LH);
   // keep this chunk's light for sampling by moving things (player, drops)
-  if(!ch.light) ch.light=new Uint8Array(CS*CS*H*4);
-  for(let y=0;y<H;y++)for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){ const i=pI(x,y,z), o=((y*CS+z)*CS+x)*4;
+  if(!ch.light||ch.lightH!==LH){ ch.light=new Uint8Array(CS*CS*LH*4); ch.lightH=LH; }
+  for(let y=0;y<LH;y++)for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){ const i=pI(x,y,z), o=((y*CS+z)*CS+x)*4;
     ch.light[o]=Math.max(SR[i],SG[i],SBL[i]); ch.light[o+1]=BR[i]; ch.light[o+2]=BG[i]; ch.light[o+3]=BBL[i]; }
-  const at=(x,y,z)=>(y<0||y>=H)?0:pad[pI(x,y,z)];
-  const op=(x,y,z)=>{if(y<0)return true;if(y>=H)return false;return BLOCKS[pad[pI(x,y,z)]].opaque;};
+  const at=(x,y,z)=>(y<0||y>=LH)?0:pad[pI(x,y,z)];
+  const op=(x,y,z)=>{if(y<0)return true;if(y>=LH)return false;return BLOCKS[pad[pI(x,y,z)]].opaque;};
   vbO.n=0; vbW.n=0; vbL.n=0; vbG.n=0;
   const x0=ch.cx*CS, z0=ch.cz*CS, seed=world.seed;
   const ao=[0,0,0,0], L=[0,0,0,0], cells=[0,0,0,0,0,0,0,0,0,0,0,0];
-  for(let y=0;y<H;y++)for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){
+  for(let y=0;y<LH;y++)for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){
     const b=pad[pI(x,y,z)]; if(b===0) continue;
     const bd=BLOCKS[b], wx=x0+x, wz=z0+z; PAT=0; CB=b;
     const bio=ch.bio?BIO[ch.bio[z*CS+x]]:null, tc=(bd.btint&&bio)?(bd.btint==='grass'?bio.grass:bd.btint==='lily'?null:bio.foliage):null;
@@ -1868,7 +1931,7 @@ const _sl=new Uint8Array(8);
 function sampleLight(x,y,z){
   const X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z);
   if(Y>=world.H){_sl.set(VL_SUN);return _sl;}
-  const ch=world.chunk(X>>4,Z>>4); if(!ch||!ch.light||Y<0){_sl.set(VL_SUN);return _sl;}
+  const ch=world.chunk(X>>4,Z>>4); if(!ch||!ch.light||Y<0||Y>=(ch.lightH||world.H)){_sl.set(VL_SUN);return _sl;}
   const o=((Y*CS+(Z&15))*CS+(X&15))*4, s=SKYC[ch.light[o]];
   _sl[0]=_sl[1]=_sl[2]=s; _sl[3]=255; _sl[4]=BLKC[ch.light[o+1]]; _sl[5]=BLKC[ch.light[o+2]]; _sl[6]=BLKC[ch.light[o+3]]; return _sl;
 }
@@ -1880,7 +1943,8 @@ class World{
     this.meta=meta; this.seed=meta.seedNum; this.size=meta.size; this.H=meta.height;
     this.NC=Math.ceil(this.size/CS);
     this.gen=meta.dim==='under'?new UnderGen(this.seed,this.size,this.H):meta.dim==='dusk'?new DuskGen(this.seed,this.size,this.H):meta.dim==='pocket'?new PocketGen(this.seed,this.size,this.H):meta.gen===2?new Generator2(this.seed,this.size,this.H):new Generator(this.seed,this.size,this.H);
-    this.gen.v3=!!meta.mc;
+    this.gen.v3=!!meta.mc; if(!meta.dim) SEA=meta.sea||19; else SEA=19;
+    if(this.gen.v2&&!meta.dim){ const D=DEPTHS[meta.depth]||DEPTHS.mini; Object.assign(this.gen,{ha:D.ha,ma:D.ma,oa:D.oa,ky:SEA/19,caves:!!meta.caves}); }
     this.chunks=new Map();
     this.edits=new Map();               // chunkKey -> Map(index -> block)
     if(save&&save.edits) for(const k in save.edits){const a=save.edits[k],m=new Map();for(let i=0;i<a.length;i+=2)m.set(a[i],a[i+1]);const [cx,cz]=k.split(',').map(Number);this.edits.set(this.key(cx,cz),m);}
@@ -1893,6 +1957,7 @@ class World{
     const ch=new Chunk(cx,cz,this.H); this.gen.fill(ch);
     const e=this.edits.get(this.key(cx,cz)); if(e) for(const [i,v] of e) ch.blocks[i]=v;
     if(ch.genTiles&&this.tiles) for(const t of ch.genTiles){ const k=tileKey(t.x,t.y,t.z); if(!this.tiles.has(k)&&world&&this===world&&ch.blocks[(t.y*CS+(t.z&15))*CS+(t.x&15)]===B.CHEST_WOOD&&!(this.lootDone&&this.lootDone[k])){ this.tiles.set(k,{kind:'chest',x:t.x,y:t.y,z:t.z,s:lootChest(t)}); this.lootDone=this.lootDone||{}; this.lootDone[k]=1; } }
+    { const bl=ch.blocks, L=CS*CS; let y=this.H-1; for(;y>0;y--){ let any=false; for(let i=y*L,e=i+L;i<e;i++) if(bl[i]){ any=true; break; } if(any) break; } ch.top=y+1; }
     this.chunks.set(this.key(cx,cz),ch); return ch;
   }
   ready(cx,cz){ // a chunk can mesh once all 8 neighbours exist (or lie outside the world)
@@ -1912,7 +1977,7 @@ class World{
   set(x,y,z,v){
     if(y<1||y>=this.H||x<0||z<0||x>=this.size||z>=this.size) return false;
     const cx=x>>4,cz=z>>4,ch=this.chunk(cx,cz); if(!ch) return false;
-    const i=(y*CS+(z&15))*CS+(x&15); ch.blocks[i]=v;
+    const i=(y*CS+(z&15))*CS+(x&15); ch.blocks[i]=v; if(v&&y+1>(ch.top||0)) ch.top=y+1;
     const k=this.key(cx,cz); let e=this.edits.get(k); if(!e){e=new Map();this.edits.set(k,e);} e.set(i,v);
     ch.dirty=true; const lx=x&15, lz=z&15;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){ if(!dx&&!dz)continue;
@@ -4206,7 +4271,7 @@ function dayInfo(){
 function applySky(){
   const {k}=dayInfo(), w=4*k*(1-k), sun=[0,0,0], sky=[0,0,0];
   for(let i=0;i<3;i++){ sun[i]=SUN_NIGHT[i]+(SUN_DAY[i]-SUN_NIGHT[i])*k+SUN_DUSK[i]*w*.7; sky[i]=SKY_NIGHT[i]+(SKY_DAY[i]-SKY_NIGHT[i])*k+SKY_DUSK[i]*w*.8; }
-  if(world&&world.meta.dim==='under'){ sun[0]=.55; sun[1]=.25; sun[2]=.15; sky[0]=.3; sky[1]=.07; sky[2]=.03; gl.uniform1f(U.uAmb,.5); } else if(world&&world.meta.dim==='dusk'){ sun[0]=.78; sun[1]=.6; sun[2]=.95; sky[0]=.42; sky[1]=.26; sky[2]=.55; gl.uniform1f(U.uAmb,.16); } else if(world&&world.meta.dim==='pocket'){ sun[0]=sun[1]=sun[2]=.4; sky[0]=.08; sky[1]=.05; sky[2]=.14; gl.uniform1f(U.uAmb,.12); } else gl.uniform1f(U.uAmb,.03);
+  if(world&&world.meta.dim==='under'){ sun[0]=.55; sun[1]=.25; sun[2]=.15; sky[0]=.3; sky[1]=.07; sky[2]=.03; gl.uniform1f(U.uAmb,.5); } else if(world&&world.meta.dim==='dusk'){ sun[0]=.78; sun[1]=.6; sun[2]=.95; sky[0]=.42; sky[1]=.26; sky[2]=.55; gl.uniform1f(U.uAmb,.16); } else if(world&&world.meta.dim==='pocket'){ sun[0]=sun[1]=sun[2]=.4; sky[0]=.08; sky[1]=.05; sky[2]=.14; gl.uniform1f(U.uAmb,.12); } else gl.uniform1f(U.uAmb,window.__amb??.05);
   gl.uniform3f(U.uSun,sun[0],sun[1],sun[2]); SUNV=sun; FOG=sky; gl.clearColor(sky[0],sky[1],sky[2],1); gl.uniform3fv(U.uFog,sky);
   document.body.style.background=`rgb(${sky.map(v=>Math.min(255,v*255|0)).join(',')})`;
 }
@@ -4222,7 +4287,7 @@ function draw(focusX,focusZ,showPlayer){
   gl.uniformMatrix4fv(U.uVP,false,cam.vp); gl.uniformMatrix4fv(U.uView,false,cam.view);
   const tnow=performance.now()/1000; gl.uniform1f(U.uTime,tnow%10000); gl.uniform1i(U.uMode,0);
   gl.uniform1f(U.uRoof,world.meta&&(world.meta.dim==='under'||world.meta.dim==='pocket')&&!cam.persp?Math.floor(player.y)+(world.meta.dim==='pocket'?3.99:5.99):0);
-  const di=dayInfo(); gl.uniform1f(U.uClouds,cam.mode==='fp'?1:0); gl.uniform1f(U.uCloudY,world.H+16); gl.uniform2f(U.uWind,1.2,.4);
+  const di=dayInfo(); gl.uniform1f(U.uClouds,cam.mode==='fp'?1:0); gl.uniform1f(U.uCloudY,cloudH()); gl.uniform2f(U.uWind,1.2,.4);
   { const sd=sunDir()||[0,1,0]; gl.uniform2f(U.uSunXZ,sd[0]/Math.max(.25,sd[1]),sd[2]/Math.max(.25,sd[1])); }
   const pv=xform(cam.view,player.x,player.y+.9,player.z);
   gl.uniform3f(U.uPV,pv[0],pv[1],pv[2]); gl.uniform1f(U.uPY,player.y); gl.uniform1f(U.uCut,0); gl.uniform1f(U.uCutR,cutR());
@@ -4251,7 +4316,7 @@ function draw(focusX,focusZ,showPlayer){
   for(const ch of vis){ if(ch.glass&&ch.glass.n){gl.bindVertexArray(ch.glass.vao);gl.drawElements(gl.TRIANGLES,(ch.glass.n>>2)*6,gl.UNSIGNED_INT,0);} }
   if(smMesh.n){gl.bindVertexArray(smMesh.vao);gl.drawElements(gl.TRIANGLES,(smMesh.n>>2)*6,gl.UNSIGNED_INT,0);}
   // cloud layer: one big quad, the shader decides where the blocky clouds are
-  if(cam.persp&&!(world.meta&&world.meta.dim)){ cloudVB.n=0; setVL(VL_SUN); const cy=world.H+16, R=fr*1.6; quadRaw(cloudVB,[[focusX-R,cy,focusZ-R],[focusX+R,cy,focusZ-R],[focusX+R,cy,focusZ+R],[focusX-R,cy,focusZ+R]],[255,255,255],1);
+  if(cam.persp&&!(world.meta&&world.meta.dim)){ cloudVB.n=0; setVL(VL_SUN); const cy=cloudH(), R=fr*1.6; quadRaw(cloudVB,[[focusX-R,cy,focusZ-R],[focusX+R,cy,focusZ-R],[focusX+R,cy,focusZ+R],[focusX-R,cy,focusZ+R]],[255,255,255],1);
     upload(cloudMesh,cloudVB,gl.STREAM_DRAW); gl.uniform2f(U.uCloudA,cam.persp?.82:.16,cam.persp?0:30); gl.uniform1i(U.uMode,1); gl.bindVertexArray(cloudMesh.vao); gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_INT,0); gl.uniform1i(U.uMode,0); }
   if(lnMesh.n){gl.uniform1f(U.uAlpha,1);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-2,-4);gl.bindVertexArray(lnMesh.vao);gl.drawElements(gl.TRIANGLES,(lnMesh.n>>2)*6,gl.UNSIGNED_INT,0);gl.disable(gl.POLYGON_OFFSET_FILL);}
   gl.depthMask(true); gl.disable(gl.BLEND);
@@ -5264,7 +5329,7 @@ function findSpawn(cx,cz){
   const g=world.gen; if(g.dusk||g.pocket) return [cx+.5,(g.pocket?20:g.height(cx,cz)+1),cz+.5];
   for(let r=0;r<200;r+=3)for(let a=0;a<8;a++){const x=Math.max(2,Math.min(world.size-3,cx+Math.round(Math.cos(a*Math.PI/4)*r))),z=Math.max(2,Math.min(world.size-3,cz+Math.round(Math.sin(a*Math.PI/4)*r)));
     if(g.v2){ const h=g.spawnOK(x,z); if(h) return [x+.5,h+1,z+.5]; continue; }
-    const h=g.height(x,z); if(h>SEA+1&&h<33) return [x+.5,h+1,z+.5];}
+    const h=g.height(x,z); if(h>SEA+1&&h<SEA+14*(g.ha||1)) return [x+.5,h+1,z+.5];}
   if(g.v2) for(let r=200;r<Math.min(3000,world.size);r+=8)for(let a=0;a<16;a++){ const x=Math.max(2,Math.min(world.size-3,cx+Math.round(Math.cos(a*Math.PI/8)*r))),z=Math.max(2,Math.min(world.size-3,cz+Math.round(Math.sin(a*Math.PI/8)*r)));
     const h=g.spawnOK(x,z); if(h) return [x+.5,h+1,z+.5]; }
   return [cx+.5,Math.max(SEA+1,g.height(cx,cz))+1,cz+.5];
@@ -5355,7 +5420,7 @@ function stepGrowth(dt){ if(!world||world.preview) return; growAcc+=dt; let n=Ma
   const pcx=Math.floor(player.x)>>4, pcz=Math.floor(player.z)>>4, per=Math.max(4,(world.H>>4)*4), R=4;
   while(n--) for(let cz=pcz-R;cz<=pcz+R;cz++) for(let cx=pcx-R;cx<=pcx+R;cx++){ const ch=world.chunk(cx,cz); if(!ch) continue; const bl=ch.blocks, L=bl.length;
     for(let k=0;k<per;k++){ const i=(Math.random()*L)|0, b=bl[i]; if(b&&TICK[b]){ const lx=i&15, lz=(i>>4)&15, y=(i>>8); TICK[b](cx*CS+lx,y,cz*CS+lz,b); } } } }
-function skyAt(x,y,z){ const ch=world.chunk(x>>4,z>>4); if(!ch||!ch.light||y<0||y>=world.H) return 15; return ch.light[((y*CS+(z&15))*CS+(x&15))*4]; }
+function skyAt(x,y,z){ const ch=world.chunk(x>>4,z>>4); if(!ch||!ch.light||y<0||y>=(ch.lightH||world.H)) return 15; return ch.light[((y*CS+(z&15))*CS+(x&15))*4]; }
 function waterNear(x,y,z){ for(let dy=0;dy<=1;dy++) for(let dz=-4;dz<=4;dz++) for(let dx=-4;dx<=4;dx++) if(isW(world.get(x+dx,y+dy,z+dz))) return true; return false; }
 for(const k of ['wheat','carrots','potatoes','beetroots','melon_stem','pumpkin_stem']) for(const id of CROPS[k].ids) TICK[id]=(x,y,z,b)=>{ const bd=BLOCKS[b], fb=world.get(x,y-1,z);
   if(!isFarmland(fb)){ breakBlock(x,y,z,null); return; }
@@ -6371,13 +6436,14 @@ function readKeys(){
 }
 
 /* ---------- menus ---------- */
-let pickedSize=100, pickedGM='survival';
+let pickedSize=100, pickedGM='survival', pickedDepth='classic';
+document.querySelectorAll('[data-depth]').forEach(b=>b.addEventListener('click',()=>{pickedDepth=b.dataset.depth;document.querySelectorAll('[data-depth]').forEach(x=>x.setAttribute('aria-checked',x===b));}));
 document.querySelectorAll('[data-gm]').forEach(b=>b.addEventListener('click',()=>{pickedGM=b.dataset.gm;document.querySelectorAll('[data-gm]').forEach(x=>x.setAttribute('aria-checked',x===b));}));
 document.querySelectorAll('[data-size]').forEach(b=>b.addEventListener('click',()=>{pickedSize=+b.dataset.size;document.querySelectorAll('[data-size]').forEach(x=>x.setAttribute('aria-checked',x===b));}));
 document.getElementById('forge').addEventListener('click',()=>{
   const name=document.getElementById('wName').value.trim()||'World';
   const seedStr=document.getElementById('wSeed').value.trim()||String((Math.random()*1e9)|0);
-  const meta={id:'w'+Date.now().toString(36),name,seed:seedStr,seedNum:seedFrom(seedStr),size:pickedSize,height:64,gen:2,mc:1,gameMode:pickedGM,created:Date.now(),played:Date.now()};
+  const meta={id:'w'+Date.now().toString(36),name,seed:seedStr,seedNum:seedFrom(seedStr),size:pickedSize,height:DEPTHS[pickedDepth].height,sea:DEPTHS[pickedDepth].sea,depth:pickedDepth,caves:1,gen:2,mc:1,gameMode:pickedGM,created:Date.now(),played:Date.now()};
   const idx=listWorlds(); idx.unshift(meta); store.set('strata:index',idx);
   enterPlay(meta,null);
 });

@@ -12,6 +12,8 @@ Saves live in the browser's local storage, per device.
 ## What's in it
 
 - **Worlds:** seeded worlds of 100 / 1,000 / 10,000 blocks with chunk streaming.
+  - Three depths: Mini (64 tall), Classic (128 tall, surface at 64) and Full (256 tall with big mountains).
+  - Caves: big caverns, long tunnels, thin passages, ravines, underground lakes and lava pools near the bottom, without wrecking the surface.
   - Continents, oceans, rivers and mountains.
   - About 30 biomes chosen by temperature and humidity.
   - Waterfalls, kelp, coral and vines.
