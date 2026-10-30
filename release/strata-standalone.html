@@ -2165,12 +2165,15 @@ function buildViewModel(){ PAT=0;
   upload(vmMesh,vmVB,gl.STREAM_DRAW);
 }
 function buildHighlight(h){
-  lnVB.n=0; setVL(VL_EMISSIVE); if(!h) {lnMesh.n=0;return;}
-  const e=.006,[x,y,z]=h, a=[x-e,y-e,z-e], b=[x+1+e,y+1+e,z+1+e];
-  const C=i=>[i&1?b[0]:a[0],i&2?b[1]:a[1],i&4?b[2]:a[2]];
-  const E=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
-  lnVB.need(24); const col=h.place?[240,181,72]:[255,255,255];
-  for(const [i,j] of E){const p=C(i),q=C(j);lnVB.v(p[0],p[1],p[2],col[0],col[1],col[2],255);lnVB.v(q[0],q[1],q[2],col[0],col[1],col[2],255);}
+  lnVB.n=0; PAT=0; if(!h) {lnMesh.n=0;return;}
+  // a chunky outline (thin boxes along every edge) plus a faint tinted shell, readable on a phone screen
+  const e=.012,[x,y,z]=h, a=[x-e,y-e,z-e], b=[x+1+e,y+1+e,z+1+e], t=.035, col=h.place?[240,181,72]:[255,255,255];
+  setVL(VL_EMISSIVE); VL[3]=230;
+  const bx=(p,q)=>emitBox(lnVB,p,q,col,IDT);
+  for(const yy of [a[1],b[1]-t]) for(const zz of [a[2],b[2]-t]) bx([a[0],yy,zz],[b[0],yy+t,zz+t]);
+  for(const yy of [a[1],b[1]-t]) for(const xx of [a[0],b[0]-t]) bx([xx,yy,a[2]],[xx+t,yy+t,b[2]]);
+  for(const xx of [a[0],b[0]-t]) for(const zz of [a[2],b[2]-t]) bx([xx,a[1],zz],[xx+t,b[1],zz+t]);
+  VL[3]=mining&&mining.target&&mining.prog>0?70:45; emitBox(lnVB,a,b,h.place?[240,181,72]:[255,255,255],IDT); VL[3]=255;
   upload(lnMesh,lnVB,gl.STREAM_DRAW);
 }
 
@@ -2343,7 +2346,7 @@ const surv=()=>game()&&world.meta.gameMode!=='creative';
 const inv={slots:new Array(36).fill(null),grid:new Array(9).fill(null),armor:[null,null,null,null],cursor:null,sel:0,one:false};
 const held=()=>inv.slots[inv.sel];
 const heldTool=()=>{const s=held();const t=s&&ITEMS[s.id].tool;return t&&t!=='bow'?t:null;};
-const tapOnly=()=>{const s=held(), it=s&&ITEMS[s.id]; return !!it&&(it.forgewrite||it.instrument||it.disc||s.id===I.DUSK_ORB||it.instrument||it.disc||id===I.DISC_BLANK||it.telelink||it.lore||it.expander||it.starter||it.decorItem||it.bucket||it.rod||it.xpbook||it.journal||it.camera||it.grimoire||it.tool==='bow'||it.food||it.bag||it.throwing||it.hook||it.cart||s.id===I.BOAT||it.upg||s.id===I.SADDLE);};
+const tapOnly=()=>{const s=held(), it=s&&ITEMS[s.id]; return !!it&&(it.forgewrite||it.instrument||it.disc||s.id===I.DUSK_ORB||it.telelink||it.lore||it.expander||it.starter||it.decorItem||it.bucket||it.rod||it.xpbook||it.journal||it.camera||it.grimoire||it.tool==='bow'||it.food||it.bag||it.throwing||it.hook||it.cart||s.id===I.BOAT||it.upg||s.id===I.SADDLE);};
 const heldTier=()=>{const s=held();return s&&ITEMS[s.id].tier||1;};
 const isBow=s=>!!s&&ITEMS[s.id].tool==='bow';
 function mkStack(id,n,d,bag){const it=ITEMS[id];const s={id,n,d:it.dur?(d??it.dur):undefined}; if(bag) s.bag=bag; return s;}
@@ -2439,7 +2442,7 @@ function startMining(sx,sy,ptr){ [sx,sy]=fpXY(sx,sy); mining={t0:performance.now
 function stepMining(dt){
   if(!mining) return;
   // nothing breaks until the finger has been held still for a moment, so drags and taps never break blocks by accident
-  if(performance.now()-mining.t0<(creative()?200:160)) return;
+  if(performance.now()-mining.t0<HOLD_MS()) return;
   if(mining.cool>0){ mining.cool-=dt; return; }
   const r=pick(mining.sx,mining.sy);
   if(!r||!reachOK(...r.hit)){ mining.target=null; mining.prog=0; mining.key=null; return; }
@@ -2448,14 +2451,19 @@ function stepMining(dt){
   if(!isFinite(t)){ if(!mining.warned){ toast(whyCantMine(b)); mining.warned=true; } return; }
   mining.prog+=dt/t; mining.chipT-=dt;
   if(mining.chipT<=0){ mining.chipT=.1; const [x,y,z]=r.hit; chips(x,y,z,b,3,1.8); }
-  if(mining.prog>=1){ mineBlock(r); mining.broke++; mining.prog=0; mining.key=null; if(creative()) mining.cool=.28; }
+  if(mining.prog>=1){ mineBlock(r); mining.broke++; try{ navigator.vibrate&&navigator.vibrate(12); }catch(e){} mining.prog=0; mining.key=null; if(creative()) mining.cool=.28; }
 }
+const HOLD_MS=()=>creative()?200:170;
+// releasing a finger: a hold has already done its breaking; a quick tap uses, interacts, places (Build) or picks up plants (Mine)
 function endMining(id){
-  if(!mining||(id!==undefined&&mining.ptr!==id)) return;
-  if(!mining.broke&&mining.prog<.25&&performance.now()-mining.t0<350&&(tapDecor(mining.sx,mining.sy)||tapEntity(mining.sx,mining.sy)||tryInteract(mining.sx,mining.sy)||useHeld(mining.sx,mining.sy))){ mining=null; return; }  // quick tap opens tables and crucibles
-  if(!mining.broke&&mining.prog<1){ const r=pick(mining.sx,mining.sy);   // quick taps still pick up pebbles and plants
-    if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12&&(!creative()||BLOCKS[world.get(...r.hit)]?.replace)) mineBlock(r); }
-  mining=null;
+  if(!mining||(id!==undefined&&mining.ptr!==id)) return false;
+  const m=mining; mining=null;
+  if(m.broke||performance.now()-m.t0>=350) return true;
+  if(tapDecor(m.sx,m.sy)||tapEntity(m.sx,m.sy)||tryInteract(m.sx,m.sy)||useHeld(m.sx,m.sy)) return true;
+  if(buildMode){ placeSurv(m.sx,m.sy); return true; }
+  const r=pick(m.sx,m.sy); const b=r&&world.get(...r.hit);
+  if(r&&reachOK(...r.hit)&&mineTime(b,heldTool())<=.12&&(!creative()||BLOCKS[b]?.replace)) mineBlock(r);
+  return true;
 }
 function tapInstant(sx,sy){ if(tapDecor(sx,sy)||tapEntity(sx,sy)||tryInteract(sx,sy)) return; if(ITEMS[held()?.id]?.decorItem&&useDecor(sx,sy)) return; const r=pick(sx,sy); if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12&&(!creative()||BLOCKS[world.get(...r.hit)]?.replace)) mineBlock(r); }
 
@@ -3894,7 +3902,7 @@ function draw(focusX,focusZ,showPlayer){
   // cloud layer: one big quad, the shader decides where the blocky clouds are
   if(cam.persp&&!(world.meta&&world.meta.dim)){ cloudVB.n=0; setVL(VL_SUN); const cy=world.H+16, R=fr*1.6; quadRaw(cloudVB,[[focusX-R,cy,focusZ-R],[focusX+R,cy,focusZ-R],[focusX+R,cy,focusZ+R],[focusX-R,cy,focusZ+R]],[255,255,255],1);
     upload(cloudMesh,cloudVB,gl.STREAM_DRAW); gl.uniform2f(U.uCloudA,cam.persp?.82:.16,cam.persp?0:30); gl.uniform1i(U.uMode,1); gl.bindVertexArray(cloudMesh.vao); gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_INT,0); gl.uniform1i(U.uMode,0); }
-  if(lnMesh.n){gl.uniform1f(U.uAlpha,.9);gl.bindVertexArray(lnMesh.vao);gl.drawArrays(gl.LINES,0,lnMesh.n);gl.uniform1f(U.uAlpha,1);}
+  if(lnMesh.n){gl.uniform1f(U.uAlpha,1);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-2,-4);gl.bindVertexArray(lnMesh.vao);gl.drawElements(gl.TRIANGLES,(lnMesh.n>>2)*6,gl.UNSIGNED_INT,0);gl.disable(gl.POLYGON_OFFSET_FILL);}
   gl.depthMask(true); gl.disable(gl.BLEND);
   if(vmMesh.n){ gl.clear(gl.DEPTH_BUFFER_BIT); gl.uniform2f(U.uFogR,1e5,1e5); gl.uniform1f(U.uClouds,0); gl.bindVertexArray(vmMesh.vao); gl.drawElements(gl.TRIANGLES,(vmMesh.n>>2)*6,gl.UNSIGNED_INT,0); }
   gl.bindVertexArray(null);
@@ -4838,8 +4846,9 @@ function frame(now){
   }
   updateCamera(dt,[player.x,player.y+player.stepOff+1,player.z]);
   if(flash){flash.t-=dt; if(flash.t<=0)flash=null;}
-  if(cam.mode==='fp'&&mode==='play'){ const r=pick(cam.W/dpr/2,cam.H/dpr/2); hover=r&&reachOK(...r.hit)?(buildMode&&r.prev?Object.assign(r.prev.slice(),{place:true}):r.hit):null; }
-  const hl=flash?Object.assign(flash.c.slice(),{place:flash.place}):mining&&mining.target&&mining.prog>0?mining.target.hit:hover;
+  if(cam.mode==='fp'&&mode==='play'){ const r=pick(cam.W/dpr/2,cam.H/dpr/2); hover=r&&reachOK(...r.hit)?r.hit:null; }
+  let touchHl=null; if(mining&&cam.mode!=='fp'){ const r=pick(mining.sx,mining.sy); if(r&&reachOK(...r.hit)) touchHl=r.hit; }
+  const hl=flash?Object.assign(flash.c.slice(),{place:flash.place}):mining&&mining.target&&mining.prog>0?mining.target.hit:touchHl||hover;
   buildHighlight(hl);
   if(cam.photo) vmMesh.n=0; buildDynamic(); buildCracks(); if(!cam.photo) buildViewModel(); else vmMesh.n=0; draw(focusX,focusZ,cam.mode!=='fp'); takePhotoNow();
   updateHUD(dt);
@@ -4991,13 +5000,13 @@ function syncEye(){ const fp=cam.mode==='fp'; document.getElementById('eye').set
 const ptrs=new Map(); let gest=null;
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointerdown',e=>{
-  if(mode!=='play') return; canvas.setPointerCapture(e.pointerId);
+  if(mode!=='play') return; try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,t0:performance.now(),hist:[[e.clientX,e.clientY,performance.now()]],btn:e.button,type:e.pointerType});
   if(game()&&e.button===0&&isBow(held())&&ptrs.size===1){ bowDraw={ptr:e.pointerId,t0:performance.now(),sx:e.clientX,sy:e.clientY}; }
   if(ptrs.size===2){ mining=null; bowDraw=null; const [a,b]=[...ptrs.values()]; gest={pinch:true,d:Math.hypot(a.x-b.x,a.y-b.y),ang:Math.atan2(b.y-a.y,b.x-a.x),z:cam.zoom}; }
   else { gest={axis:null};
     // survival: press and hold on a block to mine it (drag instead to move the camera)
-    if(game()&&e.button===0&&!buildMode&&!tapOnly()&&!pickEntity(e.clientX,e.clientY)) startMining(e.clientX,e.clientY,e.pointerId); }
+    if(game()&&e.button===0&&!tapOnly()&&!pickEntity(e.clientX,e.clientY)) startMining(e.clientX,e.clientY,e.pointerId); }
   cam.zv=0;
 });
 canvas.addEventListener('pointermove',e=>{
@@ -5011,7 +5020,9 @@ canvas.addEventListener('pointermove',e=>{
   if(!gest) return;
   const tx=e.clientX-q.x0, ty=e.clientY-q.y0;
   if(bowDraw&&bowDraw.ptr===e.pointerId){ bowDraw.sx=e.clientX; bowDraw.sy=e.clientY; if(cam.mode==='fp'){ cam.fpYaw-=dx*.004; cam.fpPitch=Math.max(-1.5,Math.min(1.5,cam.fpPitch-dy*.004)); } return; }   // aiming, not orbiting
-  if(mining&&mining.ptr===e.pointerId&&Math.hypot(tx,ty)>8&&!mining.broke&&mining.prog<.15) mining=null; else if(mining&&mining.ptr===e.pointerId&&Math.hypot(tx,ty)>40) mining=null;
+  if(mining&&mining.ptr===e.pointerId){ const engaged=performance.now()-mining.t0>=HOLD_MS();
+    if(!engaged){ if(Math.hypot(tx,ty)>16) mining=null; else return; }
+    else if(cam.mode!=='fp'){ mining.sx=e.clientX; mining.sy=e.clientY; return; } }
   if(cam.mode==='fp'){ if(Math.hypot(tx,ty)>6){ cam.fpYaw-=dx*.006; cam.fpPitch=Math.max(-1.5,Math.min(1.5,cam.fpPitch-dy*.006)); } return; }
   if(!gest.axis&&Math.hypot(tx,ty)>10) gest.axis=Math.abs(tx)>Math.abs(ty)?'yaw':'zoom';
   if(gest.axis==='yaw') manualYaw(-dx*.008);
@@ -5020,10 +5031,10 @@ canvas.addEventListener('pointermove',e=>{
 const ptrEnd=e=>{
   const q=ptrs.get(e.pointerId); if(!q) return; ptrs.delete(e.pointerId);
   if(bowDraw&&bowDraw.ptr===e.pointerId){ const pw=bowPower(); const bd=bowDraw; bowDraw=null; gest=null; if(e.type==='pointerup'&&isBow(held())) shoot(bd.sx,bd.sy,Math.max(.25,pw)); return; }
-  const wasMining=mining&&mining.ptr===e.pointerId; endMining(e.pointerId);
+  const used=endMining(e.pointerId);
   if(gest&&gest.pinch){ if(ptrs.size===0) gest=null; return; }
   const dtm=performance.now()-q.t0, moved=Math.hypot(q.x-q.x0,q.y-q.y0);
-  if(e.type==='pointerup'&&moved<9&&dtm<350&&mode==='play'){ if(!wasMining) tapWorld(...fpXY(q.x,q.y),q.btn===2); }
+  if(e.type==='pointerup'&&moved<17&&dtm<350&&mode==='play'){ if(!used) tapWorld(...fpXY(q.x,q.y),q.btn===2); }
   else if(gest&&gest.axis==='zoom'&&cam.mode!=='fp'){ const h=q.hist, a=h[0], b=h[h.length-1], t=(b[2]-a[2])/1000; if(t>0){ const vy=(b[1]-a[1])/t; if(Math.abs(vy)>350) cam.zv=Math.max(-4,Math.min(4,vy*.0035)); } }
   gest=null;
 };
