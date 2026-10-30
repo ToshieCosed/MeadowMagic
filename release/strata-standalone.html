@@ -161,6 +161,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
 #actions button.on span,#actions button:active span{color:var(--sun-ink)}
 #bJump{right:0;bottom:0;width:calc(var(--btn)*1.45);height:calc(var(--btn)*1.45)}
 #bDash{right:calc(var(--btn)*1.6);bottom:calc(var(--btn)*0.05);width:var(--btn);height:var(--btn)}
+#bFwd{right:calc(var(--btn)*1.55);bottom:calc(var(--btn)*2.45);width:calc(var(--btn)*1.05);height:calc(var(--btn)*1.05)}
 #bSprint{right:calc(var(--btn)*1.75);bottom:calc(var(--btn)*1.3);width:calc(var(--btn)*.86);height:calc(var(--btn)*.86)}
 #bSprint[aria-pressed="true"]{background:rgba(143,220,92,.85);border-color:var(--stam)}
 #bSprint[aria-pressed="true"] svg{stroke:#10200a} #bSprint[aria-pressed="true"] span{color:#10200a}
@@ -291,6 +292,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
     <button id="bJump" aria-label="Jump"><svg viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6"/></svg><span>Jump</span></button>
     <button id="bDash" aria-label="Dash"><svg viewBox="0 0 24 24"><path d="M5 6l6 6-6 6M13 6l6 6-6 6"/></svg><span>Dash</span></button>
     <button id="bSprint" aria-label="Sprint" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M13 4l-2 6h5l-6 10 2-7H7z"/></svg><span>Sprint</span></button>
+    <button id="bFwd" aria-label="Walk forward" hidden><svg viewBox="0 0 24 24"><path d="M12 20V5M5 12l7-7 7 7"/></svg><span>Walk</span></button>
     <button id="bCrouch" aria-label="Crouch"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/><path d="M5 19h14"/></svg><span>Crouch</span></button>
   </div>
   <svg id="stam" viewBox="0 0 44 44"><circle cx="22" cy="22" r="16" stroke="rgba(16,21,27,.55)"/><circle id="stamArc" cx="22" cy="22" r="16" stroke="var(--stam)" stroke-dasharray="100.5 100.5" transform="rotate(-90 22 22)"/></svg>
@@ -2432,9 +2434,13 @@ function mineBlock(r){
   flash={c:[x,y,z],t:.2};
 }
 let mining=null;
-function startMining(sx,sy,ptr){ mining={t0:performance.now(),sx,sy,ptr,key:null,target:null,prog:0,chipT:0,broke:0,warned:false}; }
+const fpXY=(sx,sy)=>cam.mode==='fp'?[cam.W/dpr/2,cam.H/dpr/2]:[sx,sy];
+function startMining(sx,sy,ptr){ [sx,sy]=fpXY(sx,sy); mining={t0:performance.now(),sx,sy,ptr,key:null,target:null,prog:0,chipT:0,broke:0,warned:false,cool:0}; }
 function stepMining(dt){
   if(!mining) return;
+  // nothing breaks until the finger has been held still for a moment, so drags and taps never break blocks by accident
+  if(performance.now()-mining.t0<(creative()?200:160)) return;
+  if(mining.cool>0){ mining.cool-=dt; return; }
   const r=pick(mining.sx,mining.sy);
   if(!r||!reachOK(...r.hit)){ mining.target=null; mining.prog=0; mining.key=null; return; }
   const key=r.hit.join(','); if(key!==mining.key){ mining.key=key; mining.prog=0; mining.target=r; mining.warned=false; }
@@ -2442,16 +2448,16 @@ function stepMining(dt){
   if(!isFinite(t)){ if(!mining.warned){ toast(whyCantMine(b)); mining.warned=true; } return; }
   mining.prog+=dt/t; mining.chipT-=dt;
   if(mining.chipT<=0){ mining.chipT=.1; const [x,y,z]=r.hit; chips(x,y,z,b,3,1.8); }
-  if(mining.prog>=1){ mineBlock(r); mining.broke++; mining.prog=0; mining.key=null; }
+  if(mining.prog>=1){ mineBlock(r); mining.broke++; mining.prog=0; mining.key=null; if(creative()) mining.cool=.28; }
 }
 function endMining(id){
   if(!mining||(id!==undefined&&mining.ptr!==id)) return;
-  if(!mining.broke&&mining.prog<.25&&performance.now()-mining.t0<350&&(tryInteract(mining.sx,mining.sy)||useHeld(mining.sx,mining.sy))){ mining=null; return; }  // quick tap opens tables and crucibles
+  if(!mining.broke&&mining.prog<.25&&performance.now()-mining.t0<350&&(tapDecor(mining.sx,mining.sy)||tapEntity(mining.sx,mining.sy)||tryInteract(mining.sx,mining.sy)||useHeld(mining.sx,mining.sy))){ mining=null; return; }  // quick tap opens tables and crucibles
   if(!mining.broke&&mining.prog<1){ const r=pick(mining.sx,mining.sy);   // quick taps still pick up pebbles and plants
-    if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12) mineBlock(r); }
+    if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12&&(!creative()||BLOCKS[world.get(...r.hit)]?.replace)) mineBlock(r); }
   mining=null;
 }
-function tapInstant(sx,sy){ if(tapDecor(sx,sy)||tapEntity(sx,sy)||tryInteract(sx,sy)) return; if(ITEMS[held()?.id]?.decorItem&&useDecor(sx,sy)) return; const r=pick(sx,sy); if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12) mineBlock(r); }
+function tapInstant(sx,sy){ if(tapDecor(sx,sy)||tapEntity(sx,sy)||tryInteract(sx,sy)) return; if(ITEMS[held()?.id]?.decorItem&&useDecor(sx,sy)) return; const r=pick(sx,sy); if(r&&reachOK(...r.hit)&&mineTime(world.get(...r.hit),heldTool())<=.12&&(!creative()||BLOCKS[world.get(...r.hit)]?.replace)) mineBlock(r); }
 
 /* ---------- building (survival) ---------- */
 function placeSurv(sx,sy){
@@ -2768,7 +2774,8 @@ function renderCatalog(){
   const g=document.getElementById('catGrid'); g.innerHTML=''; const q=document.getElementById('catSearch').value.trim().toLowerCase();
   const ids=Object.keys(ITEMS).map(Number).filter(id=>(catTab==='all'||itemCat(id)===catTab)&&(!q||ITEMS[id].name.toLowerCase().includes(q)));
   document.getElementById('catCount').textContent=`${ids.length} items`;
-  for(const id of ids){ const b=document.createElement('button'); b.className='islot'; b.innerHTML=`<img alt="" src="${iconURL(id)}">`; b.setAttribute('aria-label','Take '+ITEMS[id].name); b.title=ITEMS[id].name;
+  const io=window.__catIO||(window.__catIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ const im=e.target; im.src=iconURL(+im.dataset.id); window.__catIO.unobserve(im); } },{rootMargin:'200px'}));
+  for(const id of ids){ const b=document.createElement('button'); b.className='islot'; b.innerHTML=iconCache[id]?`<img alt="" src="${iconCache[id]}">`:`<img alt="" data-id="${id}">`; if(!iconCache[id]) io.observe(b.firstChild); b.setAttribute('aria-label','Take '+ITEMS[id].name); b.title=ITEMS[id].name;
     b.addEventListener('click',()=>{ if(inv.cursor){ inv.cursor=null; } else inv.cursor=mkStack(id,inv.one?1:ITEMS[id].stack); renderInv(); }); g.appendChild(b); }
 }
 function renderArmor(){ const el=document.getElementById('armorRow'); el.innerHTML=''; const names=['Helmet','Chestplate','Leggings','Boots'];
@@ -4693,10 +4700,10 @@ function drawRays(di){
   let target=0, sx=.5, sy=1.2, disc=0, dir=[0,0];
   if(sd&&di.k>.02){
     const dusk=4*di.k*(1-di.k);
-    target=(.07+.3*dusk)*Math.min(1,sky*1.3);
+    target=(.17+.33*dusk)*Math.min(1,sky*1.3);
     if(cam.persp){ const c=xform(cam.vp,pos[0]+sd[0]*600,pos[1]+sd[1]*600,pos[2]+sd[2]*600);
       if(c[3]<=0) target*=0; else { sx=c[0]/c[3]*.5+.5; sy=c[1]/c[3]*.5+.5; const off=Math.max(0,Math.max(Math.abs(sx-.5),Math.abs(sy-.5))-.5); target*=Math.max(0,1-off*1.4); disc=Math.min(1,sky*1.5); } }
-    else { const c0=xform(cam.vp,pos[0],pos[1],pos[2]), c1=xform(cam.vp,pos[0]+sd[0]*20,pos[1]+sd[1]*20,pos[2]+sd[2]*20); let dx=c1[0]-c0[0], dy=c1[1]-c0[1]; const l=Math.hypot(dx,dy)||1; dir=[dx/l,dy/l]; target*=.55; }
+    else { const c0=xform(cam.vp,pos[0],pos[1],pos[2]), c1=xform(cam.vp,pos[0]+sd[0]*20,pos[1]+sd[1]*20,pos[2]+sd[2]*20); let dx=c1[0]-c0[0], dy=c1[1]-c0[1]; const l=Math.hypot(dx,dy)||1; dir=[dx/l,dy/l]; target*=.7; }
   }
   rayK+=(target-rayK)*.08; if(rayK<.004&&!disc) return;
   const dusk=sd?4*di.k*(1-di.k):0, col=[1,.93-.35*dusk,.78-.5*dusk];
@@ -4955,6 +4962,7 @@ function holdBtn(id,down,up){const b=document.getElementById(id);
 let touchJump=false;
 holdBtn('bJump',()=>{touchJump=true;input.jumpEdge=true;},()=>{touchJump=false;});
 holdBtn('bDash',()=>{input.dashEdge=true;});
+let touchFwd=false; holdBtn('bFwd',()=>{touchFwd=true;},()=>{touchFwd=false;});
 holdBtn('bCrouch',()=>{input.crouchToggle=true;});
 holdBtn('bSprint',()=>{ input.sprintLock=!input.sprintLock; document.getElementById('bSprint').setAttribute('aria-pressed',input.sprintLock); });
 document.getElementById('rotL').addEventListener('click',()=>{ if(cam.mode==='fp') cam.fpYaw+=Math.PI/4; else manualYaw(-Math.PI/4); });
@@ -4977,7 +4985,7 @@ function toggleEye(){
   else { cam.mode='fp'; cam.fpYaw=player.face; cam.fpPitch=-.12; }
   syncEye();
 }
-function syncEye(){ const fp=cam.mode==='fp'; document.getElementById('eye').setAttribute('aria-pressed',fp); document.getElementById('xhair').hidden=!fp; document.getElementById('tilt').disabled=fp; }
+function syncEye(){ const fp=cam.mode==='fp'; document.getElementById('eye').setAttribute('aria-pressed',fp); document.getElementById('xhair').hidden=!fp; document.getElementById('bFwd').hidden=!fp; if(!fp) touchFwd=false; document.getElementById('tilt').disabled=fp; }
 
 // world gestures: tap = mine/build · horizontal drag = orbit · vertical drag/flick = zoom with momentum · pinch = zoom + twist
 const ptrs=new Map(); let gest=null;
@@ -5003,7 +5011,7 @@ canvas.addEventListener('pointermove',e=>{
   if(!gest) return;
   const tx=e.clientX-q.x0, ty=e.clientY-q.y0;
   if(bowDraw&&bowDraw.ptr===e.pointerId){ bowDraw.sx=e.clientX; bowDraw.sy=e.clientY; if(cam.mode==='fp'){ cam.fpYaw-=dx*.004; cam.fpPitch=Math.max(-1.5,Math.min(1.5,cam.fpPitch-dy*.004)); } return; }   // aiming, not orbiting
-  if(mining&&mining.ptr===e.pointerId&&Math.hypot(tx,ty)>10) mining=null;
+  if(mining&&mining.ptr===e.pointerId&&Math.hypot(tx,ty)>8&&!mining.broke&&mining.prog<.15) mining=null; else if(mining&&mining.ptr===e.pointerId&&Math.hypot(tx,ty)>40) mining=null;
   if(cam.mode==='fp'){ if(Math.hypot(tx,ty)>6){ cam.fpYaw-=dx*.006; cam.fpPitch=Math.max(-1.5,Math.min(1.5,cam.fpPitch-dy*.006)); } return; }
   if(!gest.axis&&Math.hypot(tx,ty)>10) gest.axis=Math.abs(tx)>Math.abs(ty)?'yaw':'zoom';
   if(gest.axis==='yaw') manualYaw(-dx*.008);
@@ -5015,7 +5023,7 @@ const ptrEnd=e=>{
   const wasMining=mining&&mining.ptr===e.pointerId; endMining(e.pointerId);
   if(gest&&gest.pinch){ if(ptrs.size===0) gest=null; return; }
   const dtm=performance.now()-q.t0, moved=Math.hypot(q.x-q.x0,q.y-q.y0);
-  if(e.type==='pointerup'&&moved<9&&dtm<350&&mode==='play'){ if(!wasMining) tapWorld(q.x,q.y,q.btn===2); }
+  if(e.type==='pointerup'&&moved<9&&dtm<350&&mode==='play'){ if(!wasMining) tapWorld(...fpXY(q.x,q.y),q.btn===2); }
   else if(gest&&gest.axis==='zoom'&&cam.mode!=='fp'){ const h=q.hist, a=h[0], b=h[h.length-1], t=(b[2]-a[2])/1000; if(t>0){ const vy=(b[1]-a[1])/t; if(Math.abs(vy)>350) cam.zv=Math.max(-4,Math.min(4,vy*.0035)); } }
   gest=null;
 };
@@ -5042,6 +5050,7 @@ function readKeys(){
   let kx=0,kz=0; if(keys.has('w')||keys.has('arrowup'))kz-=1; if(keys.has('s')||keys.has('arrowdown'))kz+=1; if(keys.has('a')||keys.has('arrowleft'))kx-=1; if(keys.has('d')||keys.has('arrowright'))kx+=1;
   let sx=kx, sz=kz, mag=Math.min(1,Math.hypot(kx,kz)); if(mag>0){const l=Math.hypot(kx,kz);sx/=l;sz/=l;}
   if(touchMove.mag>0){ const l=Math.hypot(touchMove.x,touchMove.z)||1; sx=touchMove.x/l; sz=touchMove.z/l; mag=touchMove.mag; }
+  else if(touchFwd&&cam.mode==='fp'){ sx=0; sz=-1; mag=1; }
   // screen-relative → world: screen right = camera right, screen up = camera forward on ground
   // in iso/close views the stick's frame is frozen while held, so an automatic camera swing never bends your path
   let fx,fz,rx,rz;
