@@ -1,0 +1,37 @@
+# Publishes a GitHub Release whenever the standalone build changes on main.
+# The tag is v0.<run number>.0 unless VERSION holds a version (e.g. 0.12.0).
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ['release/strata-standalone.html', 'VERSION']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick a version
+        id: v
+        run: |
+          if [ -s VERSION ]; then V="$(tr -d ' \n' < VERSION)"; else V="0.${GITHUB_RUN_NUMBER}.0"; fi
+          # never collide with an existing tag
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then V="$V-build.${GITHUB_RUN_NUMBER}"; fi
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" release/strata-standalone.html \
+            --target "$GITHUB_SHA" \
+            --title "Strata ${{ steps.v.outputs.tag }}" \
+            --notes "$(git log -1 --pretty=%B)
+
+          Download **strata-standalone.html** and open it in a browser to play."

@@ -47,5 +47,7 @@ Saves live in the browser's local storage, per device.
 | `src/strata.html` | The source: page body, styles and script in one file (the form published as a claude.ai artifact). |
 | `release/strata-standalone.html` | The current release: a full standalone HTML document built from the source. |
 | `index.html` | A copy of the release for GitHub Pages. |
+| `VERSION` | Version used for the next automatic release tag. |
+| `.github/workflows/release.yml` | Publishes a GitHub Release, with the standalone file attached, whenever `release/strata-standalone.html` or `VERSION` changes on `main`. |
 | `tools/build_standalone.py` | Rebuilds `release/` and `index.html` from `src/`: `python3 tools/build_standalone.py` |
 | `tools/history/` | The patch scripts that built each feature batch, kept for reference. They were run against the working copy at the time and are not meant to be re-run. |
