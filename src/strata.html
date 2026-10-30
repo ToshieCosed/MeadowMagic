@@ -4590,12 +4590,13 @@ function moveGhost(x,y){ const g=ghost(); g.style.left=x+'px'; g.style.top=y+'px
 function hideGhost(){ ghost().hidden=true; }
 function sxHoldText(){ document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to drop it':'Tap: move · Hold: pick up · Drag: drop'; }
 // containers: no item bar, the two boxes grow to fill the screen and never scroll
-function sxFit(){ const sx=document.getElementById('sx'), win=sx.querySelector('.sx-win'); if(!SX||SX.kind!=='store'){ sx.style.removeProperty('--sxs'); return; }
+function sxFit(){ const sx=document.getElementById('sx'), win=sx.querySelector('.sx-win'); if(!sxBox()){ sx.style.removeProperty('--sxs'); return; }
   const base=30; sx.style.setProperty('--sxs',base+'px'); const grids=[...win.querySelectorAll('.sx-grid')]; if(!grids.length) return;
   let gh=0, gw=0; for(const g of grids){ const r=g.getBoundingClientRect(); gh+=r.height; gw=Math.max(gw,r.width); }
   const oh=win.scrollHeight-gh, ow=win.scrollWidth-gw, W=innerWidth-20, H=innerHeight-20;
   const k=Math.min((H-oh)/gh,(W-ow)/gw); sx.style.setProperty('--sxs',Math.max(18,Math.min(72,Math.floor(base*k*.97)))+'px'); }
-function renderSX(){ if(!SX) return; try{ _renderSX(); } finally { sxFit(); } }
+const sxBox=()=>!!SX&&(SX.kind==='store'||!!SX.bag); // a chest, container or open backpack: no item bar
+function renderSX(){ if(!SX) return; try{ _renderSX(); } finally { document.getElementById('sx').classList.toggle('sx-store',sxBox()); sxFit(); } }
 function _renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=document.getElementById('sxB'); A.innerHTML=''; Bx.innerHTML='';
   sxHoldText();
   const head=(el,t,btns)=>{ const h=document.createElement('h4'); h.textContent=t; for(const [lbl,fn] of btns||[]){ const b=document.createElement('button'); b.className='ghost'; b.textContent=lbl; b.addEventListener('click',()=>{ fn(); renderSX(); }); h.appendChild(b); } el.appendChild(h); };
