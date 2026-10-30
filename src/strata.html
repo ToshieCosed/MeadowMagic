@@ -204,24 +204,29 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
 .fw-signbox{display:flex;flex-wrap:wrap;gap:8px;background:rgba(24,33,42,.95);padding:10px;border-radius:12px}.fw-signbox input{flex:1;min-width:140px;background:#1d2530;color:#fff;border:1px solid #445;border-radius:7px;padding:8px}
 #sgText{width:100%;box-sizing:border-box;background:#1d2530;color:#fff;border:1px solid #445;border-radius:8px;padding:8px;font:15px system-ui}.sgrow{display:flex;gap:10px;flex-wrap:wrap}.sgrow select{background:#1d2530;color:#fff;border:1px solid #445;border-radius:6px;padding:4px}
 .sgcols{display:flex;flex-wrap:wrap;gap:5px}.sgcols button{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid rgba(255,255,255,.3)}.sgcols button[aria-pressed=true]{border-color:#fff;box-shadow:0 0 0 2px #f0b548}
-#sx{position:fixed;inset:0;z-index:7;display:flex;flex-direction:column;background:rgba(14,19,25,.86);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
-  padding:calc(env(safe-area-inset-top,0px) + 8px) max(10px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 8px) max(10px,env(safe-area-inset-left,0px));gap:8px;user-select:none;-webkit-user-select:none}
-.sx-top{display:flex;gap:8px;align-items:center}.sx-top b{font-size:15px}.sx-top button{padding:7px 12px;border-radius:9px}
-.sx-body{flex:1;min-height:0;display:flex;gap:10px}.sx-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto}
-.sx-box{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px}.sx-box h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted);display:flex;gap:8px;align-items:center}.sx-box h4 button{padding:3px 8px;border-radius:7px;font-size:11px}
-.sx-grid{display:grid;grid-template-columns:repeat(9,var(--sxs));gap:3px}.sx-grid.w3{grid-template-columns:repeat(3,var(--sxs))}
-#sx{--sxs:clamp(30px,min(5.2vw,8.8vh),46px)}
-.sx-slot{width:var(--sxs);height:var(--sxs);position:relative;padding:0;border-radius:7px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;touch-action:none}
-.sx-slot img{width:76%;height:76%;pointer-events:none}.sx-slot .n{position:absolute;right:2px;bottom:0;font-size:10px;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}.sx-slot .dur{position:absolute;left:12%;right:12%;bottom:2px;height:3px;border-radius:2px;background:rgba(0,0,0,.55);pointer-events:none}.sx-slot .dur i{display:block;height:100%;border-radius:2px}
-.sx-slot.sel{border-color:#f0b548}.sx-slot.hot{outline:2px solid #f0b548}.sx-slot.out{border-color:#7ad38a}.sx-slot .lbl{font-size:9px;color:var(--muted);pointer-events:none}
-.sx-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sx-arrow{font-size:20px;color:var(--muted)}
-.sx-side{width:clamp(180px,30vw,330px);display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:6px;min-height:0}
-.sx-tabs{display:flex;flex-wrap:wrap;gap:3px}.sx-tabs button{padding:4px 7px;border-radius:7px;font-size:11px}.sx-tabs button[aria-pressed=true]{background:#f0b548;color:#111}
-.sx-list{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:2px;align-content:start}
-.sx-list button{aspect-ratio:1;padding:0;border-radius:6px;background:rgba(0,0,0,.3);border:1px solid transparent;display:grid;place-items:center;touch-action:none}.sx-list button img{width:80%;height:80%;pointer-events:none}.sx-list button.no{opacity:.35}
-#sxSearch{background:#1d2530;color:#fff;border:1px solid #445;border-radius:8px;padding:7px}
-#sxGhost{position:fixed;width:44px;height:44px;pointer-events:none;z-index:9;transform:translate(-50%,-60%);filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
-@media (orientation:portrait){.sx-body{flex-direction:column}.sx-side{width:auto;height:34%}#sx{--sxs:clamp(28px,9.4vw,44px)}}
+#sx{position:fixed;inset:0;z-index:7;background:rgba(0,0,0,.28);user-select:none;-webkit-user-select:none;--sxs:clamp(24px,min(3.6vw,6.2vh),34px)}
+.sx-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:6px;align-items:stretch;max-height:calc(100% - 16px)}
+.sx-win{background:rgba(24,33,42,.92);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.sx-top{display:flex;gap:6px;align-items:center}.sx-top b{font-size:13px}.sx-top button{padding:4px 10px;border-radius:8px;font-size:12px}
+.sx-box{background:rgba(255,255,255,.04);border-radius:8px;padding:5px}.sx-box h4{margin:0 0 4px;font-size:11px;font-weight:600;color:var(--muted);display:flex;gap:6px;align-items:center}.sx-box h4 button{padding:2px 7px;border-radius:6px;font-size:10px}
+.sx-grid{display:grid;grid-template-columns:repeat(9,var(--sxs));gap:2px}.sx-grid.w3{grid-template-columns:repeat(3,var(--sxs))}
+.sx-slot{width:var(--sxs);height:var(--sxs);position:relative;padding:0;border-radius:5px;background:rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;touch-action:none}
+.sx-slot img{width:80%;height:80%;pointer-events:none}.sx-slot .n{position:absolute;right:1px;bottom:-1px;font-size:9px;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}.sx-slot .dur{position:absolute;left:12%;right:12%;bottom:2px;height:2px;border-radius:2px;background:rgba(0,0,0,.55);pointer-events:none}.sx-slot .dur i{display:block;height:100%;border-radius:2px}
+.sx-slot.sel{border-color:#f0b548}.sx-slot.hot{outline:2px solid #f0b548}.sx-slot.out{border-color:#7ad38a}.sx-slot .lbl{font-size:8px;color:var(--muted);pointer-events:none}
+.sx-row{display:flex;gap:6px;align-items:center}.sx-arrow{font-size:16px;color:var(--muted)}
+#sxHold{font-size:11px;min-height:14px;text-align:center}
+#sxSearch{background:rgba(24,33,42,.92);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 8px;font-size:13px}
+.sx-side{position:absolute;right:max(8px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:clamp(150px,calc(50vw - 260px),360px);display:flex;flex-direction:column;gap:4px}
+.sx-pager{display:flex;align-items:center;gap:6px;justify-content:space-between}.sx-pager span{font-size:12px;color:var(--text)}.sx-pager button{padding:3px 12px;border-radius:7px}
+.sx-tabs{display:flex;flex-wrap:wrap;gap:2px}.sx-tabs button{width:28px;height:28px;padding:2px;border-radius:7px;display:grid;place-items:center;background:rgba(24,33,42,.85);border:1px solid rgba(255,255,255,.12)}.sx-tabs button img{width:100%;height:100%}.sx-tabs button[aria-pressed=true]{background:#f0b548}
+.sx-list{flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:repeat(auto-fill,30px);grid-auto-rows:30px;gap:2px;align-content:start}
+.sx-list button{width:30px;height:30px;padding:0;border-radius:5px;background:rgba(0,0,0,.28);border:1px solid transparent;display:grid;place-items:center;touch-action:none}.sx-list button img{width:84%;height:84%;pointer-events:none}.sx-list button.no{opacity:.35}
+.sx-tools{position:absolute;left:max(8px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 8px);display:flex;flex-direction:column;gap:4px;width:clamp(70px,calc(50vw - 300px),118px)}
+.sx-tools .tr{display:flex;flex-wrap:wrap;gap:3px}.sx-tools .tb{width:30px;height:30px;padding:0;border-radius:7px;display:grid;place-items:center;font-size:15px;background:rgba(24,33,42,.85);border:1px solid rgba(255,255,255,.14)}
+.sx-tools .sv{padding:5px 6px;border-radius:7px;font-size:11px;text-align:left;background:rgba(24,33,42,.85);border:1px solid rgba(255,255,255,.14)}.sx-tools .sv.full{border-color:#7ad38a}
+#sxGhost{position:fixed;width:40px;height:40px;pointer-events:none;z-index:9;transform:translate(-50%,-60%);filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+@media (max-width:760px){.sx-tools{display:none}.sx-side{width:clamp(120px,calc(100vw - 9*var(--sxs) - 60px),260px)}.sx-center{left:calc((100vw - clamp(120px,calc(100vw - 9*var(--sxs) - 60px),260px))/2 - 4px)}}
+@media (orientation:portrait){#sx{--sxs:clamp(26px,9vw,36px)}.sx-center{top:8px;transform:translateX(-50%);left:50%}.sx-side{left:8px;right:8px;width:auto;top:auto;height:38%}.sx-tools{display:none}}
 #mapHud{opacity:.88;position:fixed;z-index:3;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);width:150px;height:150px;image-rendering:pixelated;border:3px solid #c9b48a;border-radius:6px;background:#e8dcb8;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 #mapHud.big{width:min(70vw,70vh);height:min(70vw,70vh)}
 .paintBody{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;justify-content:center;padding:8px;overflow:auto}
@@ -401,9 +406,13 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
   </div>
 </section>
 <section id="sx" hidden aria-label="Inventory">
-  <div class="sx-top"><b id="sxTitle">Inventory</b><span id="sxHold" class="hint"></span><span style="flex:1"></span><button class="ghost" id="sxLayout" title="Switch inventory layout">Classic layout</button><button class="primary" id="sxClose">Done</button></div>
-  <div class="sx-body"><div class="sx-main"><div class="sx-box" id="sxA"></div><div class="sx-box" id="sxB"></div></div>
-    <aside class="sx-side" id="sxSide"><div class="sx-tabs" id="sxTabs"></div><div class="sx-list" id="sxList"></div><input id="sxSearch" placeholder="Search" autocomplete="off"></aside></div>
+  <div class="sx-tools" id="sxTools"></div>
+  <div class="sx-center"><div class="sx-win">
+    <div class="sx-top"><b id="sxTitle">Inventory</b><span style="flex:1"></span><button class="ghost" id="sxLayout" title="Switch to the classic layout">Classic</button><button class="primary" id="sxClose">Done</button></div>
+    <div class="sx-box" id="sxA"></div><div class="sx-box" id="sxB"></div><div id="sxHold" class="hint"></div></div>
+    <input id="sxSearch" placeholder="Search items" autocomplete="off"></div>
+  <aside class="sx-side" id="sxSide"><div class="sx-pager"><button class="ghost" id="sxPrev" aria-label="Previous page">◀</button><span id="sxPage">1/1</span><button class="ghost" id="sxNext" aria-label="Next page">▶</button></div>
+    <div class="sx-tabs" id="sxTabs"></div><div class="sx-list" id="sxList"></div></aside>
   <img id="sxGhost" alt="" hidden>
 </section>
 <section id="inv" class="panel" aria-label="Inventory and crafting" hidden>
@@ -2817,7 +2826,7 @@ function openInv(){ if(mode!=='play'||!game()) return; if(splitOn2()){ mining=nu
 function closeInv(){
   for(let i=0;i<9;i++) if(inv.grid[i]){ const s=inv.grid[i]; inv.grid[i]=null; returnStack(s); }
   if(inv.cursor){ const s=inv.cursor; inv.cursor=null; returnStack(s); }
-  document.getElementById('inv').hidden=true; document.getElementById('sx').hidden=true; SX=null; mode='play'; last=performance.now(); renderHotbar();
+  document.getElementById('inv').hidden=true; document.getElementById('sx').hidden=true; SX=null; document.getElementById('hud').style.visibility=''; mode='play'; last=performance.now(); renderHotbar();
 }
 
 /* =====================================================================
@@ -3216,7 +3225,7 @@ let sui=null;   // {arr, key?, title, bagSlot?}
 function openStore(arr,title,key){ mining=null; sui={arr,title,key}; mode='store'; if(splitOn2()){ sxOpen('store'); return; } document.getElementById('store').hidden=false; document.querySelector('#store h2').textContent=title; renderStore(); }
 function closeStore(){
   if(inv.cursor){ const s=inv.cursor; inv.cursor=null; returnStack(s); }
-  document.getElementById('store').hidden=true; document.getElementById('sx').hidden=true; SX=null; sui=null; if(mode==='store'){ mode='play'; last=performance.now(); } invChanged(); renderHotbar(); }
+  document.getElementById('store').hidden=true; document.getElementById('sx').hidden=true; SX=null; document.getElementById('hud').style.visibility=''; sui=null; if(mode==='store'){ mode='play'; last=performance.now(); } invChanged(); renderHotbar(); }
 const noBagInBag=(arr,c)=>!(sui&&sui.isBag&&arr===sui.arr&&c&&ITEMS[c.id].bag);
 function renderStore(){
   if(!sui) return; if(SX&&!document.getElementById('sx').hidden){ renderSX(); return; }
@@ -4514,10 +4523,10 @@ function setLayout(v){ const p=prefsGet(); p.invLayout=v; store.set('strata:pref
 const splitOn2=()=>splitOn()||window.__layout==='split';
 let SX=null;   // {kind:'inv'|'store', bag:openedBackpackStack, tab, q}
 function returnStack(s){ const l=addItem(s.id,s.n,s.d,s.bag); if(!l&&s.x) inv.slots[inv.landed].x=s.x; if(l){ spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d,s.bag); if(s.x) drops[drops.length-1].x=s.x; } }
-function sxOpen(kind){ SX={kind,tab:SX&&SX.tab||'all',q:'',bag:null}; document.getElementById('sx').hidden=false; document.getElementById('sxSearch').value=''; renderSX(); }
+function sxOpen(kind){ SX={kind,tab:SX&&SX.tab||'all',q:'',bag:null,page:0}; document.getElementById('sx').hidden=false; document.getElementById('hud').style.visibility='hidden'; document.getElementById('sxSearch').value=''; renderSX(); }
 function sxClose(){ const k=SX&&SX.kind; document.getElementById('sx').hidden=true; SX=null; if(k==='store') closeStore(); else closeInv(); }
 document.getElementById('sxClose').addEventListener('click',sxClose);
-document.getElementById('sxLayout').addEventListener('click',()=>{ const k=SX&&SX.kind; setLayout('classic'); document.getElementById('sx').hidden=true; SX=null;
+document.getElementById('sxLayout').addEventListener('click',()=>{ const k=SX&&SX.kind; setLayout('classic'); document.getElementById('sx').hidden=true; SX=null; document.getElementById('hud').style.visibility='';
   if(k==='store'&&sui){ document.getElementById('store').hidden=false; renderStore(); } else { document.getElementById('inv').hidden=false; renderInv(); } });
 document.querySelectorAll('.layoutBtn').forEach(b=>b.addEventListener('click',()=>{ setLayout('split');
   if(!document.getElementById('store').hidden&&sui){ document.getElementById('store').hidden=true; sxOpen('store'); } else { document.getElementById('inv').hidden=true; sxOpen('inv'); } }));
@@ -4547,7 +4556,7 @@ function sxSlot(arr,i,el,opts){ const b=document.createElement('button'); b.clas
   const up=e=>{ const d=sxDrag; if(!d||d.b!==b) return; clearTimeout(d.timer); sxDrag=null; hideGhost();
     if(d.held){ const t=document.elementFromPoint(e.clientX,e.clientY), tgt=t&&t.closest&&t.closest('.sx-slot'), side=t&&t.closest&&t.closest('#sxSide');
       if(tgt&&tgt!==b&&tgt.sxArr){ sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); }
-      else if(side&&creative()&&inv.cursor){ inv.cursor=null; toast('Deleted'); }
+      else if((side&&creative()||t&&t.closest&&t.closest('.sx-trash'))&&inv.cursor){ inv.cursor=null; toast('Deleted'); }
       renderSX(); return; }
     if(e.type!=='pointerup') return;
     if(opts&&opts.output){ takeOutput(); renderSX(); return; }
@@ -4567,9 +4576,9 @@ const ghost=()=>document.getElementById('sxGhost');
 function showGhost(x,y){ const c=inv.cursor; if(!c) return; const g=ghost(); g.src=iconURL(c.id); g.hidden=false; moveGhost(x,y); }
 function moveGhost(x,y){ const g=ghost(); g.style.left=x+'px'; g.style.top=y+'px'; }
 function hideGhost(){ ghost().hidden=true; }
-function sxHoldText(){ document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to put it down':'Tap: move · Hold: pick up · Hold and drag: drop anywhere'; }
+function sxHoldText(){ document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to drop it':'Tap: move · Hold: pick up · Drag: drop'; }
 function renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=document.getElementById('sxB'); A.innerHTML=''; Bx.innerHTML='';
-  document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to put it down':'Tap: move · Hold: pick up · Hold and drag: drop anywhere';
+  sxHoldText();
   const head=(el,t,btns)=>{ const h=document.createElement('h4'); h.textContent=t; for(const [lbl,fn] of btns||[]){ const b=document.createElement('button'); b.className='ghost'; b.textContent=lbl; b.addEventListener('click',()=>{ fn(); renderSX(); }); h.appendChild(b); } el.appendChild(h); };
   // top box: the chest / backpack / crafting
   if(SX.kind==='store'&&sui){ document.getElementById('sxTitle').textContent=sui.title; head(A,`${sui.title} · ${sui.arr.filter(Boolean).length}/${sui.arr.length}`,[['Take all',()=>takeAll()],['Store all',()=>storeAll()]]);
@@ -4580,32 +4589,62 @@ function renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=
     head(A,'Crafting'+(st.tier>=2?' · '+BLOCKS[TABLE_OF[st.tier]].name.toLowerCase():' · by hand')+(st.tan?' · tanning':''));
     const row=document.createElement('div'); row.className='sx-row'; const g=document.createElement('div'); g.className='sx-grid w3'; for(let i=0;i<9;i++) sxSlot(inv.grid,i,g); row.appendChild(g);
     const ar=document.createElement('span'); ar.className='sx-arrow'; ar.textContent='→'; row.appendChild(ar); const rc=matchGrid(); const outArr=[rc?mkStack(rc.out,rc.n):null]; sxSlot(outArr,0,row,{output:1,cls:'out'});
-    const arm=document.createElement('div'); arm.className='sx-grid w3'; arm.style.gridTemplateColumns='repeat(4,var(--sxs))'; arm.style.marginLeft='auto'; ['Head','Body','Legs','Feet'].forEach((l,k)=>sxSlot(inv.armor,k,arm,{armor:k,lbl:l})); row.appendChild(arm);
+    const arm=document.createElement('div'); arm.className='sx-grid w3'; arm.style.gridTemplateColumns='repeat(2,var(--sxs))'; arm.style.marginLeft='auto'; ['Head','Body','Legs','Feet'].forEach((l,k)=>sxSlot(inv.armor,k,arm,{armor:k,lbl:l})); row.appendChild(arm);
     A.appendChild(row); }
   // bottom box: your inventory
-  head(Bx,'Inventory'+(creative()?' · drag onto the side bar to delete':''));
+  head(Bx,'Inventory');
   const bag=document.createElement('div'); bag.className='sx-grid'; for(let i=9;i<36;i++) sxSlot(inv.slots,i,bag,{cls:inv.slots[i]&&ITEMS[inv.slots[i].id].bag&&SX.bag===inv.slots[i]?'hot':''}); Bx.appendChild(bag);
   const hot=document.createElement('div'); hot.className='sx-grid'; hot.style.marginTop='6px'; for(let i=0;i<9;i++) sxSlot(inv.slots,i,hot,{cls:(i===inv.sel?'sel':'')+(inv.slots[i]&&SX.bag===inv.slots[i]?' hot':'')}); Bx.appendChild(hot);
   renderSXSide(); renderHotbar(); invDirty=false; }
-// the side bar: every item (creative) or recipes (survival), with tabs and search
+// the side bar: every item (creative) or recipes (survival) in pages, with icon tabs; tools and saved loadouts on the left
+const SX_TAB_ICON={all:()=>B.CHEST_WOOD,can:()=>B.TABLE,blocks:()=>B.GRASS,decor:()=>I.PAINTING,tools:()=>GEN['iron:pick'],weapons:()=>GEN['iron:sword'],armor:()=>ITEMS[2033]?2033:I.LEATHER,storage:()=>B.CHEST_WOOD,travel:()=>I.CART_WOOD,items:()=>I.STICK};
+let sxPerPage=60;
+function sxIcon(b,id){ const io=window.__catIO||(window.__catIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ const im=e.target; im.src=iconURL(+im.dataset.id); window.__catIO.unobserve(im); } },{rootMargin:'100px'}));
+  if(iconCache[id]) b.innerHTML=`<img alt="" src="${iconCache[id]}">`; else { b.innerHTML=`<img alt="" data-id="${id}">`; io.observe(b.firstChild); } }
 function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs'), L=document.getElementById('sxList'); T.innerHTML=''; L.innerHTML='';
-  const cre=creative(), tabs=cre?[['all','All'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['travel','Travel'],['items','Items']]:[['all','All'],['can','Can make'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['storage','Storage'],['travel','Travel'],['items','Items']];
+  const cre=creative(), tabs=cre?[['all','All items'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['travel','Travel'],['items','Items']]:[['all','All recipes'],['can','Can make now'],['blocks','Blocks'],['decor','Decor'],['tools','Tools'],['weapons','Weapons'],['armor','Armor'],['storage','Storage'],['travel','Travel'],['items','Items']];
   if(!tabs.some(t=>t[0]===SX.tab)) SX.tab='all';
-  for(const [k,l] of tabs){ const b=document.createElement('button'); b.className='ghost'; b.textContent=l; b.setAttribute('aria-pressed',SX.tab===k); b.addEventListener('click',()=>{ SX.tab=k; renderSXSide(); }); T.appendChild(b); }
-  const io=window.__catIO||(window.__catIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ const im=e.target; im.src=iconURL(+im.dataset.id); window.__catIO.unobserve(im); } },{rootMargin:'200px'}));
-  const icon=(b,id)=>{ if(iconCache[id]) b.innerHTML=`<img alt="" src="${iconCache[id]}">`; else { b.innerHTML=`<img alt="" data-id="${id}">`; if(io) io.observe(b.firstChild); else b.firstChild.src=iconURL(id); } };
-  if(cre){ const ids=Object.keys(ITEMS).map(Number).filter(id=>(SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q)));
-    for(const id of ids){ const b=document.createElement('button'); icon(b,id); b.title=ITEMS[id].name; b.setAttribute('aria-label',ITEMS[id].name);
-      let t=null, held=false; b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){} held=false; t=setTimeout(()=>{ held=true; inv.cursor=mkStack(id,ITEMS[id].stack); showGhost(e.clientX,e.clientY); sxHoldText(); },280); });
-      b.addEventListener('pointermove',e=>{ if(held) moveGhost(e.clientX,e.clientY); });
-      b.addEventListener('pointerup',e=>{ clearTimeout(t); hideGhost(); if(held){ const el=document.elementFromPoint(e.clientX,e.clientY), tgt=el&&el.closest&&el.closest('.sx-slot'); if(tgt&&tgt.sxArr) sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); renderSX(); return; }
-        if(inv.cursor){ inv.cursor=null; renderSX(); return; } addItem(id,ITEMS[id].stack); invChanged(); renderSX(); toast(ITEMS[id].name); });
-      b.addEventListener('pointercancel',()=>{ clearTimeout(t); hideGhost(); });
-      L.appendChild(b); } }
-  else { const list=RECIPES.filter(r=>!r.hidden&&(SX.tab==='all'||SX.tab==='can'?true:r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))&&recipeOK(r));
-    list.sort((a,b)=>(canCraft(b)?1:0)-(canCraft(a)?1:0));
-    for(const r of list.slice(0,300)){ const b=document.createElement('button'), ok=canCraft(r); icon(b,r.out); if(!ok) b.classList.add('no'); b.title=ITEMS[r.out].name+(r.n>1?' ×'+r.n:'');
-      b.addEventListener('click',()=>{ if(ok){ craftFromBook(r,b); renderSX(); } else { const need=Object.entries(needs(r)).map(([k,n])=>`${n} ${ITEMS[keyOf(r,k)[0]].name.toLowerCase()}`).join(', '); toast(`${ITEMS[r.out].name}: needs ${need}`); } }); L.appendChild(b); } } }
+  for(const [k,l] of tabs){ const b=document.createElement('button'); b.title=l; b.setAttribute('aria-label',l); b.setAttribute('aria-pressed',SX.tab===k); sxIcon(b,SX_TAB_ICON[k]()); b.addEventListener('click',()=>{ SX.tab=k; SX.page=0; renderSXSide(); }); T.appendChild(b); }
+  // how many icons fit: the panel never scrolls, it pages
+  const r=L.getBoundingClientRect(); const cols=Math.max(1,Math.floor((r.width+2)/32)), rows=Math.max(1,Math.floor((r.height+2)/32)); sxPerPage=cols*rows;
+  let entries;
+  if(cre) entries=Object.keys(ITEMS).map(Number).filter(id=>(SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q))).map(id=>({id}));
+  else { entries=RECIPES.filter(r=>!r.hidden&&recipeOK(r)&&(SX.tab==='all'||SX.tab==='can'||r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))).map(r=>({id:r.out,r,ok:canCraft(r)}));
+    entries.sort((a,b)=>(b.ok?1:0)-(a.ok?1:0)); }
+  const pages=Math.max(1,Math.ceil(entries.length/sxPerPage)); SX.page=Math.max(0,Math.min(pages-1,SX.page||0));
+  document.getElementById('sxPage').textContent=`${SX.page+1}/${pages}`;
+  for(const en of entries.slice(SX.page*sxPerPage,(SX.page+1)*sxPerPage)){ const id=en.id, b=document.createElement('button'); sxIcon(b,id); b.title=ITEMS[id].name+(en.r&&en.r.n>1?' ×'+en.r.n:''); b.setAttribute('aria-label',b.title);
+    if(!cre){ if(!en.ok) b.classList.add('no'); b.addEventListener('click',()=>{ if(en.ok){ craftFromBook(en.r,b); renderSX(); } else { const need=Object.entries(needs(en.r)).map(([k,n])=>`${n} ${ITEMS[keyOf(en.r,k)[0]].name.toLowerCase()}`).join(', '); toast(`${ITEMS[id].name}: needs ${need}`); } }); L.appendChild(b); continue; }
+    let t=null, held=false; b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){} held=false; t=setTimeout(()=>{ held=true; inv.cursor=mkStack(id,ITEMS[id].stack); showGhost(e.clientX,e.clientY); sxHoldText(); },280); });
+    b.addEventListener('pointermove',e=>{ if(held) moveGhost(e.clientX,e.clientY); });
+    b.addEventListener('pointerup',e=>{ clearTimeout(t); hideGhost(); if(held){ const el=document.elementFromPoint(e.clientX,e.clientY), tgt=el&&el.closest&&el.closest('.sx-slot'); if(tgt&&tgt.sxArr) sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); renderSX(); return; }
+      if(inv.cursor){ inv.cursor=null; renderSX(); return; } addItem(id,ITEMS[id].stack); invChanged(); renderSX(); });
+    b.addEventListener('pointercancel',()=>{ clearTimeout(t); hideGhost(); });
+    L.appendChild(b); }
+  renderSXTools(); }
+addEventListener('resize',()=>{ if(SX&&!document.getElementById('sx').hidden) renderSXSide(); });
+document.getElementById('sxPrev').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)-1; if(SX.page<0) SX.page=1e9; renderSXSide(); } });
+document.getElementById('sxNext').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)+1; const n=+document.getElementById('sxPage').textContent.split('/')[1]; if(SX.page>=n) SX.page=0; renderSXSide(); } });
+// swipe the item panel left/right to turn pages
+{ let x0=null; const L=document.getElementById('sxList'); L.addEventListener('touchstart',e=>{ x0=e.touches[0].clientX; },{passive:true}); L.addEventListener('touchend',e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0; x0=null; if(Math.abs(dx)>50) document.getElementById(dx<0?'sxNext':'sxPrev').click(); },{passive:true}); }
+// left column: trash, time, heal, magnet, clear, and seven saved inventories (creative)
+function renderSXTools(){ const el=document.getElementById('sxTools'); el.innerHTML=''; const cre=creative();
+  const row=document.createElement('div'); row.className='tr'; el.appendChild(row);
+  const tool=(icon,title,fn)=>{ const b=document.createElement('button'); b.className='tb'; b.textContent=icon; b.title=title; b.setAttribute('aria-label',title); b.addEventListener('click',()=>{ fn(); renderSX(); }); row.appendChild(b); return b; };
+  const trash=tool('🗑','Trash: drop or tap with a held stack to delete it',()=>{ if(inv.cursor){ inv.cursor=null; toast('Deleted'); } else toast('Hold a stack, then tap or drop it here'); }); trash.classList.add('sx-trash');
+  if(!cre) return;
+  tool(dayInfo().day?'🌙':'☀️','Skip to '+(dayInfo().day?'night':'day'),()=>{ const T=world.dayLen+world.nightLen, t=((world.time%T)+T)%T; world.time+=dayInfo().day?world.dayLen-t+1:T-t+1; });
+  tool('❤','Heal',()=>{ player.hp=player.maxHp; player.fireT=0; hudDirty=true; });
+  tool('🧲','Pull nearby drops to you',()=>{ for(const q of drops) if(Math.hypot(q.x-player.x,q.z-player.z)<40){ q.x=player.x; q.y=player.y+1; q.z=player.z; q.age=1; } });
+  tool('⌫','Clear inventory',()=>{ inv.slots.fill(null); invChanged(); });
+  const saves=prefsGet().loadouts||[];
+  for(let k=0;k<7;k++){ const b=document.createElement('button'); b.className='sv'+(saves[k]?' full':''); b.textContent=saves[k]?`Load ${k+1}`:`Save ${k+1}`; b.title=saves[k]?'Tap to load · hold to overwrite with your inventory':'Save your inventory here';
+    let t=null, long=false;
+    b.addEventListener('pointerdown',()=>{ long=false; t=setTimeout(()=>{ long=true; const p=prefsGet(); p.loadouts=p.loadouts||[]; p.loadouts[k]=inv.slots.map(packS); store.set('strata:prefs',p); toast('Saved to slot '+(k+1)); renderSXTools(); },550); });
+    b.addEventListener('pointerup',()=>{ clearTimeout(t); if(long) return; const p=prefsGet(); p.loadouts=p.loadouts||[];
+      if(p.loadouts[k]){ inv.slots=p.loadouts[k].map(unpackS); while(inv.slots.length<36) inv.slots.push(null); invChanged(); toast('Loaded slot '+(k+1)); renderSX(); }
+      else { p.loadouts[k]=inv.slots.map(packS); store.set('strata:prefs',p); toast('Saved to slot '+(k+1)); renderSXTools(); } });
+    b.addEventListener('pointercancel',()=>clearTimeout(t)); el.appendChild(b); } }
 
 /* ---------- stage 6: decor entities ---------- */
 const b64=u=>{ let s=''; for(let i=0;i<u.length;i+=8192) s+=String.fromCharCode.apply(null,u.subarray(i,i+8192)); return btoa(s); };
