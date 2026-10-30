@@ -173,7 +173,7 @@ function buildViewModel2(){ PAT=0; CB=0; vmVB.n=0; SKV.fpN=0; if(cam.mode!=='fp'
   const f1=Math.sqrt(sw), f2=-.3*Math.sin(f1*Math.PI), f3=.4*Math.sin(f1*Math.PI*2), f4=-.4*Math.sin(sw*Math.PI), f5=Math.sin(sw*sw*Math.PI), f6=Math.sin(f1*Math.PI);
   let ARM=mc(CAM,mT(bx,by,0),mT(f2+.64,f3-.6-eq*.6,f4-.72),mY(45*DEG),mY(f6*70*DEG),mZ(f5*-20*DEG),mT(-1,3.6,3.5),mZ(120*DEG),mX(200*DEG),mY(-135*DEG),mT(5.6,0,0),mS(1/16));
   if(s){ // with an item: the arm comes in lower, angled so the fist sits under the item
-    ARM=mc(CAM,mT(bx,by,0),mT(-.4*Math.sin(f1*Math.PI)+.56*kx,.2*Math.sin(f1*Math.PI*2)-.52-eq*.6,-.2*Math.sin(sw*Math.PI)-.72),mY((45-f5*20)*DEG),mZ(-f6*20*DEG),mX(-f6*80*DEG),mY(-45*DEG));
+    ARM=mc(CAM,mT(bx,by,0),mT(-.4*Math.sin(f1*Math.PI)+.56*kx-(1-kx)*.14,.2*Math.sin(f1*Math.PI*2)-.52+(1-kx)*.13-eq*.6,-.2*Math.sin(sw*Math.PI)-.72),mY((45-f5*20)*DEG),mZ(-f6*20*DEG),mX(-f6*80*DEG),mY(-45*DEG));
     if(drawing) ARM=mc(CAM,mT(.28,-.42,-.62),mX(-8*DEG),mY(-6*DEG)); if(eating) ARM=mc(CAM,mT(.12,-.42+Math.abs(Math.sin(now*14))*.04,-.5),mX(-35*DEG),mY(-40*DEG));
     const d=dispOf(id), IM=mc(ARM,mS(ks),dispM(d.fp)); emitItem(vmVB,id,IM);
     const g=d===DISP.block?ap(ARM,0,-.12,.05):d===DISP.hand?ap(IM,.3,.3,.5):ap(IM,.5,.2,.5);
