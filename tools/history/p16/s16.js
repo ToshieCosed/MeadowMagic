@@ -176,8 +176,9 @@ function buildViewModel2(){ PAT=0; CB=0; vmVB.n=0; SKV.fpN=0; if(cam.mode!=='fp'
     ARM=mc(CAM,mT(bx,by,0),mT(-.4*Math.sin(f1*Math.PI)+.56*kx-(1-kx)*.14,.2*Math.sin(f1*Math.PI*2)-.52+(1-kx)*.13-eq*.6,-.2*Math.sin(sw*Math.PI)-.72),mY((45-f5*20)*DEG),mZ(-f6*20*DEG),mX(-f6*80*DEG),mY(-45*DEG));
     if(drawing) ARM=mc(CAM,mT(.28,-.42,-.62),mX(-8*DEG),mY(-6*DEG)); if(eating) ARM=mc(CAM,mT(.12,-.42+Math.abs(Math.sin(now*14))*.04,-.5),mX(-35*DEG),mY(-40*DEG));
     const d=dispOf(id), IM=mc(ARM,mS(ks),dispM(d.fp)); emitItem(vmVB,id,IM);
-    const g=d===DISP.block?ap(ARM,0,-.12,.05):d===DISP.hand?ap(IM,.3,.3,.5):ap(IM,.5,.2,.5);
-    SKV.fpN=fpArm(CAM,g,[.6,-.74,.12]); }
+    const gw=d===DISP.block?ap(ARM,0,-.12,.05):d===DISP.hand?ap(IM,.3,.3,.5):ap(IM,.5,.2,.5), dv=[gw[0]-P[0],gw[1]-P[1],gw[2]-P[2]];
+    const g=[dv[0]*R[0]+dv[1]*R[1]+dv[2]*R[2], dv[0]*Uc[0]+dv[1]*Uc[1]+dv[2]*Uc[2], -(dv[0]*F[0]+dv[1]*F[1]+dv[2]*F[2])];   // back into camera space
+    SKV.fpN=fpArm(CAM,g,[.7,-.66,.14]); }
   else { // empty hand: the fist rises from the lower right and punches forward when swinging
     const pu=Math.sin(f1*Math.PI), g=[.42*kx+f2*.5+bx,-.3+f3*.35-eq*.6+by,-.75+f4*.5-pu*.2];
     SKV.fpN=fpArm(CAM,g,[.62-pu*.2,-.72,.1+pu*.25]); }
