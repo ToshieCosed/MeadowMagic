@@ -235,6 +235,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-of
   .sx-list{grid-template-columns:repeat(auto-fill,28px);grid-auto-rows:28px}.sx-list button{width:28px;height:28px}
   #sxSearch{position:fixed;left:max(6px,env(safe-area-inset-left,0px));right:calc(31vw + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
   .sx-tools{display:none}}
+#sx.sx-store .sx-side,#sx.sx-store .sx-tools,#sx.sx-store #sxSearch{display:none!important}
+#sx.sx-store .sx-center{left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;max-height:none!important}
+#sx.sx-store .sx-win{overflow:hidden}
+#sx.sx-store .sx-slot .n{font-size:calc(var(--sxs)*.3)}#sx.sx-store .sx-slot .lbl{font-size:calc(var(--sxs)*.24)}
 #mapHud{opacity:.88;position:fixed;z-index:3;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);width:150px;height:150px;image-rendering:pixelated;border:3px solid #c9b48a;border-radius:6px;background:#e8dcb8;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 #mapHud.big{width:min(70vw,70vh);height:min(70vw,70vh)}
 .paintBody{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;justify-content:center;padding:8px;overflow:auto}
@@ -4531,7 +4535,7 @@ function setLayout(v){ const p=prefsGet(); p.invLayout=v; store.set('strata:pref
 const splitOn2=()=>splitOn()||window.__layout==='split';
 let SX=null;   // {kind:'inv'|'store', bag:openedBackpackStack, tab, q}
 function returnStack(s){ const l=addItem(s.id,s.n,s.d,s.bag); if(!l&&s.x) inv.slots[inv.landed].x=s.x; if(l){ spawnDrop(player.x,player.y+1,player.z,s.id,l,s.d,s.bag); if(s.x) drops[drops.length-1].x=s.x; } }
-function sxOpen(kind){ SX={kind,tab:SX&&SX.tab||'all',q:'',bag:null,page:0}; document.getElementById('sx').hidden=false; document.getElementById('hud').style.visibility='hidden'; document.getElementById('sxSearch').value=''; renderSX(); }
+function sxOpen(kind){ SX={kind,tab:SX&&SX.tab||'all',q:'',bag:null,page:0}; document.getElementById('sx').hidden=false; document.getElementById('sx').classList.toggle('sx-store',kind==='store'); document.getElementById('hud').style.visibility='hidden'; document.getElementById('sxSearch').value=''; renderSX(); }
 function sxClose(){ const k=SX&&SX.kind; document.getElementById('sx').hidden=true; SX=null; if(k==='store') closeStore(); else closeInv(); }
 document.getElementById('sxClose').addEventListener('click',sxClose);
 document.getElementById('sxLayout').addEventListener('click',()=>{ const k=SX&&SX.kind; setLayout('classic'); document.getElementById('sx').hidden=true; SX=null; document.getElementById('hud').style.visibility='';
@@ -4585,7 +4589,14 @@ function showGhost(x,y){ const c=inv.cursor; if(!c) return; const g=ghost(); g.s
 function moveGhost(x,y){ const g=ghost(); g.style.left=x+'px'; g.style.top=y+'px'; }
 function hideGhost(){ ghost().hidden=true; }
 function sxHoldText(){ document.getElementById('sxHold').textContent=inv.cursor?'Holding '+slotLabel(inv.cursor)+' · tap a slot to drop it':'Tap: move · Hold: pick up · Drag: drop'; }
-function renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=document.getElementById('sxB'); A.innerHTML=''; Bx.innerHTML='';
+// containers: no item bar, the two boxes grow to fill the screen and never scroll
+function sxFit(){ const sx=document.getElementById('sx'), win=sx.querySelector('.sx-win'); if(!SX||SX.kind!=='store'){ sx.style.removeProperty('--sxs'); return; }
+  const base=30; sx.style.setProperty('--sxs',base+'px'); const grids=[...win.querySelectorAll('.sx-grid')]; if(!grids.length) return;
+  let gh=0, gw=0; for(const g of grids){ const r=g.getBoundingClientRect(); gh+=r.height; gw=Math.max(gw,r.width); }
+  const oh=win.scrollHeight-gh, ow=win.scrollWidth-gw, W=innerWidth-20, H=innerHeight-20;
+  const k=Math.min((H-oh)/gh,(W-ow)/gw); sx.style.setProperty('--sxs',Math.max(18,Math.min(72,Math.floor(base*k*.97)))+'px'); }
+function renderSX(){ if(!SX) return; try{ _renderSX(); } finally { sxFit(); } }
+function _renderSX(){ if(!SX) return; const A=document.getElementById('sxA'), Bx=document.getElementById('sxB'); A.innerHTML=''; Bx.innerHTML='';
   sxHoldText();
   const head=(el,t,btns)=>{ const h=document.createElement('h4'); h.textContent=t; for(const [lbl,fn] of btns||[]){ const b=document.createElement('button'); b.className='ghost'; b.textContent=lbl; b.addEventListener('click',()=>{ fn(); renderSX(); }); h.appendChild(b); } el.appendChild(h); };
   // top box: the chest / backpack / crafting
@@ -4631,7 +4642,7 @@ function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs
     b.addEventListener('pointercancel',()=>{ clearTimeout(t); hideGhost(); });
     L.appendChild(b); }
   renderSXTools(); }
-addEventListener('resize',()=>{ if(SX&&!document.getElementById('sx').hidden) renderSXSide(); });
+addEventListener('resize',()=>{ if(SX&&!document.getElementById('sx').hidden){ renderSXSide(); sxFit(); } });
 document.getElementById('sxPrev').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)-1; if(SX.page<0) SX.page=1e9; renderSXSide(); } });
 document.getElementById('sxNext').addEventListener('click',()=>{ if(SX){ SX.page=(SX.page||0)+1; const n=+document.getElementById('sxPage').textContent.split('/')[1]; if(SX.page>=n) SX.page=0; renderSXSide(); } });
 // swipe the item panel left/right to turn pages
