@@ -313,3 +313,19 @@ All eight phases shipped in v0.19.0. How they behave in the game is described un
 **Tested:**
 - 7 AND 10 = 2, OR = 15, XOR = 13, ADD = 16 (capped), SUB = 3 (10 − 7, in face order), MIN = 7, NAND = 14.
 - A receiver in on/off mode turns a received 7 into on.
+
+## v0.20.3 — three tiers of signal blocks
+1. **Signal broadcaster and signal receiver** (wired, no wireless)
+   - Recipe: basic logic chip, fine copper wire, stone and a coil.
+   - They work only on the blocks touching them.
+   - Same logic unit as the advanced terminal: face roles, 14 operations, and exact / preset / on/off output.
+   - Defaults: the front face (the way you faced when placing it) is the output and every other face is an input. The broadcaster sends a preset level; the receiver turns a level back into on/off.
+2. **Wireless terminal** (basic)
+   - Recipe: radio control circuit, iron, glass and coils.
+   - On/off only. A broadcaster sends "on" while any input is on; a receiver outputs on from every face while its channel is on.
+3. **Advanced wireless terminal**
+   - Recipe: steel crafting table; steel, an advanced chip, a basic wireless terminal, a signal broadcaster and a signal receiver.
+   - Levels and logic over channels, as in v0.20.2.
+   - Terminals placed in v0.20.2 are this tier.
+
+All three tiers share channels: a basic broadcaster's "on" arrives as level 16.
