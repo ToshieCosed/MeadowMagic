@@ -114,7 +114,7 @@ function deliver(k){ const last=k.path[k.path.length-1]; if(!world.tiles.has(TK(
   const I0=invAt(...posOf(last,k.face)); let left=I0?invInsert(I0,k):k.n;
   if(left>0){ const ds=pipeRoute(last,k.id,k,k.from.join()); for(const D of ds){ const I1=invAt(...posOf(D.p,D.d)); if(!I1) continue; left=invInsert(I1,{...k,n:left}); if(!left) break; } }
   if(left>0){ spawnDrop(last.x+.5,last.y+1,last.z+.5,k.id,left,k.d,k.bag); if(k.x) drops[drops.length-1].sx=k.x; } }
-W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } return o.apply(this,arguments); });
+W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } if(window.finishPistons) finishPistons(); return o.apply(this,arguments); });
 
 /* ---------- hoppers and droppers ---------- */
 function stepHopper(t,dt){ const T=t.tech; T.cd=(T.cd||0)-dt; if(T.cd>0) return; T.cd=.4; const fl=T.slots[5], me=invAt(t.x,t.y,t.z);

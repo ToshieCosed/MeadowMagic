@@ -273,3 +273,18 @@ All eight phases shipped in v0.19.0. How they behave in the game is described un
 **Placed backpacks**
 - Crouch and use a backpack on a block to set it down.
 - Tap to open. Break it to pick it back up with its contents and upgrades.
+
+## v0.20.1
+**Signal timing**
+- Circuits update 20 times a second.
+- Every gate and every wireless hop takes exactly one tick, so timing is predictable and clocks can toggle every tick.
+- A CLOCK gate drove a receiver 30 blocks away at 10 Hz: 20 state changes a second.
+
+**Pistons**
+- Pushed and pulled blocks slide over 3 ticks, and the head extends and retracts smoothly.
+- The world updates when the blocks land.
+- Moves finish before a save.
+
+**Chunk loading on any machine**
+- Every machine panel has a chunk loading toggle that keeps the 3×3 chunks around it running from anywhere in the world.
+- Only machines and circuits run there. Lighting updates wait until you come back.

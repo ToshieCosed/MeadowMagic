@@ -495,7 +495,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.0</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.1</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -6822,7 +6822,7 @@ function tapLineNode(t,s,it){ const k=TK(t.x,t.y,t.z);
   linkPend=null; lineT=0; toast(`Wired · ${len.toFixed(1)} blocks`); sfx('place',t.x+.5,t.y+.9,t.z+.5,.5); }
 
 /* ---------- chunk loading for wireless terminals ---------- */
-function updateForced(){ const F=new Set(); for(const t of techList()) if(t.tech.type==='wterm'&&t.tech.cl){ const R=1; for(let a=-R;a<=R;a++) for(let b=-R;b<=R;b++) F.add(world.key((t.x>>4)+a,(t.z>>4)+b)); } world.forced=F; }
+function updateForced(){ const F=new Set(); for(const t of techList()) if(t.tech.cl){ const R=1; for(let a=-R;a<=R;a++) for(let b=-R;b<=R;b++) F.add(world.key((t.x>>4)+a,(t.z>>4)+b)); } world.forced=F; }
 
 /* ---------- machines ---------- */
 const MELT={}; for(const [k,id] of METALS19){ MELT[id]=['m_'+k,MB_INGOT]; MELT[MI[k].rod]=['m_'+k,MB_INGOT]; MELT[MI[k].plate]=['m_'+k,MB_INGOT]; MELT[MI[k].gear]=['m_'+k,MB_INGOT]; MELT[MI[k].tube]=['m_'+k,MB_INGOT]; }
@@ -6891,16 +6891,21 @@ function stepSifter(t){ const T=t.tech; let crank=null; for(let d=0;d<6;d++){ co
 const movable=(x,y,z)=>{ const b=world.get(x,y,z); if(b<0) return false; if(b===0||isLiquid(b)||(b>0&&BLOCKS[b].replace)) return 'air'; if(b===B.BEDROCK||BLOCKS[b].portal||world.tiles.has(TK(x,y,z))||SPEC[b]&&SPEC[b].h===Infinity) return false; return true; };
 function pistonExtend(t){ const d=DIR6[t.tech.f]; let n=0, x=t.x, y=t.y, z=t.z;
   for(;;){ x+=d[0]; y+=d[1]; z+=d[2]; if(y<1||y>=world.H-1||!loaded(x,z)) return false; const m=movable(x,y,z); if(!m) return false; if(m==='air') break; if(++n>12) return false; }
-  for(let i=n;i>=1;i--){ const sx=t.x+d[0]*i, sy=t.y+d[1]*i, sz=t.z+d[2]*i; world.set(sx+d[0],sy+d[1],sz+d[2],world.get(sx,sy,sz)); }
-  const h=[t.x+d[0],t.y+d[1],t.z+d[2]]; world.set(...h,TECHB.phead); const ht=newTech(...h,'phead',t.tech.f); ht.tech.sticky=t.tech.type==='spiston';
-  t.tech.ext=true; markMesh(t); sfx('piston',t.x+.5,t.y+.5,t.z+.5,.7,16); return true; }
+  const mv=[]; for(let i=n;i>=1;i--){ const sx=t.x+d[0]*i, sy=t.y+d[1]*i, sz=t.z+d[2]*i; mv.push({b:world.get(sx,sy,sz),from:[sx,sy,sz],to:[sx+d[0],sy+d[1],sz+d[2]]}); }
+  for(const m of mv) world.set(...m.from,B.AIR);
+  t._mv={list:mv,k:0,dur:3,ext:true}; t.tech.ext=true; markMesh(t); sfx('piston',t.x+.5,t.y+.5,t.z+.5,.7,16); return true; }
+function finishMove(t){ const M=t._mv; if(!M) return; t._mv=null; const d=DIR6[t.tech.f];
+  for(const m of M.list) world.set(...m.to,m.b);
+  if(M.ext){ const h=[t.x+d[0],t.y+d[1],t.z+d[2]]; world.set(...h,TECHB.phead); const ht=newTech(...h,'phead',t.tech.f); ht.tech.sticky=t.tech.type==='spiston'; }
+  markMesh(t); }
+window.finishPistons=()=>{ for(const t of techList()) if(t._mv) finishMove(t); };
 function pistonRetract(t){ const d=DIR6[t.tech.f], h=[t.x+d[0],t.y+d[1],t.z+d[2]];
   if(world.get(...h)===TECHB.phead){ world.set(...h,B.AIR); world.tiles.delete(TK(...h)); techDirty(); }
-  if(t.tech.type==='spiston'){ const p=[h[0]+d[0],h[1]+d[1],h[2]+d[2]]; if(movable(...p)===true){ world.set(...h,world.get(...p)); world.set(...p,B.AIR); } }
-  t.tech.ext=false; markMesh(t); sfx('piston',t.x+.5,t.y+.5,t.z+.5,.5,16); }
+  const mv=[]; if(t.tech.type==='spiston'){ const p=[h[0]+d[0],h[1]+d[1],h[2]+d[2]]; if(movable(...p)===true){ mv.push({b:world.get(...p),from:p,to:h}); world.set(...p,B.AIR); } }
+  t._mv={list:mv,k:0,dur:3,ext:false,head:true}; t.tech.ext=false; markMesh(t); sfx('piston',t.x+.5,t.y+.5,t.z+.5,.5,16); }
 
 /* ---------- the tick ---------- */
-let acc=0, statT=0, uiT=0; const wch={};
+let acc=0, statT=0, uiT=0; const wch={}, wchN={};
 function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
   if((tankGroupsT-=dt)<=0){ tankGroupsT=.5; buildTankGroups(); for(const g of tankGroups) levelGroup(g); }
   if((lineT-=dt)<=0){ lineT=1; buildLines(); updateForced(); }
@@ -6915,20 +6920,20 @@ function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
   for(const t of list){ const k=t.tech.type; if(k==='gate'){ t._nso=gateEval(t); t.tech.e=Math.max(0,t.tech.e-.02); } }
   for(const t of list) if(t.tech.type==='gate'&&t._nso!==t._so){ t._so=t._nso; t._chg=1; }
   for(const t of list){ const T=t.tech, k=T.type;
-    if(k==='wterm'){ const pw=T.e>.05; if(pw) T.e-=.05; if(T.role==='tx'){ const on=pw&&anySig(t); wch[T.ch]=wch[T.ch]||{}; wch[T.ch][TK(t.x,t.y,t.z)]=on; t._so=on; } else t._so=pw&&Object.values(wch[T.ch]||{}).some(v=>v); }
+    if(k==='wterm'){ const pw=T.e>.05; if(pw) T.e-=.05; if(T.role==='tx'){ const on=pw&&anySig(t); wchN[T.ch]=wchN[T.ch]||{}; wchN[T.ch][TK(t.x,t.y,t.z)]=on; t._so=on; } else t._so=pw&&Object.values(wch[T.ch]||{}).some(v=>v); }
     else if(typeOf(t)==='lamp'){ const conn=anyConn(t), want=T.e>=.5&&(!conn||anySig(t)); if(want) T.e-=.5; const isOn=!!BLOCKS[world.get(t.x,t.y,t.z)].lit;
       if(want!==isOn){ T.lt=(T.lt||0)+1; if(T.lt>2){ T.lt=0; const L=LAMPS[BLOCKS[world.get(t.x,t.y,t.z)].lamp]; world.set(t.x,t.y,t.z,want?L.on:L.off); } } else T.lt=0; }
     else if(k==='tap'){ const on=anySig(t)&&T.e>=.2; if(on) T.e-=.2; t._on=on; if(on) stepTap(t); }
-    else if(k==='piston'||k==='spiston'){ const on=anySig(t,T.f); if(on&&!T.ext&&T.e>=10){ if(pistonExtend(t)) T.e-=10; } else if(!on&&T.ext) pistonRetract(t); }
+    else if(k==='piston'||k==='spiston'){ if(t._mv){ if(++t._mv.k>=t._mv.dur) finishMove(t); continue; } const on=anySig(t,T.f); if(on&&!T.ext&&T.e>=10){ if(pistonExtend(t)) T.e-=10; } else if(!on&&T.ext) pistonRetract(t); }
     else if(k==='terminal'){ t._on=T.e>=.1; if(t._on) T.e-=.1; }
     else if(k==='mwcru') stepCrucible(t,dt);
     else if(k==='sifter') stepSifter(t);
     else if(k==='crank'){ if(T.spin>0){ T.spin=Math.max(0,T.spin-dt); T.ang=(T.ang||0)+dt*7; markDyn(); } }
     else if(k==='xpdrain') stepDrain(t);
     else if(TD(t).slots&&(k.startsWith('extr')||k==='moulder'||k==='spress'||k==='gpress'||k==='windmill'||k==='capbank'||k==='inducer'||k==='receiver')) stepMachine(t,dt); }
-  stepPours(dt);
+  stepPours(dt); for(const c in wchN){ wch[c]=Object.assign(wch[c]||{},wchN[c]); delete wchN[c]; } world.wch=wch; TICKN++;
   if((statT-=dt)<=0){ statT=1; for(const t of list){ t._inR=(t._i||0)+(t._gen||0); t._outR=(t._o||0)+(t.tech._use||0); t._i=t._o=t._gen=0; t.tech._use=0; } } }
-const markDyn=()=>{};
+const markDyn=()=>{}; let TICKN=0;
 function stepTap(t){ const tank=tN(t,OPP[t.tech.f]); if(!isTank(tank)) return; const g=tank._grp||[tank], fl=gFluid(g); if(!fl) return;
   const d=DIR6[t.tech.f], px=t.x+.5+d[0]*.3, py=t.y+.35, pz=t.z+.5+d[2]*.3;
   if(fl==='xp'){ const [,n]=tankTake(tank,MB_XP*3); if(n>=MB_XP){ const v=Math.floor(n/MB_XP); orbs.push({x:px,y:py,z:pz,vx:(Math.random()-.5)*1.2,vy:-1,vz:(Math.random()-.5)*1.2,v,t:-.2,h:Math.random()*360}); } return; }
@@ -7004,9 +7009,10 @@ function body(t){ const T=t.tech, k=T.type; let h=''; if(window.body20){ const r
       <div class="tu-rf" style="margin-top:6px">Signal: ${t._so?'ON':'off'} · Power: ${T.e>.05?'on':'off'}</div></div>`;
   if(k==='terminal') h+=`<div class="tu-box tu-rf">${termLines(t).join('<br>')}</div>`;
   return h+rfBox(t)+slotsRow(t); }
+function clRow(t){ return `<div class="tu-box tu-row"><button class="tu-b" data-cl aria-pressed="${!!t.tech.cl}">Chunk loading ${t.tech.cl?'on':'off'}</button><span class="tu-lab">Keeps the 3×3 chunks around this block running while you're anywhere in this world. Only machines and circuits run there (${world.forced?world.forced.size:0} chunks held now).</span></div>`; }
 function renderTech(full){ const t=cur; if(!t) return; if(!world.tiles.has(TK(t.x,t.y,t.z))){ closeTech(); return; }
   document.getElementById('tuT').textContent=t.tech.type==='gate'?'Logic gate · '+t.tech.g:BLOCKS[world.get(t.x,t.y,t.z)]?.name||'Machine';
-  const B2=document.getElementById('tuB'); const html=body(t)+(TD(t).slots?hotbarRow():''); if(!full&&B2._h===html) return; if(!full&&B2.contains(document.activeElement)&&document.activeElement.tagName==='INPUT') return; B2._h=html; B2.innerHTML=html;
+  const B2=document.getElementById('tuB'); const html=body(t)+(t.tech.type!=='wterm'?clRow(t):'')+(TD(t).slots?hotbarRow():''); if(!full&&B2._h===html) return; if(!full&&B2.contains(document.activeElement)&&document.activeElement.tagName==='INPUT') return; B2._h=html; B2.innerHTML=html;
   B2.querySelectorAll('[data-ts]').forEach(b=>b.onclick=()=>slotClick(t,+b.dataset.ts));
   B2.querySelectorAll('[data-hb]').forEach(b=>b.onclick=()=>{ inv.sel=+b.dataset.hb; renderHotbar(); renderTech(true); });
   B2.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ t.tech.g=b.dataset.g; t._q=null; t.tech.st=false; markMesh(t); renderTech(true); });
@@ -7127,6 +7133,10 @@ window.techDyn=function(vb,p){ const now=performance.now()/1000;
     if(k==='wterm'){ setVL(VL_EMISSIVE); emitBox(vb,[t.x+.44,t.y+1.18,t.z+.44],[t.x+.56,t.y+1.28,t.z+.56],T.e>.05?(T.role==='tx'?(t._so?[255,170,60]:[120,80,40]):(t._so?[90,255,140]:[40,110,60])):[50,50,50],IDT); }
     if(window.techDyn20) techDyn20(vb,t,T,k,lit,now);
     if(k.startsWith('extr')&&T.run){ setVL(VL_EMISSIVE); emitBox(vb,[t.x+.42,t.y+.42,t.z+.42],[t.x+.58,t.y+.58,t.z+.58],[255,200,90],oT(t.x,t.y,t.z,T.f)); } }
+  for(const t of techList()){ const M=t._mv; if(!M) continue; const d=DIR6[t.tech.f], fr=Math.min(1,(M.k+acc/.05)/M.dur);
+    for(const m of M.list){ const bd=BLOCKS[m.b]; if(!bd) continue; const x=m.from[0]+(m.to[0]-m.from[0])*fr, y=m.from[1]+(m.to[1]-m.from[1])*fr, z=m.from[2]+(m.to[2]-m.from[2])*fr; setVL(sampleLight(x+.5,y+.5,z+.5)); emitBox(vb,[x,y,z],[x+1,y+1,z+1],bd.side,IDT); emitBox(vb,[x-.002,y+.999,z-.002],[x+1.002,y+1.003,z+1.002],bd.top,IDT); }
+    const e=M.ext?fr:1-fr, hx=t.x+d[0]*e, hy=t.y+d[1]*e, hz=t.z+d[2]*e; setVL(sampleLight(t.x+.5+d[0],t.y+.5+d[1],t.z+.5+d[2])); const st=t.tech.type==='spiston';
+    emitBox(vb,[0,0,.75],[1,1,1],st?[110,190,80]:[160,130,90],oT(hx,hy,hz,t.tech.f)); emitBox(vb,[.38,.38,.75-e],[.62,.62,.75],[150,150,154],oT(t.x,t.y,t.z,t.tech.f)); }
   // wires between poles: a sagging black line
   const links=world.techLinks||[]; if(links.length){ setVL(VL_SUN); for(const l of links){ const a=world.tiles.get(l[0]), b=world.tiles.get(l[1]); if(!a||!b) continue; if(Math.hypot(a.x-p.x,a.z-p.z)>60&&Math.hypot(b.x-p.x,b.z-p.z)>60) continue;
       const A=[a.x+.5,a.y+(a.tech.type==='pole'?.98:.98),a.z+.5], Bp=[b.x+.5,b.y+.98,b.z+.5], len=Math.hypot(A[0]-Bp[0],A[1]-Bp[1],A[2]-Bp[2]), sag=Math.min(1.2,len*.05), N=Math.max(4,Math.ceil(len/1.5));
@@ -7141,7 +7151,7 @@ function lineBox(vb,a,b,r,col){ const d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], L=Math.
 const TECH_IDS=new Set([...Object.values(TECHB),...Object.values(LAMPS).map(l=>l.off),...Object.values(MI).flatMap(m=>[m.rod,...m.wire,m.plate,m.gear,m.tube]),I.ROD_MOLD,I.POOR_WIRE,...COILS,I.CLOTH,I.SAIL,I.IRON_SHARD,I.SILICON,I.MAGNET,I.SI_DISC,I.CHIP_BASIC,I.CHIP_ADV,I.RADIO,I.LINKER,...CUTTERS,...SAWS,...Object.values(BULBS)]);
 W('itemCat',o=>function(id){ return TECH_IDS.has(id)?'tech':o.apply(this,arguments); });
 if(typeof SX_TAB_ICON==='object') SX_TAB_ICON.tech=()=>I.COIL;
-window.T19={rfBox,slotsRow,hotbarRow,tN,tAt,DIR6,OPP,HDIRS,TD,TDX,TT,techList,techDirty,newTech,anySig,sigIn,ico,openTech,renderTech,slotOK,markMesh,oT,shd,lineBox,rotA,lookDir,dirOf,fmt,TK,FLUID,get cur(){ return cur; }};
+window.T19={get tickN(){ return TICKN; },finishMove,rfBox,slotsRow,hotbarRow,tN,tAt,DIR6,OPP,HDIRS,TD,TDX,TT,techList,techDirty,newTech,anySig,sigIn,ico,openTech,renderTech,slotOK,markMesh,oT,shd,lineBox,rotA,lookDir,dirOf,fmt,TK,FLUID,get cur(){ return cur; }};
 window.techAfterLoad=function(){ techDirty(); for(const t of world.tiles.values()) if(t.kind==='tech'&&!t.tech.slots) t.tech.slots=[]; updateForced(); };
 window.TECH={tapSpout,tapStand,tapLineNode,stepTap,buildLines,updateForced,tAt,TT,TECHB,LAMPS,MI,FLUID,tankAdd,tankTake,buildTankGroups,techTick,openTech,network,termLines,newTech,gateEval,wch,get groups(){ return tankGroups; },get lines(){ return lineComps; }};
 }
@@ -7261,7 +7271,7 @@ function deliver(k){ const last=k.path[k.path.length-1]; if(!world.tiles.has(TK(
   const I0=invAt(...posOf(last,k.face)); let left=I0?invInsert(I0,k):k.n;
   if(left>0){ const ds=pipeRoute(last,k.id,k,k.from.join()); for(const D of ds){ const I1=invAt(...posOf(D.p,D.d)); if(!I1) continue; left=invInsert(I1,{...k,n:left}); if(!left) break; } }
   if(left>0){ spawnDrop(last.x+.5,last.y+1,last.z+.5,k.id,left,k.d,k.bag); if(k.x) drops[drops.length-1].sx=k.x; } }
-W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } return o.apply(this,arguments); });
+W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } if(window.finishPistons) finishPistons(); return o.apply(this,arguments); });
 
 /* ---------- hoppers and droppers ---------- */
 function stepHopper(t,dt){ const T=t.tech; T.cd=(T.cd||0)-dt; if(T.cd>0) return; T.cd=.4; const fl=T.slots[5], me=invAt(t.x,t.y,t.z);
