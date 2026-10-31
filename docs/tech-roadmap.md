@@ -5,6 +5,8 @@ This is CuddlyKitsune's design for the technology tree, written down so each pha
 
 Status key: ✅ done · 🔜 next · ⏳ later
 
+All eight phases shipped in v0.19.0. How they behave in the game is described under "How it plays", at the end.
+
 ---
 
 ## Phase 1 — groundwork (v0.18.0) ✅
@@ -14,7 +16,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - Squid and glow squid. They squirt ink when hurt; the ink shot blinds. Parrots live in jungles; tame them with seeds and recolour them with dye.
 - Every animal can breed, including tame wolves and parrots. Heart particles appear for taming, love and liking the player.
 
-## Phase 2 — basic signals and the metal foundry 🔜
+## Phase 2 — basic signals and the metal foundry ✅ (v0.19.0)
 **Levers**
 - A small, explicitly user-defined amount of RF-like energy when on: "just enough to activate a sprinkler".
 
@@ -44,7 +46,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - While a lever signal is present, the tap pours. An XP tank makes an XP shower, with orbs falling out.
 - The tap stops when the signal stops.
 
-## Phase 3 — power (RF-like) and wire ⏳
+## Phase 3 — power (RF-like) and wire ✅ (v0.19.0)
 **Cutters**
 - Made from any metal above tin and copper (iron, steel, …).
 - **Poor copper wire** comes from copper ingots plus cutters.
@@ -72,7 +74,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 ====
 ```
 
-## Phase 4 — circuits ⏳
+## Phase 4 — circuits ✅ (v0.19.0)
 **Analog logic circuits**
 - Crafted from copper wire. Placed as blocks, they connect to each other and react once given RF.
 - Simulated per block, on neighbour basis.
@@ -92,7 +94,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - The **receiver** converts voltage from a copper wire into block or logic gate transfer.
 - The **inducer** converts stored or transmitted RF back into a connection for a coil or wire.
 
-## Phase 5 — powered lights ⏳
+## Phase 5 — powered lights ✅ (v0.19.0)
 **Bulbs**
 - Crafted from copper coils and glass. Coloured bulbs are available.
 
@@ -105,7 +107,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - No constant light updates: only when the cached emission changes or gets occluded. The phase 1 light cache already supports this.
 - No real-time light bounce.
 
-## Phase 6 — silicon ⏳
+## Phase 6 — silicon ✅ (v0.19.0)
 **Hand crank and sifter**
 - Two separate blocks. The player presses and clicks the sifter handle to rotate it, which gives it mechanical power.
 - One sifting step per tick.
@@ -119,7 +121,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - Built from the same kind of machine materials.
 - Disc → **basic logic chip**.
 
-## Phase 7 — terminals and wireless ⏳
+## Phase 7 — terminals and wireless ✅ (v0.19.0)
 **RF terminal**
 - Recipe: glass, a basic logic chip and copper coil parts.
 - When powered, it shows a poster-like **retro DOS-style** display of RF in and out, battery and energy statistics.
@@ -135,7 +137,7 @@ Status key: ✅ done · 🔜 next · ⏳ later
 - **Chunk-loading mode** (a setting) works across the whole overworld.
 - Dummy-loaded chunks process only the circuit. Unrelated entities and lighting updates are skipped.
 
-## Phase 8 — pistons ⏳
+## Phase 8 — pistons ✅ (v0.19.0)
 - **Pistons** and **slimy pistons** (sticky).
 - They update in chunk-loaded chunks.
 
@@ -158,3 +160,72 @@ Status key: ✅ done · 🔜 next · ⏳ later
 
 **Verified**
 - After random generation order and hundreds of random edits, the incremental result matches a full re-solve cell for cell.
+
+---
+
+## How it plays (v0.19.0)
+**Signals**
+- What counts as a signal is only what this spec states:
+  - A lever on gives a little RF (1 RF/tick) to its neighbours and a signal on every face.
+  - A gate needs RF from any neighbour to run, reads its left, right and back neighbours, and outputs from its front.
+  - A receiver outputs while it holds charge.
+  - A wireless receiver outputs its channel's state.
+- No wire or dust signalling has been invented. Copper wire is only a crafting ingredient until it is defined.
+
+**Gates**
+- One craftable logic gate (copper wire and stone). Pick its type in its panel: AND, OR, NOT, XOR, NAND, NOR, XNOR, BUF (with delay), LATCH, TFF, CLOCK, PULSE.
+- Each gate adds one tick of delay, so loops settle step by step.
+
+**Energy**
+- Touching tech blocks share energy, from fuller to emptier, and respect in/out.
+- Windmill: about 1 RF/t, more with height and open sides. It holds 10,000 RF and keeps its charge when broken.
+- Capacitor bank: 50,000 RF. Both show the green `====` meter on their sides.
+- Every RF panel shows bars, stored/capacity, in RF/s, out RF/s and loss %.
+
+**Power lines**
+- Tap a pole, inducer or receiver with any coil, then tap another one up to 24 blocks away. This uses one coil.
+- Lines draw as sagging black wires.
+- Loss is 0.4% per block of wire, capped at 60%. Throughput depends on the weakest coil tier in the line: 20, 60 or 160 RF/t.
+
+**Foundry**
+- Fuel heats the crucible toward 100%. It melts only at 90% and above, only with a spout on any face, and only into a tank beside it.
+- 1 ingot is 144 mB, ore is 288 and an iron shard is 36.
+- Click the spout to pour onto the plate stand under it: a stick becomes a rod mold, and a rod mold casts a rod (the mold stays).
+
+**Tanks**
+- Four tiers. Any tiers connect and their levels balance, filling bottom-up. Only same-type tanks merge visually into one clear structure.
+- Tanks keep their contents when broken.
+- XP is 20 mB per point. An XP drain on a tank pulls in orbs, and your XP while you stand on it.
+- A tap on a tank face pours while it has a signal: XP showers out as orbs, and molten metal pours onto a plate stand below.
+
+**Extruder**
+- Set the shape (wire, plate, gear, tube) and the thickness (fine, standard, heavy), then press Begin.
+- It needs RF: 400 RF per rod. Tiers set the speed (×1, ×2, ×3).
+- Copper rod → copper wire.
+
+**Magnets**
+- Put iron nuggets in any machine's charge slot. Each takes 100 RF.
+
+**Lamps**
+- Lamps come in 16 colours, emit at the maximum level 15 and spread 15 blocks. They light up when powered.
+- If a signal source is next to a lamp, it follows that signal.
+- A lamp mounts on any face: a post on the ground, a bracket on walls and ceilings.
+- Light only updates when a lamp switches (it uses the light cache).
+
+**Silicon**
+- Click the crank beside the sifter. Load sand by tapping the sifter with it.
+- One step per tick, 20 steps per sand.
+- Rewards: coal, iron shards, silicon, rock, seeds, bone and iron nuggets.
+- Moulder: 2 silicon → disc. Silicon press: disc + 2 fine copper wire → basic chip. Greater circuit press: advanced chip.
+
+**RF terminal**
+- Shows the network it sits on: stored energy, generation, use, loss, nodes and lines.
+- Adjacent terminals facing the same way merge into one bigger screen with bigger text.
+
+**Wireless**
+- Set the channel and the broadcaster/receiver role. The linker tool copies a broadcaster's channel to a receiver.
+- Chunk loading keeps a 3×3 chunk area running. Only circuits tick there. Lighting is deferred until you come near.
+
+**Pistons**
+- Push up to 12 blocks. The slimy piston pulls one block back.
+- They work in chunk-loaded areas. Movement is instant (no slide animation yet).

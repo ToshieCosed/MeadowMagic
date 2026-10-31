@@ -19,7 +19,7 @@ Saves live in the browser's local storage, per device.
   - Waterfalls, kelp, coral and vines.
 - **Light:** coloured block and sky light stored per chunk, re-solved only where light-relevant blocks change; torches, jack o'lanterns, sea lanterns, shroomlights and coloured lanterns.
 - **Creatures:** squid and glow squid (ink shot that blinds), tamable parrots in jungles, tamable wolves; every animal breeds, with heart particles.
-- **Roadmap:** the planned tech tree (foundry, tanks, RF power, circuits, lamps, silicon, wireless, pistons) is in [docs/tech-roadmap.md](docs/tech-roadmap.md).
+- **Tech:** metalwork crucible, spouts and casting; tiered multiblock tanks and XP; RF power with windmills, capacitors, power lines and terminals; logic gates; coloured lamps; sifting and silicon chips; wireless with chunk loading; pistons. Details are in [docs/tech-roadmap.md](docs/tech-roadmap.md).
 - **Camera and movement:**
   - Iso camera plus over-the-shoulder and first-person views.
   - Climbing with stamina, sprinting, and Minecraft 1.13-style swimming.
