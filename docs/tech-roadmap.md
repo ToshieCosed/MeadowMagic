@@ -229,3 +229,47 @@ All eight phases shipped in v0.19.0. How they behave in the game is described un
 **Pistons**
 - Push up to 12 blocks. The slimy piston pulls one block back.
 - They work in chunk-loaded areas. Movement is instant (no slide animation yet).
+
+## v0.20.0 additions
+**Capacitor banks** (EnderIO style)
+- Tiers: Basic 50k, Advanced 250k and Vibrant 1M RF. Throughput per bank: 100, 500 and 2,000 RF/t.
+- Touching banks of the same tier form one multiblock: shared charge, a merged frame, and one input/output setting (both, input only or output only).
+
+**Solar panels I–VIII** (Solar Flux style)
+- Peak output: 1, 3, 8, 20, 50, 120, 280 and 640 RF/t.
+- Output scales with daylight and open sky above the panel.
+- Touching panels pool their charge, and every panel powers whatever touches it.
+- Recipe chain:
+  - Mirror: glass + silver, aluminium or tin plate.
+  - Photovoltaic cells I–IV, made from mirrors, silicon discs, copper wire, coils and chips, plus tin, bronze, gold and steel plates.
+  - Panel I: mirrors + fine copper wire + tin plate + stone.
+  - Panels II–VIII: 2 panels of the tier below + 4 plates of that tier's metal (bronze, aluminium, gold, iron, steel, titanium, platinum) + 2 cells + a wire, coil or chip. Each tier needs the matching crafting table.
+
+**Coal generator**
+- Burns any furnace fuel for 10 RF/t and holds 20k RF.
+
+**Item distributors** (pipes)
+- They connect to each other.
+- Each side touching an inventory can be set to Off, Pick up or Deposit, with an optional filter.
+- Loads are split evenly at every fork.
+- A stack upgrade moves whole stacks at twice the speed.
+- They work with chests, placed backpacks, hoppers, droppers, furnaces and machines. Machines accept their inputs and give out their outputs.
+
+**Hoppers and droppers**
+- Hopper: pulls from the inventory above, or catches dropped items, and pushes into what it points at.
+- Dropper: gives out one item per signal.
+- Both have a filter slot.
+
+**Item filter**
+- Use it in hand to pick up to 18 items, then set Allow or Block.
+
+**Upgrades**
+- Chests take 1–5 upgrades by tier (wood to diamond). Backpacks take 1–4.
+- Stack I/II/III: ×2, ×4 or ×8 per slot for automated insertion and pickups.
+- Filter: limits what goes in. On a carried backpack it pulls matching pickups straight in.
+- Void: destroys listed items, or the overflow when its list is empty.
+- Install one by tapping a chest or backpack while holding it. Manage them with the Upgrades button while the inventory is open.
+
+**Placed backpacks**
+- Crouch and use a backpack on a block to set it down.
+- Tap to open. Break it to pick it back up with its contents and upgrades.
