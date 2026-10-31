@@ -495,7 +495,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.1</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.2</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -6760,10 +6760,25 @@ function sigOut(n,toward){ // does tile n send a signal through its face `toward
   if(k==='lever') return !!n.tech.on;
   if(k==='gate') return toward===n.tech.f&&!!n._so;
   if(k==='receiver') return (n.tech.e||0)>1;
-  if(k==='wterm') return n.tech.role==='rx'&&!!n._so;
+  if(k==='wterm') return wFace(n,toward)==='out'&&(n._lv||0)>0;
   return false; }
+// signal levels 0–16: plain on/off signals count as 16, wireless terminals carry exact levels, nothing fades
+const wFace=(t,d)=>(t.tech.fo&&t.tech.fo[d])||(t.tech.role==='rx'?'out':'in');
+const sigLevel=(n,toward)=>!n?0:n.tech.type==='wterm'?(wFace(n,toward)==='out'?(n._lv||0):0):(sigOut(n,toward)?16:0);
+const LVL=v=>Math.max(0,Math.min(16,Math.round(v)));
+const WOPS={PASS:'Highest input',AND:'Bitwise AND',OR:'Bitwise OR',XOR:'Bitwise XOR',NAND:'16 − AND',NOR:'16 − OR',XNOR:'16 − XOR',ADD:'Sum',SUB:'First minus the rest',MIN:'Lowest',MAX:'Highest',EQ:'16 if all equal',GT:'16 if first is greatest',INV:'16 − first'};
+function wOp(op,v){ if(!v.length) return 0; const r=(f)=>v.slice(1).reduce(f,v[0]);
+  switch(op){ case 'AND': return LVL(r((a,b)=>a&b)); case 'OR': return LVL(r((a,b)=>a|b)); case 'XOR': return LVL(r((a,b)=>a^b));
+    case 'NAND': return 16-LVL(r((a,b)=>a&b)); case 'NOR': return 16-LVL(r((a,b)=>a|b)); case 'XNOR': return 16-LVL(r((a,b)=>a^b));
+    case 'ADD': return LVL(v.reduce((a,b)=>a+b,0)); case 'SUB': return LVL(r((a,b)=>a-b)); case 'MIN': return Math.min(...v); case 'MAX': case 'PASS': return Math.max(...v);
+    case 'EQ': return v.every(x=>x===v[0])?16:0; case 'GT': return v.slice(1).every(x=>v[0]>x)?16:0; case 'INV': return 16-v[0]; } return Math.max(...v); }
+function wEval(t,chLevel){ const T=t.tech, vals=[];
+  if(T.role==='rx') vals.push(chLevel);
+  for(let d=0;d<6;d++) if(wFace(t,d)==='in'){ const n=tN(t,d); if(n&&sigSources.has(n.tech.type)&&(n.tech.type!=='gate'||n.tech.f===OPP[d])) vals.push(sigLevel(n,OPP[d])); }
+  const res=wOp(T.op||'PASS',vals), cv=T.conv||(T.role==='rx'?'onoff':'preset');
+  t._in=vals; t._res=res; return cv==='level'?res:cv==='onoff'?(res>0?16:0):(res>0?LVL(T.pl??16):0); }
 const sigIn=(t,d)=>{ const n=tN(t,d); return n?sigOut(n,OPP[d]):false; };
-const sigConn=(t,d)=>{ const n=tN(t,d); if(!n||!sigSources.has(n.tech.type)) return false; return n.tech.type!=='gate'||n.tech.f===OPP[d]; };
+const sigConn=(t,d)=>{ const n=tN(t,d); if(!n||!sigSources.has(n.tech.type)) return false; if(n.tech.type==='wterm') return wFace(n,OPP[d])==='out'; return n.tech.type!=='gate'||n.tech.f===OPP[d]; };
 const anySig=(t,except)=>{ for(let d=0;d<6;d++) if(d!==except&&sigIn(t,d)) return true; return false; };
 const anyConn=(t,except)=>{ for(let d=0;d<6;d++) if(d!==except&&sigConn(t,d)) return true; return false; };
 const hRot=(f,s)=>{ const i=HDIRS.indexOf(f); return HDIRS[(i+s+4)%4]; };
@@ -6920,7 +6935,8 @@ function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
   for(const t of list){ const k=t.tech.type; if(k==='gate'){ t._nso=gateEval(t); t.tech.e=Math.max(0,t.tech.e-.02); } }
   for(const t of list) if(t.tech.type==='gate'&&t._nso!==t._so){ t._so=t._nso; t._chg=1; }
   for(const t of list){ const T=t.tech, k=T.type;
-    if(k==='wterm'){ const pw=T.e>.05; if(pw) T.e-=.05; if(T.role==='tx'){ const on=pw&&anySig(t); wchN[T.ch]=wchN[T.ch]||{}; wchN[T.ch][TK(t.x,t.y,t.z)]=on; t._so=on; } else t._so=pw&&Object.values(wch[T.ch]||{}).some(v=>v); }
+    if(k==='wterm'){ const pw=T.e>.05; if(pw) T.e-=.05; const chL=Math.max(0,...Object.values(wch[T.ch]||{}).map(Number)); t._rx=chL;
+      const out=pw?wEval(t,chL):0; t._nlv=out; t._so=out>0; if(T.role==='tx'){ wchN[T.ch]=wchN[T.ch]||{}; wchN[T.ch][TK(t.x,t.y,t.z)]=out; } }
     else if(typeOf(t)==='lamp'){ const conn=anyConn(t), want=T.e>=.5&&(!conn||anySig(t)); if(want) T.e-=.5; const isOn=!!BLOCKS[world.get(t.x,t.y,t.z)].lit;
       if(want!==isOn){ T.lt=(T.lt||0)+1; if(T.lt>2){ T.lt=0; const L=LAMPS[BLOCKS[world.get(t.x,t.y,t.z)].lamp]; world.set(t.x,t.y,t.z,want?L.on:L.off); } } else T.lt=0; }
     else if(k==='tap'){ const on=anySig(t)&&T.e>=.2; if(on) T.e-=.2; t._on=on; if(on) stepTap(t); }
@@ -6931,6 +6947,7 @@ function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
     else if(k==='crank'){ if(T.spin>0){ T.spin=Math.max(0,T.spin-dt); T.ang=(T.ang||0)+dt*7; markDyn(); } }
     else if(k==='xpdrain') stepDrain(t);
     else if(TD(t).slots&&(k.startsWith('extr')||k==='moulder'||k==='spress'||k==='gpress'||k==='windmill'||k==='capbank'||k==='inducer'||k==='receiver')) stepMachine(t,dt); }
+  for(const t of list) if(t.tech.type==='wterm'){ t._lv=t._nlv||0; }
   stepPours(dt); for(const c in wchN){ wch[c]=Object.assign(wch[c]||{},wchN[c]); delete wchN[c]; } world.wch=wch; TICKN++;
   if((statT-=dt)<=0){ statT=1; for(const t of list){ t._inR=(t._i||0)+(t._gen||0); t._outR=(t._o||0)+(t.tech._use||0); t._i=t._o=t._gen=0; t.tech._use=0; } } }
 const markDyn=()=>{}; let TICKN=0;
@@ -7004,9 +7021,16 @@ function body(t){ const T=t.tech, k=T.type; let h=''; if(window.body20){ const r
   if(['moulder','spress','gpress'].includes(k)) h+=`<div class="tu-box"><div class="tu-bar"><b style="width:${(T.prog||0)*100}%"></b></div><div class="tu-msg">${T.msg||''}</div><div class="tu-lab" style="text-align:left">${{moulder:'2 silicon → lesser silicon disc · 600 RF',spress:'Disc + 2 fine copper wire → basic logic chip · 800 RF',gpress:'2 basic chips + gold ingot + 2 heavy copper wire + silicon → advanced logic chip · 2000 RF'}[k]}</div></div>`;
   if(k==='sifter') h+=`<div class="tu-box">Sand: ${T.sand||0} / 64 · Tap the sifter with sand to load it, and click the crank beside it to sift. <div class="tu-bar"><b style="width:${(T.steps||0)/20*100}%"></b></div></div>`;
   if(TD(t).tank){ const g=t._grp||[t], fl=gFluid(g); h+=`<div class="tu-box tu-rf"><b>${BLOCKS[world.get(t.x,t.y,t.z)].name}</b> · ${g.length} connected<br>${fl?FLUID[fl].name:'Empty'}: ${fmt(gAmt(g))} / ${fmt(gCap(g))} mB${fl==='xp'?` (${Math.floor(gAmt(g)/MB_XP)} XP)`:''}<div class="tu-bar" style="margin-top:6px"><b style="width:${gAmt(g)/gCap(g)*100}%;background:rgb(${fl?FLUID[fl].col:[80,80,80]})"></b></div></div>`; return h; }
+  if(k==='wterm'){ const cv=T.conv||(T.role==='rx'?'onoff':'preset'), FN=['East','West','Up','Down','South','North'];
+    h+=`<div class="tu-box"><b>Logic</b><div class="tu-row" style="margin-top:6px">${Object.keys(WOPS).map(o=>`<button class="tu-b" data-wop="${o}" aria-pressed="${(T.op||'PASS')===o}">${o}</button>`).join('')}</div>
+      <div class="tu-lab" style="text-align:left;margin-top:4px">${T.op||'PASS'}: ${WOPS[T.op||'PASS']} of ${T.role==='rx'?'the received level and ':''}the input faces. Levels run 0–16 and never fade; plain on/off signals count as 16.</div>
+      <div class="tu-row" style="margin-top:8px">Output: ${[['level','Exact level'],['preset','Preset level when above 0'],['onoff','On/off']].map(([k2,n2])=>`<button class="tu-b" data-wcv="${k2}" aria-pressed="${cv===k2}">${n2}</button>`).join('')}</div>
+      ${cv==='preset'?`<div class="tu-row" style="margin-top:6px">Preset level <input type="range" min="1" max="16" value="${T.pl??16}" data-wpl> <b>${T.pl??16}</b></div>`:''}
+      <div class="tu-row" style="margin-top:8px">${FN.map((n2,d)=>`<span class="tu-lab">${n2}</span><button class="tu-b" data-wfo="${d}">${wFace(t,d)==='in'?'In':wFace(t,d)==='out'?'Out':'Off'}</button>`).join('')}</div>
+      <div class="tu-rf" style="margin-top:8px">${T.role==='rx'?`Received on channel ${T.ch}: ${t._rx||0} · `:''}Inputs: ${(t._in||[]).join(', ')||'none'} · Result: ${t._res||0} · ${T.role==='tx'?'Broadcasting':'Output'}: ${t._lv||0}</div></div>`; }
   if(k==='wterm') h+=`<div class="tu-box"><div class="tu-row">Channel <input type="number" min="0" max="255" value="${T.ch}" data-ch style="width:70px"> <button class="tu-b" data-role="tx" aria-pressed="${T.role==='tx'}">Broadcaster</button><button class="tu-b" data-role="rx" aria-pressed="${T.role==='rx'}">Receiver</button></div>
       <div class="tu-row" style="margin-top:8px"><button class="tu-b" data-cl aria-pressed="${!!T.cl}">Chunk loading ${T.cl?'on':'off'}</button><span class="tu-lab">Keeps this area running from anywhere in the overworld. Only circuits run there: no creatures, no lighting updates.</span></div>
-      <div class="tu-rf" style="margin-top:6px">Signal: ${t._so?'ON':'off'} · Power: ${T.e>.05?'on':'off'}</div></div>`;
+      <div class="tu-rf" style="margin-top:6px">Power: ${T.e>.05?'on':'off · needs RF from a neighbour'}</div></div>`;
   if(k==='terminal') h+=`<div class="tu-box tu-rf">${termLines(t).join('<br>')}</div>`;
   return h+rfBox(t)+slotsRow(t); }
 function clRow(t){ return `<div class="tu-box tu-row"><button class="tu-b" data-cl aria-pressed="${!!t.tech.cl}">Chunk loading ${t.tech.cl?'on':'off'}</button><span class="tu-lab">Keeps the 3×3 chunks around this block running while you're anywhere in this world. Only machines and circuits run there (${world.forced?world.forced.size:0} chunks held now).</span></div>`; }
@@ -7023,6 +7047,10 @@ function renderTech(full){ const t=cur; if(!t) return; if(!world.tiles.has(TK(t.
   B2.querySelectorAll('[data-ch]').forEach(b=>b.onchange=()=>{ const old=t.tech.ch; if(wch[old]) delete wch[old][TK(t.x,t.y,t.z)]; t.tech.ch=Math.max(0,Math.min(255,+b.value|0)); renderTech(true); });
   B2.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{ if(wch[t.tech.ch]) delete wch[t.tech.ch][TK(t.x,t.y,t.z)]; t.tech.role=b.dataset.role; renderTech(true); });
   if(window.bind20) bind20(t,B2);
+  B2.querySelectorAll('[data-wop]').forEach(b=>b.onclick=()=>{ t.tech.op=b.dataset.wop; renderTech(true); });
+  B2.querySelectorAll('[data-wcv]').forEach(b=>b.onclick=()=>{ t.tech.conv=b.dataset.wcv; renderTech(true); });
+  B2.querySelectorAll('[data-wpl]').forEach(b=>b.oninput=()=>{ t.tech.pl=+b.value; renderTech(true); });
+  B2.querySelectorAll('[data-wfo]').forEach(b=>b.onclick=()=>{ const d=+b.dataset.wfo; t.tech.fo=t.tech.fo||[0,1,2,3,4,5].map(i=>wFace(t,i)); t.tech.fo[d]={in:'out',out:'off',off:'in'}[wFace(t,d)]; renderTech(true); });
   B2.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>{ t.tech.cl=!t.tech.cl; updateForced(); renderTech(true); }); }
 W('stepTiles',o=>function(dt){ o.apply(this,arguments); if(mode==='tech'&&(uiT-=dt)<=0){ uiT=.25; renderTech(false); } });
 
@@ -7151,7 +7179,7 @@ function lineBox(vb,a,b,r,col){ const d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], L=Math.
 const TECH_IDS=new Set([...Object.values(TECHB),...Object.values(LAMPS).map(l=>l.off),...Object.values(MI).flatMap(m=>[m.rod,...m.wire,m.plate,m.gear,m.tube]),I.ROD_MOLD,I.POOR_WIRE,...COILS,I.CLOTH,I.SAIL,I.IRON_SHARD,I.SILICON,I.MAGNET,I.SI_DISC,I.CHIP_BASIC,I.CHIP_ADV,I.RADIO,I.LINKER,...CUTTERS,...SAWS,...Object.values(BULBS)]);
 W('itemCat',o=>function(id){ return TECH_IDS.has(id)?'tech':o.apply(this,arguments); });
 if(typeof SX_TAB_ICON==='object') SX_TAB_ICON.tech=()=>I.COIL;
-window.T19={get tickN(){ return TICKN; },finishMove,rfBox,slotsRow,hotbarRow,tN,tAt,DIR6,OPP,HDIRS,TD,TDX,TT,techList,techDirty,newTech,anySig,sigIn,ico,openTech,renderTech,slotOK,markMesh,oT,shd,lineBox,rotA,lookDir,dirOf,fmt,TK,FLUID,get cur(){ return cur; }};
+window.T19={wOp,wEval,sigLevel,get tickN(){ return TICKN; },finishMove,rfBox,slotsRow,hotbarRow,tN,tAt,DIR6,OPP,HDIRS,TD,TDX,TT,techList,techDirty,newTech,anySig,sigIn,ico,openTech,renderTech,slotOK,markMesh,oT,shd,lineBox,rotA,lookDir,dirOf,fmt,TK,FLUID,get cur(){ return cur; }};
 window.techAfterLoad=function(){ techDirty(); for(const t of world.tiles.values()) if(t.kind==='tech'&&!t.tech.slots) t.tech.slots=[]; updateForced(); };
 window.TECH={tapSpout,tapStand,tapLineNode,stepTap,buildLines,updateForced,tAt,TT,TECHB,LAMPS,MI,FLUID,tankAdd,tankTake,buildTankGroups,techTick,openTech,network,termLines,newTech,gateEval,wch,get groups(){ return tankGroups; },get lines(){ return lineComps; }};
 }

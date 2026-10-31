@@ -288,3 +288,28 @@ All eight phases shipped in v0.19.0. How they behave in the game is described un
 **Chunk loading on any machine**
 - Every machine panel has a chunk loading toggle that keeps the 3×3 chunks around it running from anywhere in the world.
 - Only machines and circuits run there. Lighting updates wait until you come back.
+
+## v0.20.2 — signal levels and wireless logic
+**Levels**
+- Signals carry a level from 0 to 16 and never fade. Plain on/off signals count as 16 (on) or 0 (off).
+- Gates, lamps, taps and pistons treat any level above 0 as on.
+
+**Wireless terminals** (both broadcasters and receivers)
+- **Face roles:** each face can be In, Out or Off. Defaults: a broadcaster's faces are inputs, a receiver's are outputs.
+- **Operation:** combines the input-face levels. A receiver also includes the level it receives. Inputs are taken in face order: East, West, Up, Down, South, North.
+  - PASS (highest)
+  - AND, OR, XOR (bitwise)
+  - NAND, NOR, XNOR (16 minus the bitwise result)
+  - ADD (capped at 16), SUB (first minus the rest)
+  - MIN, MAX
+  - EQ (16 if all equal), GT (16 if the first is greatest)
+  - INV (16 minus the first)
+- **Output:** the exact level, a preset level (1–16) whenever the result is above 0, or on/off.
+  - A broadcaster sends its output on its channel and out of its Out faces.
+  - A receiver sends its output out of its Out faces. On/off mode drops the level.
+- **Channels:** if several broadcasters share a channel, it carries the highest level.
+- **Timing:** each terminal takes one tick, like gates.
+
+**Tested:**
+- 7 AND 10 = 2, OR = 15, XOR = 13, ADD = 16 (capped), SUB = 3 (10 − 7, in face order), MIN = 7, NAND = 14.
+- A receiver in on/off mode turns a received 7 into on.
