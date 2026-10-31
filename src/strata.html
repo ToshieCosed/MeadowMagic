@@ -495,7 +495,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.4</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.5</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -7466,6 +7466,24 @@ window.techDyn20=function(vb,t,T,k,lit,now){ const D=TT[k]||{};
   for(const k of PKT){ const i=Math.min(k.path.length-1,Math.floor(k.t)), fr=k.t-i, a=k.path[i], b=k.path[Math.min(k.path.length-1,i+1)]; let x=a.x+(b.x-a.x)*fr+.5, y=a.y+(b.y-a.y)*fr+.5, z=a.z+(b.z-a.z)*fr+.5;
     if(i===k.path.length-1){ const v=DIR6[k.face]; x+=v[0]*fr*.5; y+=v[1]*fr*.5; z+=v[2]*fr*.5; } if(Math.abs(x-p.x)>40||Math.abs(z-p.z)>40) continue;
     setVL(sampleLight(x,y,z)); const r=k.n>1?.12:.09; emitBox(vb,[x-r,y-r,z-r],[x+r,y+r,z+r],itemCol(k.id),IDT); } }; }
+/* ---------- icons for tech blocks: their own 3D model, drawn isometrically ---------- */
+const TICON={};
+function techIcon(bid){ if(TICON[bid]) return TICON[bid]; const quads=[]; let cur=[];
+  const rec={need(){},v(x,y,z,r,g,b,l){ cur.push([x,y+64,z,r,g,b,l]); if(cur.length===4){ quads.push(cur); cur=[]; } }};
+  const bk=BLOCKS[bid].tech, up=/^lamp|^lever|^tap|^crank/.test(bk), tk=TK(0,-64,0), had=world.tiles.get(tk);
+  if(up||bk==='gate'||bk==='sbcast'||bk==='srecv') world.tiles.set(tk,{kind:'tech',x:0,y:-64,z:0,s:[],tech:{type:bk,f:up?2:4,g:'AND',slots:[]}});
+  const sv=VL.slice(), pat=PAT; try{ techMesh(rec,rec,bid,BLOCKS[bid],0,-64,0); }catch(e){} VL.set(sv); PAT=pat; if(had) world.tiles.set(tk,had); else world.tiles.delete(tk);
+  const c=document.createElement('canvas'); c.width=c.height=60; if(!quads.length) return null; const g=c.getContext('2d');
+  const P=q=>[(q[0]-q[2])*.866,(q[0]+q[2])*.5-q[1]]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const Q of quads) for(const q of Q){ const p=P(q); x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); y0=Math.min(y0,p[1]); y1=Math.max(y1,p[1]); }
+  const k=52/Math.max(x1-x0,y1-y0,.6), ox=30-(x0+x1)/2*k, oy=30-(y0+y1)/2*k;
+  quads.sort((a,b)=>a.reduce((s,q)=>s+q[0]+q[1]+q[2],0)-b.reduce((s,q)=>s+q[0]+q[1]+q[2],0));
+  for(const Q of quads){ const l=Q[0][6]/255, col=`rgb(${Q[0][3]*l|0},${Q[0][4]*l|0},${Q[0][5]*l|0})`; g.fillStyle=col; g.strokeStyle=col; g.lineWidth=.6; g.beginPath();
+    Q.forEach((q,i)=>{ const p=P(q); i?g.lineTo(ox+p[0]*k,oy+p[1]*k):g.moveTo(ox+p[0]*k,oy+p[1]*k); }); g.closePath(); g.fill(); g.stroke(); }
+  return TICON[bid]=c; }
+W('itemIconCanvas',o=>function(id){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block];
+  if(bd&&bd.tech&&!(PACK&&PACK.on&&PACK.has&&PACK.has[it.block])&&typeof world!=='undefined'&&world){ const t=techIcon(it.block); if(t){ const c=document.createElement('canvas'); c.width=c.height=60; c.getContext('2d').drawImage(t,0,0); return c; } }
+  return o.apply(this,arguments); });
 window.TECH20={invAt,invInsert,invExtract,pipeRoute,splitAtForks,PKT,openFilter,openUpgrades,upTarget,fMatch};
 }
 

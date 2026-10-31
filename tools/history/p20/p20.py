@@ -19,6 +19,6 @@ R("(SX.tab==='all'||SX.tab==='can'||r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r
 R("(catTab==='all'||itemCat(id)===catTab)&&(!q||","(q||catTab==='all'||itemCat(id)===catTab)&&(!q||")
 R('<button data-c="travel">Travel</button>','<button data-c="travel">Travel</button><button data-c="tech">Tech</button>')
 R('<button data-t="travel">Travel</button>','<button data-t="travel">Travel</button><button data-t="tech">Tech</button>')
-R("v0.20.3</small>","v0.20.4</small>")
+R("v0.20.3</small>","v0.20.5</small>")
 F='/home/claude/strata.html'; open(F,'w').write(s)
 i=s.index('<script>'); j=s.rindex('</script>'); open(SP+'check.js','w').write(s[i+8:j]); print('ok20')
