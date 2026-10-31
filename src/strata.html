@@ -440,7 +440,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
     <div class="stack" id="catalogView" hidden>
       <div><h3>All items <small id="catCount" class="hint"></small></h3>
         <input type="text" id="catSearch" placeholder="Search items" aria-label="Search items">
-        <div class="seg small" id="catTabs"><button data-c="all" aria-pressed="true">All</button><button data-c="blocks">Blocks</button><button data-c="tools">Tools</button><button data-c="weapons">Weapons</button><button data-c="armor">Armor</button><button data-c="decor">Decor</button><button data-c="travel">Travel</button><button data-c="items">Items</button></div>
+        <div class="seg small" id="catTabs"><button data-c="all" aria-pressed="true">All</button><button data-c="blocks">Blocks</button><button data-c="tools">Tools</button><button data-c="weapons">Weapons</button><button data-c="armor">Armor</button><button data-c="decor">Decor</button><button data-c="travel">Travel</button><button data-c="tech">Tech</button><button data-c="items">Items</button></div>
         <p class="note">Tap an item to take a full stack (or one, with Place 1). Tap here while holding something to throw it away.</p>
         <div class="grid9" id="catGrid"></div></div>
     </div>
@@ -449,7 +449,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
         <div class="craftRow"><div class="grid3" id="cgrid"></div><span class="arrow" aria-hidden="true">→</span><button class="islot out" id="cout" aria-label="No recipe matches"></button></div>
         <p class="note">Tap a slot to pick up a stack, tap another to drop it. Turn on Place 1 to lay single items into the grid.</p></div>
       <div><h3>Recipes <small id="recCount" class="hint"></small></h3><p class="note" id="tblNote" hidden></p>
-        <div class="seg" id="recTabs" role="tablist" aria-label="Recipe type"><button data-t="all" aria-pressed="true">All</button><button data-t="tools">Tools</button><button data-t="weapons">Weapons</button><button data-t="armor">Armor</button><button data-t="blocks">Blocks</button><button data-t="decor">Decor</button><button data-t="storage">Storage</button><button data-t="travel">Travel</button><button data-t="items">Items</button></div>
+        <div class="seg" id="recTabs" role="tablist" aria-label="Recipe type"><button data-t="all" aria-pressed="true">All</button><button data-t="tools">Tools</button><button data-t="weapons">Weapons</button><button data-t="armor">Armor</button><button data-t="blocks">Blocks</button><button data-t="decor">Decor</button><button data-t="storage">Storage</button><button data-t="travel">Travel</button><button data-t="tech">Tech</button><button data-t="items">Items</button></div>
         <div class="seg small" id="recFilter" role="radiogroup" aria-label="Which recipes"><button data-f="here" aria-pressed="true">Makeable here</button><button data-f="have">Have materials</button><button data-f="all">Everything</button></div>
         <ul id="recipes"></ul></div>
     </div>
@@ -495,7 +495,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.3</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.20.4</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -3333,7 +3333,7 @@ function syncInvView(){ document.getElementById('catalogView').hidden=invView!==
   document.querySelectorAll('#invTabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===invView)); }
 function renderCatalog(){
   const g=document.getElementById('catGrid'); g.innerHTML=''; const q=document.getElementById('catSearch').value.trim().toLowerCase();
-  const ids=Object.keys(ITEMS).map(Number).filter(id=>(catTab==='all'||itemCat(id)===catTab)&&(!q||ITEMS[id].name.toLowerCase().includes(q)));
+  const ids=Object.keys(ITEMS).map(Number).filter(id=>(q||catTab==='all'||itemCat(id)===catTab)&&(!q||ITEMS[id].name.toLowerCase().includes(q)));
   document.getElementById('catCount').textContent=`${ids.length} items`;
   const io=window.__catIO||(window.__catIO=new IntersectionObserver(es=>{ for(const e of es) if(e.isIntersecting){ const im=e.target; im.src=iconURL(+im.dataset.id); window.__catIO.unobserve(im); } },{rootMargin:'200px'}));
   for(const id of ids){ const b=document.createElement('button'); b.className='islot'; b.innerHTML=iconCache[id]?`<img alt="" src="${iconCache[id]}">`:`<img alt="" data-id="${id}">`; if(!iconCache[id]) io.observe(b.firstChild); b.setAttribute('aria-label','Take '+ITEMS[id].name); b.title=ITEMS[id].name;
@@ -5200,8 +5200,8 @@ function renderSXSide(){ if(!SX) return; const T=document.getElementById('sxTabs
   // how many icons fit: the panel never scrolls, it pages
   const r=L.getBoundingClientRect(), cell=(L.firstElementChild?0:0)||(matchMedia('(orientation:portrait)').matches?30:32); const cols=Math.max(1,Math.floor((r.width+2)/cell)), rows=Math.max(1,Math.floor((r.height+2)/cell)); sxPerPage=cols*rows;
   let entries;
-  if(cre) entries=Object.keys(ITEMS).map(Number).filter(id=>(SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q))).map(id=>({id}));
-  else { entries=RECIPES.filter(r=>!r.hidden&&recipeOK(r)&&(SX.tab==='all'||SX.tab==='can'||r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))).map(r=>({id:r.out,r,ok:canCraft(r)}));
+  if(cre) entries=Object.keys(ITEMS).map(Number).filter(id=>(SX.q||SX.tab==='all'||itemCat(id)===SX.tab)&&(!SX.q||ITEMS[id].name.toLowerCase().includes(SX.q))).map(id=>({id}));
+  else { entries=RECIPES.filter(r=>!r.hidden&&recipeOK(r)&&(SX.q||SX.tab==='all'||SX.tab==='can'||r.cat===SX.tab)&&(SX.tab!=='can'||canCraft(r))&&(!SX.q||ITEMS[r.out].name.toLowerCase().includes(SX.q))).map(r=>({id:r.out,r,ok:canCraft(r)}));
     entries.sort((a,b)=>(b.ok?1:0)-(a.ok?1:0)); }
   const pages=Math.max(1,Math.ceil(entries.length/sxPerPage)); SX.page=Math.max(0,Math.min(pages-1,SX.page||0));
   document.getElementById('sxPage').textContent=`${SX.page+1}/${pages}`;
