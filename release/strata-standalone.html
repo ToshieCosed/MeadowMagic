@@ -500,7 +500,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 </section>
 
 <section class="sheet" id="pause" aria-label="Paused" hidden>
-  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.21.0</small></div>
+  <div class="brand"><h1 style="font-size:28px">PAUSED</h1><small id="pName"></small><small style="opacity:.6;margin-left:8px">v0.21.1</small></div>
   <div class="stack">
     <button class="primary" id="resume">Resume</button>
     <div class="field"><label class="l" for="rd">View distance (chunks)</label>
@@ -509,6 +509,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
       <div class="field"><label class="l" for="dayLen">Day length (min)</label><div class="range"><input type="range" id="dayLen" min="1" max="20" step="1" value="10"><output id="dayOut">10</output></div></div>
       <div class="field"><label class="l" for="nightLen">Night length (min)</label><div class="range"><input type="range" id="nightLen" min="1" max="20" step="1" value="10"><output id="nightOut">10</output></div></div>
     </div>
+    <div class="field"><label class="l" for="iScale">Item &amp; panel size</label><div class="range"><input type="range" id="iScale" min="80" max="200" step="10" value="100"><output id="iScaleOut">100%</output></div></div>
     <div class="field"><label class="l" for="sfxVol">Sound effects</label><div class="range"><input type="range" id="sfxVol" min="0" max="10" step="1" value="10"><output id="sfxOut">10</output></div></div>
     <button class="ghost" id="skipTime">Skip to night</button>
     <div class="field"><label class="l">Player skin</label>
@@ -5139,14 +5140,15 @@ function sxSlot(arr,i,el,opts){ const b=document.createElement('button'); b.clas
   b.setAttribute('aria-label',slotLabel(arr[i])); b.sxArr=arr; b.sxI=i; b.sxOpts=opts||{};
   b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(_){}
     const d={b,arr,i,x0:e.clientX,y0:e.clientY,t0:performance.now(),held:false,timer:null};
-    d.timer=setTimeout(()=>{ if(sxDrag!==d) return; if(!inv.cursor&&arr[i]&&!(opts&&opts.output)){ if(opts&&opts.accept&&false) return; clickSlot(arr,i,true); d.held=true; showGhost(e.clientX,e.clientY); try{ navigator.vibrate&&navigator.vibrate(12); }catch(_){} b.innerHTML=''; sxHoldText(); } },280);
+    d.timer=setTimeout(()=>{ if(sxDrag!==d) return; if(!inv.cursor&&arr[i]&&!(opts&&opts.output)){ if(opts&&opts.accept&&false) return; clickSlot(arr,i,true); d.held=true; d.from=true; showGhost(e.clientX,e.clientY); try{ navigator.vibrate&&navigator.vibrate(12); }catch(_){} b.innerHTML=''; sxHoldText(); } },220);
     sxDrag=d; });
-  b.addEventListener('pointermove',e=>{ const d=sxDrag; if(!d||d.b!==b) return; if(d.held) moveGhost(e.clientX,e.clientY); else if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)>12){ clearTimeout(d.timer); sxDrag=null; } });
+  b.addEventListener('pointermove',e=>{ const d=sxDrag; if(!d||d.b!==b) return; if(d.held) moveGhost(e.clientX,e.clientY); else if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)>9){ clearTimeout(d.timer); if(!inv.cursor&&arr[i]&&!(opts&&opts.output)){ clickSlot(arr,i,true); d.held=true; d.from=true; showGhost(e.clientX,e.clientY); try{ navigator.vibrate&&navigator.vibrate(8); }catch(_){} b.innerHTML=''; sxHoldText(); } else sxDrag=null; } });
   const up=e=>{ const d=sxDrag; if(!d||d.b!==b) return; clearTimeout(d.timer); sxDrag=null; hideGhost();
     if(d.held){ const t=document.elementFromPoint(e.clientX,e.clientY), tgt=t&&t.closest&&t.closest('.sx-slot'), side=t&&t.closest&&t.closest('#sxSide');
-      if(tgt&&tgt!==b&&tgt.sxArr){ sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); }
+      if(tgt&&tgt!==b&&tgt.sxArr){ sxDrop(tgt.sxArr,tgt.sxI,tgt.sxOpts); if(d.from&&inv.cursor&&!arr[i]){ arr[i]=inv.cursor; inv.cursor=null; invChanged(); } }
       else if((side&&creative()||t&&t.closest&&t.closest('.sx-trash'))&&inv.cursor){ inv.cursor=null; toast('Deleted'); }
-      renderSX(); return; }
+      else if(d.from&&inv.cursor&&!arr[i]){ arr[i]=inv.cursor; inv.cursor=null; invChanged(); }
+      document.querySelectorAll('.sx-slot.hot').forEach(x=>x.classList.remove('hot')); renderSX(); return; }
     if(e.type!=='pointerup') return;
     if(opts&&opts.output){ takeOutput(); renderSX(); return; }
     if(inv.cursor){ sxDrop(arr,i,opts); renderSX(); return; }
@@ -7684,6 +7686,29 @@ function buildShowcase(w){ const C=w.gen.C, G=SHOW_G+1, T=TECH.TECHB, X=T19;
   w.mobsInit=true; delete w.__mobs; X.techDirty();
 }
 { const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview){ buildShowcase(world); if(meta.gameMode!=='creative'){ } } }; }
+/* ---------- stage 22: item and panel size setting, easier touch dragging ---------- */
+{ const css=document.createElement('style'); css.textContent=`
+:root{--iscale:1}
+#sx{--sxs:clamp(24px,calc(min(3.6vw,6.2vh)*var(--iscale)),calc(34px*var(--iscale)))}
+.sx-slot img{width:90%;height:90%}.sx-slot .n{font-size:max(9px,calc(var(--sxs)*.3))}
+.sx-list{grid-template-columns:repeat(auto-fill,calc(30px*var(--iscale)));grid-auto-rows:calc(30px*var(--iscale))}.sx-list button{width:calc(30px*var(--iscale));height:calc(30px*var(--iscale))}
+.sx-tabs button{width:calc(28px*min(var(--iscale),1.4));height:calc(28px*min(var(--iscale),1.4))}
+#sxGhost{width:calc(48px*var(--iscale));height:calc(48px*var(--iscale))}
+.slot{width:calc(40px*var(--iscale));height:calc(40px*var(--iscale))}.slot img{width:86%;height:86%}
+#techUI .tu-slot{width:calc(52px*var(--iscale));height:calc(52px*var(--iscale))}
+.rig .islot{width:calc(52px*var(--iscale));height:calc(52px*var(--iscale))}
+@media (orientation:portrait){
+  .sx-side{width:calc(31vw/sqrt(var(--iscale)))!important}
+  #sx{--sxs:clamp(18px,min(calc(34px*var(--iscale)),calc((100vw - 31vw/sqrt(var(--iscale)) - 52px)/9)),calc(48px*var(--iscale)))}
+  .sx-list{grid-template-columns:repeat(auto-fill,calc(28px*var(--iscale)));grid-auto-rows:calc(28px*var(--iscale))}.sx-list button{width:calc(28px*var(--iscale));height:calc(28px*var(--iscale))}
+  #sxSearch{right:calc(31vw/sqrt(var(--iscale)) + 14px)!important}}
+@media (max-width:760px) and (orientation:landscape){.sx-side{width:clamp(120px,calc(100vw - 9*var(--sxs) - 60px),260px)}}`;
+  document.body.appendChild(css); }
+function setIScale(v){ v=Math.max(.8,Math.min(2,+v||1)); document.documentElement.style.setProperty('--iscale',v); const p=prefsGet(); p.iscale=v; store.set('strata:prefs',p); if(SX) renderSX(); if(typeof renderHotbar==='function') renderHotbar(); }
+{ const p=prefsGet(); document.documentElement.style.setProperty('--iscale',p.iscale||1);
+  const r=document.getElementById('iScale'), out=document.getElementById('iScaleOut'); if(r){ r.value=Math.round((p.iscale||1)*100); out.textContent=r.value+'%'; r.addEventListener('input',()=>{ out.textContent=r.value+'%'; setIScale(r.value/100); }); } }
+// while dragging, the slot under your finger lights up
+addEventListener('pointermove',e=>{ if(!sxDrag||!sxDrag.held) return; const t=document.elementFromPoint(e.clientX,e.clientY), s=t&&t.closest&&t.closest('.sx-slot'); document.querySelectorAll('.sx-slot.hot').forEach(x=>{ if(x!==s) x.classList.remove('hot'); }); if(s&&s!==sxDrag.b) s.classList.add('hot'); },{passive:true});
 
 function frame(now){
   requestAnimationFrame(frame);
