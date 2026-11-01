@@ -329,3 +329,25 @@ All eight phases shipped in v0.19.0. How they behave in the game is described un
    - Terminals placed in v0.20.2 are this tier.
 
 All three tiers share channels: a basic broadcaster's "on" arrives as level 16.
+
+## v0.21.0 — Showcase world template
+New world → World type → **Showcase** makes a flat 1000×1000 world built around a signposted tour from spawn.
+
+**Layout**
+- A stone-brick avenue runs east–west, crossed by one north–south.
+- Gravel lanes run between the rows, with lantern posts along the way.
+- Outside the tour, the wild ring holds biome strips: forests, birch, dark oak, taiga, snow, desert, badlands, jungle, swamp, mushroom fields and flower plains.
+
+**North row:** arboretum (all 11 woods), stone gallery, farm, animal pen, pond with squid, lighting hut.
+
+**South row:**
+- Storage: tiered chests full of tech parts, item distributors that split at a fork, a hopper, and a placed iron backpack with upgrades.
+- Foundry and extruders.
+- Power: windmill, coal generator, solar panels I–VIII, capacitor multiblock and an RF terminal wall.
+- Power lines.
+- Logic gates.
+- Signal levels and wireless (a lever here lights a lamp at spawn).
+- Pistons, including a clock-driven slimy piston.
+- XP tank with a tap, XP drain, sifter and silicon machines.
+
+**Far north:** house, railway, mine stairway past the ores, and a colour wall.
