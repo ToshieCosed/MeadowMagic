@@ -2029,6 +2029,7 @@ function markMeshAround(w,ch,lx,lz){ ch.dirty=true;
   const ox=lx===0?-1:lx===CS-1?1:0, oz=lz===0?-1:lz===CS-1?1:0; if(!ox&&!oz) return;
   for(const [a,b] of [[ox,0],[0,oz],[ox,oz]]) if(a||b){ const n=w.chunk(ch.cx+a,ch.cz+b); if(n) n.dirty=true; } }
 // re-solve light in world box [X0..X1]×[Y0..Y1]×[Z0..Z1]; cells just outside it are kept and act as light sources
+const TGLOW=new Map(), TANKIDS=new Set();
 function relight(w,X0,X1,Z0,Z1,Y0,Y1){
   X0=Math.max(0,X0); Z0=Math.max(0,Z0); X1=Math.min(w.size-1,X1); Z1=Math.min(w.size-1,Z1); Y0=Math.max(0,Y0); Y1=Math.min(w.H-1,Y1);
   if(X0>X1||Z0>Z1||Y0>Y1) return; const t0=performance.now();
@@ -2051,7 +2052,7 @@ function relight(w,X0,X1,Z0,Z1,Y0,Y1){
       fx[o]=0;
       if(LOPQ[bid]) r=g=b=0; else { const a=LATT[bid]; if(a){ r=r>a?r-a:0; g=g>a?g-a:0; b=b>a?b-a:0; } const tn=TINT[bid]; if(tn){ r=r*tn[0]|0; g=g*tn[1]|0; b=b*tn[2]|0; } }
       SR2[o]=r; SG2[o]=g; SB2[o]=b;
-      let e=EMIT[bid]; if(e&&LAVAID[bid]&&y+1<top&&LAVAID[bl[(y+1)*256+cb]]) e=null;
+      let e=EMIT[bid]; if(TANKIDS.has(bid)) e=TGLOW.get(wx+','+y+','+wz)||null; if(e&&LAVAID[bid]&&y+1<top&&LAVAID[bl[(y+1)*256+cb]]) e=null;
       if(e){ BR2[o]=e[0]; BG2[o]=e[1]; BB2[o]=e[2]; } else BR2[o]=BG2[o]=BB2[o]=0; } }
   // sky: open-air cells surrounded by open air can't brighten anything, so they don't need to spread
   let qt=0; const full=n=>LOPQ[id[n]]||(SR2[n]===15&&SG2[n]===15&&SB2[n]===15);
@@ -7128,7 +7129,7 @@ window.techMesh=function(vb,vg,b,bd,wx,y,wz){ const t=tAt(wx,y,wz), k=bd.tech, f
   if(k==='phead'){ const st=t&&t.tech.sticky; bx([0,0,.75],[1,1,1],st?[110,190,80]:[160,130,90]); bx([.38,.38,-.25],[.62,.62,.75],[150,150,154]); return; }
   if(k==='piston'||k==='spiston'){ const ext=t&&t.tech.ext; bx([0,0,0],[1,1,ext?1:.75],[126,126,128]); if(!ext) bx([0,0,.75],[1,1,1],k==='spiston'?[110,190,80]:[160,130,90]); else bx([.38,.38,.75],[.62,.62,1.001],[150,150,154]); bx([-.001,.4,.3],[1.001,.6,.5],[90,90,94]); return; }
   if(TT[k]&&TT[k].tank){ // frame only where the neighbour isn't the same tank, so a block of tanks reads as one
-    const same=(dx,dy,dz)=>world.get(wx+dx,y+dy,wz+dz)===b, e=.07, c=shd(S,.85);
+    const same=(dx,dy,dz)=>world.get(wx+dx,y+dy,wz+dz)===b, e=.09, c=(window.TANKFR&&TANKFR[k])||shd(S,.85);
     const edges=[]; for(const ax of [0,1,2]) for(const s1 of [0,1]) for(const s2 of [0,1]){ const o=[0,0,0], a1=(ax+1)%3, a2=(ax+2)%3; const n1=[0,0,0], n2=[0,0,0]; n1[a1]=s1?1:-1; n2[a2]=s2?1:-1;
       const nb1=same(...n1), nb2=same(...n2), diag=same(n1[0]+n2[0],n1[1]+n2[1],n1[2]+n2[2]); if(nb1&&nb2&&diag) continue; if(nb1&&!nb2||!nb1&&nb2) continue;
       const lo=[0,0,0], hi=[1,1,1]; lo[a1]=s1?1-e:0; hi[a1]=s1?1:e; lo[a2]=s2?1-e:0; hi[a2]=s2?1:e; ID(lo,hi,c); }
@@ -8076,21 +8077,51 @@ const M={
  mwcru:[[0,0,0,1,.15,1,'#3a2e2a'],[.1,.15,.1,.9,.7,.9,'#5a4a44'],[.2,.7,.2,.8,.76,.8,'#ff8a2a'],[.12,.7,.12,.88,.8,.2,'#3a2e2a'],[.12,.7,.8,.88,.8,.88,'#3a2e2a']]
 };
 M.solar=[[0,0,0,1,.16,1,'#3c3c42'],[.06,.16,.06,.94,.19,.94,'#1e3a78'],[.32,.19,.06,.36,.2,.94,'#9ab0d0'],[.62,.19,.06,.66,.2,.94,'#9ab0d0'],[.06,.19,.32,.94,.2,.36,'#9ab0d0'],[.06,.19,.62,.94,.2,.66,'#9ab0d0']];
-function techIcon(key){ const k=M[key]||(/^solar/.test(key)&&M.solar); if(!k) return null;
+const TF={tank1:'#a8bcc6',tank2:'#8a7a6a',tank3:'#7a8794',tank4:'#9ab4d4'}; window.TANKFR={}; for(const k in TF) window.TANKFR[k]=H(TF[k]);
+function tankModel(key){ const e=.09,f=TF[key],r='#e4ecf0',G='#9cd0dc',o=1-e; return [
+ [0,0,0,.03,1,1,G,.4],[0,0,0,1,1,.03,G,.4],[0,0,0,1,.03,1,'#a8e0ea',.55],
+ [0,0,0,e,1,e,f],[o,0,0,1,1,e,f],[0,0,o,e,1,1,f],[o,0,o,1,1,1,f],
+ [0,0,0,1,e,e,f],[0,0,o,1,e,1,f],[0,0,0,e,e,1,f],[o,0,0,1,e,1,f],
+ [0,o,0,1,1,e,r],[0,o,o,1,1,1,r],[0,o,0,e,1,1,r],[o,o,0,1,1,1,r],
+ [.4,.2,.985,.6,.8,1.01,'#1c2a32'],[.44,.26,1,.56,.4,1.02,'#5ae0c0'],
+ [0,0,.97,1,1,1,'#bfeaf2',.26],[.97,0,0,1,1,1,'#bfeaf2',.2]]; }
+function lampModel(bd){ const c=bd.lampCol, lit=bd.lit, bulb=c.map(v=>Math.min(255,lit?v*1.1+70:v*.75+20)); const m=[
+ [.28,0,.28,.72,.08,.72,'#32323a'],[.43,.08,.43,.57,.46,.57,'#42424a'],[.26,.46,.26,.74,.94,.74,bulb],[.3,.94,.3,.7,1,.7,'#2a2a30'],[.3,.5,.74,.7,.9,.745,bulb.map(v=>Math.min(255,v+50))]];
+ if(lit) m.push([.14,.34,.14,.86,1,.86,bulb,.28]); return m; }
+const modelFor=bd=>{ const key=bd.tech; return M[key]||(/^solar/.test(key)?M.solar:/^tank/.test(key)?tankModel(key):bd.lamp?lampModel(bd):null); };
+const col3=c=>typeof c==='string'?H(c):c;
+function techIcon(bd){ const k=modelFor(bd); if(!k) return null;
   const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d');
   g.fillStyle='rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(30,50,24,8,0,0,7); g.fill();
   const L=k.slice().sort((a,b)=>(a[0]+a[3]+a[2]+a[5]+(a[1]+a[4])*.5)-(b[0]+b[3]+b[2]+b[5]+(b[1]+b[4])*.5)); let s=7;
   const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
-  for(const q of L){ const [x0,y0,z0,x1,y1,z1,col]=q;
+  for(const q of L){ const [x0,y0,z0,x1,y1,z1,col]=q, al=q[7]===undefined?1:q[7]; g.globalAlpha=al;
     const faces=[[[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]],1.08],[[[x0,y1,z1],[x1,y1,z1],[x1,y0,z1],[x0,y0,z1]],.82],[[[x1,y1,z0],[x1,y1,z1],[x1,y0,z1],[x1,y0,z0]],.62]];
     for(const [pts,sh] of faces){ g.save(); g.beginPath(); pts.forEach((p,i)=>{const t=P(...p); i?g.lineTo(t[0],t[1]):g.moveTo(t[0],t[1]);}); g.closePath(); g.fillStyle=SH(col,sh); g.fill(); g.clip();
       const xs=pts.map(p=>P(...p)), bx=Math.min(...xs.map(a=>a[0])), by=Math.min(...xs.map(a=>a[1])), bw=Math.max(...xs.map(a=>a[0]))-bx, bh=Math.max(...xs.map(a=>a[1]))-by;
-      const n=Math.min(14,(bw*bh/18)|0); for(let i=0;i<n;i++){ g.fillStyle=rnd()<.5?'rgba(255,255,255,.13)':'rgba(0,0,0,.16)'; g.fillRect(bx+rnd()*bw|0,by+rnd()*bh|0,2,2); }
-      g.restore(); g.strokeStyle='rgba(0,0,0,.38)'; g.lineWidth=1; g.beginPath(); pts.forEach((p,i)=>{const t=P(...p); i?g.lineTo(t[0],t[1]):g.moveTo(t[0],t[1]);}); g.closePath(); g.stroke(); }
-    const t0=P(x0,y1,z1),t1=P(x1,y1,z1); g.strokeStyle='rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(t0[0],t0[1]); g.lineTo(t1[0],t1[1]); g.stroke(); }
+      const n=al<1?0:Math.min(14,(bw*bh/18)|0); for(let i=0;i<n;i++){ g.fillStyle=rnd()<.5?'rgba(255,255,255,.13)':'rgba(0,0,0,.16)'; g.fillRect(bx+rnd()*bw|0,by+rnd()*bh|0,2,2); }
+      g.restore(); g.strokeStyle=al<1?'rgba(0,0,0,0)':'rgba(0,0,0,.38)'; g.lineWidth=1; g.beginPath(); pts.forEach((p,i)=>{const t=P(...p); i?g.lineTo(t[0],t[1]):g.moveTo(t[0],t[1]);}); g.closePath(); g.stroke(); }
+    g.globalAlpha=1; const t0=P(x0,y1,z1),t1=P(x1,y1,z1); g.strokeStyle='rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(t0[0],t0[1]); g.lineTo(t1[0],t1[1]); g.stroke(); }
   return c; }
-const _iF=iconFor; iconFor=function(id){ const bd=BLOCKS[id]; if(bd&&bd.tech){ const c=techIcon(bd.tech); if(c) return c; } return _iF(id); };
+const _iF=iconFor; iconFor=function(id){ const bd=BLOCKS[id]; if(bd&&bd.tech){ const c=techIcon(bd); if(c) return c; } return _iF(id); };
 window.techIcon=techIcon;
+// held + dropped item models (emitItem) and the older mini-model path (itemBoxes) use the same models, so UI, hand and ground all match
+const _eI=emitItem; emitItem=function(vb,id,Mx){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&bd.tech?modelFor(bd):null; if(!L) return _eI(vb,id,Mx);
+  for(const q of L){ if(q[7]!==undefined&&q[7]<1&&!/^tank/.test(bd.tech)) { if(!bd.lit) continue; } if(q[7]!==undefined&&q[7]<1) continue; emitBox(vb,[q[0],q[1],q[2]],[q[3],q[4],q[5]],col3(q[6]),(x,y,z)=>ap(Mx,x,y,z)); } };
+const _iB=itemBoxes; itemBoxes=function(id){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&bd.tech?modelFor(bd):null; if(!L) return _iB(id); const s=.3;
+  return L.filter(q=>q[7]===undefined).map(q=>[[(q[0]-.5)*s,q[1]*s,(q[2]-.5)*s],[(q[3]-.5)*s,q[4]*s,(q[5]-.5)*s],col3(q[6])]); };
+// tanks holding glowing fluids (liquid XP, lava) really emit light
+for(const k of ['tank1','tank2','tank3','tank4']) TANKIDS.add(TECHB[k]);
+let _tgBusy=0; setInterval(()=>{ try{ if(_tgBusy||!world||!world.tiles||!window.TECH) return; const {TT,FLUID}=TECH, seen=new Set(), adds=[], rems=[];
+  for(const t of world.tiles.values()){ if(t.kind!=='tech') continue; const T=t.tech, D=TT[T.type]; if(!D||!D.tank) continue; const F=T.amt>0&&T.fl&&FLUID[T.fl]; const e=F&&F.glow?F.col.map(v=>Math.round(v/255*13)):null; // fixed strength: only empty<->glowing changes relight
+    const key=t.x+','+t.y+','+t.z, old=TGLOW.get(key); seen.add(key); if((!e&&!old)||(e&&old&&e[0]===old[0]&&e[1]===old[1]&&e[2]===old[2])) continue;
+    if(e){ TGLOW.set(key,e); adds.push([t.x,t.z,t.y,t.y]); } else { TGLOW.delete(key); rems.push([t.x,t.y,t.z]); } }
+  for(const key of [...TGLOW.keys()]) if(!seen.has(key)){ TGLOW.delete(key); const [x,y,z]=key.split(',').map(Number); rems.push([x,y,z]); }
+  if(!adds.length&&!rems.length) return; _tgBusy=1;
+  setTimeout(()=>{ try{ if(adds.length) (world.rlInc||(world.rlInc=[])).push(...adds.slice(0,64));
+    for(const [x,y,z] of rems.slice(0,24)) (world.rlq||(world.rlq=[])).push([x-15,x+15,z-15,z+15,y-15,y+15]);
+    if(adds.length>64||rems.length>24) for(const q of adds.slice(64).concat(rems.slice(24).map(([x,y,z])=>[x,z,y,y]))) (world.rlInc||(world.rlInc=[])).push(q); }catch(e){} _tgBusy=0; },0);
+ }catch(e){ _tgBusy=0; } },1500);
 })();
 
 </script>
