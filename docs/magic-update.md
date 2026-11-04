@@ -87,3 +87,13 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - **Premade**: 41 designs (skull & crossbones, X, !, town, home, shop, anvil, sword, tavern, zombie, pickaxe, tree, water, frost, fire, shadow, arcane, life, boots, hammer, axe, chest armour, helmet, leggings, ghost, food, chicken, pig, sheep, smeltery, cauldron, grass, technology, sunrise, sunset, flippers, wolf, stairs, prohibited, builder, shears, chest) plus 16 plain colours. Tap one to load it, then craft; tick "Craft on tap" to craft straight from the list.
 - Block parts can now carry their own colour (7th value in a box), which is how beds get wooden frames with coloured mattresses.
 - Test: `tools/tests/phase14_beds_banners.py outdir` (contact sheets of every piece and premade banner, bed/bag/sleep/respawn assertions, banner placement, editor screenshot).
+
+## v0.38.0 — coloured wires and bundles
+
+- 16 coloured wires (1 copper wire + 1 wool → 4). Tap a block face to lay a wire on it; tap the same wire again to remove it; tap a second block in a straight line on the same face to fill the run (works up poles). Several colours can share a face side by side. Wires run on their own — no dangling.
+- Bundle block (copper wires around stone, 4): any wire touching a bundle joins that colour's channel; touching bundles form a cable that carries every colour at once. Tech blocks next to a bundle are on every channel it carries.
+- Signal: 0–16, the strongest source on a colour wins (2 and 7 into a T → 7). Any live net (signal or RF) switches pistons/lamps on.
+- RF shares over the same net: producers fill consumers and batteries with a fair, demand-capped split; batteries top up what producers can't cover; full devices draw nothing.
+- Tap a wired face with an empty hand to read its signal/RF. Wires with no block under them drop as items.
+- Not integrated: pressure plates and plate-driven iron doors are not tech tiles.
+- Test: `tools/tests/phase15_wires.py`.

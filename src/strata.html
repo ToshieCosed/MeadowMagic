@@ -1003,6 +1003,10 @@ for(const d of DYES){ const col=hex(d.wool), dk=col.map(v=>v*.8|0), wood=[120,82
     def(id,d.name+' sleeping bag',d.wool,d.wool,0,{opaque:false,lightOpaque:0,shape:1,decor:1,support:1,boxes:[[0,0,0,1,.16,1]],rboxes:BAG.map(q=>rotBox(q,fi)),bag:{k:d.k,fi},noItem:fi?1:0}); pat(id,PT.WOOL); }
   for(const part of d.bedF.concat(d.bedH)) BLOCKS[part].drop=d.bedF[0]; for(const id of d.bagB) BLOCKS[id].drop=d.bagB[0];
   for(let fi=0;fi<4;fi++){ BLOCKS[d.bedF[fi]].bedPair=[d.bedF,d.bedH]; BLOCKS[d.bagB[fi]].bagSet=d.bagB; } }
+{ const id=NB('BUNDLE'), dk=[48,52,62], lt=[96,102,118], bands=[[210,50,45],[70,175,80],[65,100,220],[245,205,55]];
+  def(id,'Wire bundle','#545a68','#30343e',0,{opaque:false,lightOpaque:0,shape:1,decor:1,bundle:1,boxes:[[.2,.2,.2,.8,.8,.8]],
+    rboxes:[[.2,.2,.2,.8,.8,.8,dk],[.35,.35,0,.65,.65,.2,lt],[.35,.35,.8,.65,.65,1,lt],[0,.35,.35,.2,.65,.65,lt],[.8,.35,.35,1,.65,.65,lt],[.35,0,.35,.65,.2,.65,lt],[.35,.8,.35,.65,1,.65,lt],
+      ...bands.map((c,i)=>[.17,.28+i*.12,.17,.83,.34+i*.12,.83,c])]}); pat(id,PT.METAL); }
 { const id=NB('LOOM'); const wd=[120,82,48], lt=[196,156,104];
   def(id,'Weaving wheel','#c59a5f','#a97f4d',0,{opaque:false,lightOpaque:0,shape:1,decor:1,loom:1,boxes:[[.06,0,.1,.94,.95,.9]],
     rboxes:[[.06,0,.14,.94,.1,.86,wd],[.1,.1,.2,.2,.92,.8,wd],[.8,.1,.2,.9,.92,.8,wd],[.2,.76,.24,.8,.92,.76,lt],[.22,.3,.44,.78,.84,.56,lt],[.44,.52,.38,.56,.64,.62,[60,44,30]],[.2,.68,.3,.8,.74,.7,[236,236,240]],[.28,.1,.62,.5,.32,.84,[176,46,38]]]}); pat(id,PT.PLANK); }
@@ -2895,7 +2899,7 @@ const INSTR={piano:{name:'Piano',w:'triangle',a:.004,d:1.2,s:0,r:.3,o:0,h:.5},lu
 for(const k in INSTR) INSTR[k].item=NI('INST_'+k.toUpperCase(),INSTR[k].name,{stack:1,instrument:k});
 NI('DISC_BLANK','Blank music disc'); NI('DISC','Music disc',{stack:1,disc:1});
 NI('DEMON_BONE','Demon bone'); NI('DEMON_EYE','Demon eye');
-NI('FORGEWRITE','ForgeWrite',{stack:1,forgewrite:1}); NI('FORGEWRITE_SIGNED','Written ForgeWrite',{stack:1,forgewrite:2}); NI('SIGN','Sign',{stack:16,decorItem:1,decor:1}); NI('HSIGN','Hanging sign',{stack:16,decorItem:1,decor:1}); NI('BANNER','Banner',{stack:1,decorItem:1,decor:1});
+NI('FORGEWRITE','ForgeWrite',{stack:1,forgewrite:1}); NI('FORGEWRITE_SIGNED','Written ForgeWrite',{stack:1,forgewrite:2}); NI('SIGN','Sign',{stack:16,decorItem:1,decor:1}); NI('HSIGN','Hanging sign',{stack:16,decorItem:1,decor:1}); NI('BANNER','Banner',{stack:1,decorItem:1,decor:1}); for(const d of DYES){ const id=NI('CWIRE_'+d.k,d.name+' wire',{stack:64,decorItem:1,decor:1}); ITEMS[id].wireC=DYES.indexOf(d); }
 NI('BUCKET','Bucket',{stack:16,decorItem:0,bucket:'empty'}); NI('BUCKET_WATER','Water bucket',{stack:1,bucket:'w'}); NI('BUCKET_LAVA','Lava bucket',{stack:1,bucket:'l'});
 NI('GLIDER','Hang glider',{stack:1,glider:1}); NI('DUSK_ORB','Dusk orb',{stack:16}); NI('DUSK_PEARL','Dusk pearl');
 for(const sl of SLIMES){ sl.jelly=NI('JELLY_'+sl.k.toUpperCase(),sl.d.name+' slime jelly',{jelly:sl.d.dye}); }
@@ -5631,6 +5635,7 @@ function saveGame(){
     drops:drops.slice(0,600).map(q=>({x:q.x,y:q.y,z:q.z,vx:q.vx,vy:q.vy,vz:q.vz,id:q.id,n:q.n,d:q.d,bag:q.bag,sx:q.sx,age:q.age})),
     time:world.time,dayLen:world.dayLen,nightLen:world.nightLen,
     bedSpawn:world.bedSpawn||null,
+    wires:world.wires?[...world.wires.entries()]:[],
     decor:world.decor.map(d=>{ const o={...d,item:d.item?packS(d.item):null}; delete o.texObj; delete o.texKey; delete o.tex; delete o.canvas; return o; }), arts:world.arts, maps:world.maps.map(m=>({cx:m.cx,cz:m.cz,px:b64(m.px)})),
     techLinks:world.techLinks||[],
     tiles:[...world.tiles.values()].map(t=>({tech:t.tech,up:t.up,disc:t.disc||null,size:t.size,id:t.id,n:t.n,kind:t.kind,x:t.x,y:t.y,z:t.z,s:t.s.map(packS),burn:t.burn,burnMax:t.burnMax,heat:t.heat,prog:t.prog,dc:t.dc,dcol:t.dcol,lit:t.lit}))});
@@ -5664,7 +5669,7 @@ function startWorld(meta,save,preview){
   mobs=[]; vehicles=[]; booms=[]; hook=null; player.mount=null; player.sitting=false;
   drops.length=0; if(save&&save.drops) for(const q of save.drops) if(ITEMS[q.id]) drops.push({...q,spin:0}); arrows.length=0; decay.length=0; mining=null; hudDirty=true; invChanged();
   world.decor=(save&&save.decor||[]).map(d=>{ const o={...d,item:d.item?unpackS(d.item):null}; if(!o.fixU&&o.n&&o.n[1]===0&&o.u&&o.u[0]===-o.n[2]&&o.u[2]===o.n[0]){ o.u=[-o.u[0],0,-o.u[2]]; } o.fixU=1; return o; }); world.arts=save&&save.arts||[]; world.maps=(save&&save.maps||[]).map(m=>({cx:m.cx,cz:m.cz,px:unb64(m.px),dirty:true}));
-  world.pocketInfo=save&&save.pocketInfo||{}; world.lootDone=save&&save.lootDone||{}; world.bedSpawn=save&&save.bedSpawn||null;
+  world.pocketInfo=save&&save.pocketInfo||{}; world.lootDone=save&&save.lootDone||{}; world.bedSpawn=save&&save.bedSpawn||null; world.wires=new Map(save&&save.wires||[]);
   world.tiles=new Map(); world.time=save&&save.time!=null?save.time:40; world.dayLen=save&&save.dayLen||600; world.nightLen=save&&save.nightLen||600;
   if(save&&save.tiles) for(const t of save.tiles){ world.tiles.set(tileKey(t.x,t.y,t.z),{...t,kind:t.kind||'furnace',s:t.s.map(unpackS),smokeT:0}); }
   world.techLinks=save&&save.techLinks||[]; if(window.techAfterLoad) techAfterLoad();
@@ -6909,11 +6914,12 @@ function wOp(op,v){ if(!v.length) return 0; const r=(f)=>v.slice(1).reduce(f,v[0
     case 'EQ': return v.every(x=>x===v[0])?16:0; case 'GT': return v.slice(1).every(x=>v[0]>x)?16:0; case 'INV': return 16-v[0]; } return Math.max(...v); }
 function wEval(t,chLevel){ const T=t.tech, vals=[];
   if(WIRELESS.has(T.type)&&T.role==='rx') vals.push(chLevel);
-  for(let d=0;d<6;d++) if(wFace(t,d)==='in'){ const n=tN(t,d); if(n&&sigSources.has(n.tech.type)&&(n.tech.type!=='gate'||n.tech.f===OPP[d])) vals.push(sigLevel(n,OPP[d])); }
+  for(let d=0;d<6;d++) if(wFace(t,d)==='in'){ const n=tN(t,d); if(n&&sigSources.has(n.tech.type)&&(n.tech.type!=='gate'||n.tech.f===OPP[d])) vals.push(sigLevel(n,OPP[d])); if(WIR()&&WIR().conn(t,d)) vals.push(WIR().inLevel(t,d)); }
   const res=wOp(T.op||'PASS',vals), cv=T.conv||(T.type==='srecv'||(T.type==='wterm'&&T.role==='rx')?'onoff':'preset');
   t._in=vals; t._res=res; return cv==='level'?res:cv==='onoff'?(res>0?16:0):(res>0?LVL(T.pl??16):0); }
-const sigIn=(t,d)=>{ const n=tN(t,d); return n?sigOut(n,OPP[d]):false; };
-const sigConn=(t,d)=>{ const n=tN(t,d); if(!n||!sigSources.has(n.tech.type)) return false; if(LVOUT.has(n.tech.type)) return wFace(n,OPP[d])==='out'; return n.tech.type!=='gate'||n.tech.f===OPP[d]; };
+const WIR=()=>window.WIRE; // coloured wires and bundles (v0.38)
+const sigIn=(t,d)=>{ const n=tN(t,d); return (n?sigOut(n,OPP[d]):false)||(WIR()?WIR().inLevel(t,d)>0:false); };
+const sigConn=(t,d)=>{ if(WIR()&&WIR().conn(t,d)) return true; const n=tN(t,d); if(!n||!sigSources.has(n.tech.type)) return false; if(LVOUT.has(n.tech.type)) return wFace(n,OPP[d])==='out'; return n.tech.type!=='gate'||n.tech.f===OPP[d]; };
 const anySig=(t,except)=>{ for(let d=0;d<6;d++) if(d!==except&&sigIn(t,d)) return true; return false; };
 const anyConn=(t,except)=>{ for(let d=0;d<6;d++) if(d!==except&&sigConn(t,d)) return true; return false; };
 const hRot=(f,s)=>{ const i=HDIRS.indexOf(f); return HDIRS[(i+s+4)%4]; };
@@ -9640,6 +9646,113 @@ function refresh(){ if(!ED.built) return;
   refreshPrev(); }
 function openLoom(target){ mk(); ED.target=target||null; if(target) ED.ban=cloneBan(target.ban); else if(!ED.ban) ED.ban=newBan(); ED.sel=-1; ED.eye=false; ED.layer=0; mode='ui'; mining=null; $('loomUI').hidden=false; buildGrid(); refresh(); }
 window.__v37={renderBanner,PIECE,PL,PRESETS,openLoom,ED,sleepIn,placeBanner,newBan,cloneBan,emojiCanvas,ICO};
+})();
+
+/* ===== v0.38.0: coloured wires on block faces, bundle cables, shared signal + RF networks ===== */
+(function(){
+const X=window.T19, D6=X.DIR6, OPP=X.OPP, CC=DYES.map(d=>d.dye), CN=DYES.map(d=>d.name);
+const WID=DYES.map(d=>I['CWIRE_'+d.k]), WIDSET=new Set(WID);
+const ck=(x,y,z)=>x+','+y+','+z;
+const Wm=()=>world.wires||(world.wires=new Map());
+const isBundle=b=>b>0&&BLOCKS[b]&&BLOCKS[b].bundle;
+let dirty=true, nets=[], geo=[], termIdx=new Map(), cleanT=0, lastW=null;
+const hasSeg=(x,y,z,f,c)=>{ const a=Wm().get(ck(x,y,z)); return !!a&&a.indexOf(f*16+c)>=0; };
+function addSeg(x,y,z,f,c){ const k=ck(x,y,z); let a=Wm().get(k); if(!a) Wm().set(k,a=[]); const v=f*16+c; if(a.indexOf(v)>=0) return false; a.push(v); dirty=true; return true; }
+function delSeg(x,y,z,f,c){ const k=ck(x,y,z), a=Wm().get(k); if(!a) return false; const i=a.indexOf(f*16+c); if(i<0) return false; a.splice(i,1); if(!a.length) Wm().delete(k); dirty=true; return true; }
+// the segments a wire on face f of block (x,y,z) joins, like rails: along the same face, around an outside corner onto the next face of the same block, or up an inside corner onto the wall
+function neigh(x,y,z,f,c){ const out=[]; for(let d=0;d<6;d++){ if((d>>1)===(f>>1)) continue; const v=D6[d], nx=x+v[0], ny=y+v[1], nz=z+v[2];
+    if(hasSeg(nx,ny,nz,f,c)) out.push([nx,ny,nz,f,d]);
+    if(hasSeg(x,y,z,d,c)) out.push([x,y,z,d,d]);
+    const fv=D6[f], wx=nx+fv[0], wy=ny+fv[1], wz=nz+fv[2]; if(hasSeg(wx,wy,wz,OPP[d],c)) out.push([wx,wy,wz,OPP[d],d]); }
+  return out; }
+function bundlesAt(x,y,z,f){ const out=[]; if(isBundle(world.get(x,y,z))) out.push([x,y,z,-1]); for(let d=0;d<6;d++){ if(d===OPP[f]) continue; const v=D6[d]; if(isBundle(world.get(x+v[0],y+v[1],z+v[2]))) out.push([x+v[0],y+v[1],z+v[2],d]); } return out; }
+
+// ---------------- building the networks ----------------
+function segBoxes(x,y,z,f,c,arm){ const a=f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(c+.5)/16, hw=.028, org=[x,y,z], out=[], n0=(f&1)?-.034:1.004, n1=(f&1)?-.004:1.034;
+  const box=(lo,hi)=>{ const mn=[0,0,0], mx=[0,0,0]; mn[a]=org[a]+n0; mx[a]=org[a]+n1; mn[pl[0]]=org[pl[0]]+lo[0]; mx[pl[0]]=org[pl[0]]+hi[0]; mn[pl[1]]=org[pl[1]]+lo[1]; mx[pl[1]]=org[pl[1]]+hi[1]; out.push([mn,mx]); };
+  box([lane-hw,lane-hw],[lane+hw,lane+hw]);
+  for(let d=0;d<6;d++){ if((d>>1)===a||!arm[d]) continue; const pi=pl.indexOf(d>>1), po=1-pi, lo=[0,0], hi=[0,0]; lo[po]=lane-hw; hi[po]=lane+hw; if(d&1){ lo[pi]=0; hi[pi]=lane-hw; } else { lo[pi]=lane+hw; hi[pi]=1; } box(lo,hi); }
+  return out; }
+function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
+  // wires need something to hang on
+  for(const [k,a] of [...wires]){ const [x,y,z]=k.split(',').map(Number), b=world.get(x,y,z); if(b===0||(b>0&&isW(b))){ for(const v of a) spawnDrop(x+.5,y+.5,z+.5,WID[v&15],1); wires.delete(k); } }
+  const par=new Map(), find=k=>{ let r=k; while(par.get(r)!==r) r=par.get(r); while(par.get(k)!==r){ const n=par.get(k); par.set(k,r); k=n; } return r; }, mk=k=>{ if(!par.has(k)) par.set(k,k); }, uni=(a,b)=>{ mk(a); mk(b); a=find(a); b=find(b); if(a!==b) par.set(a,b); };
+  const cl=new Map(), clusters=[]; const clusterOf=(x,y,z)=>{ const k=ck(x,y,z); if(cl.has(k)) return cl.get(k); const c={id:clusters.length,cells:[],cols:new Set()}; clusters.push(c); const q=[[x,y,z]]; cl.set(k,c);
+    while(q.length){ const p=q.pop(); c.cells.push(p); for(const v of D6){ const nx=p[0]+v[0], ny=p[1]+v[1], nz=p[2]+v[2], nk=ck(nx,ny,nz); if(!cl.has(nk)&&isBundle(world.get(nx,ny,nz))){ cl.set(nk,c); q.push([nx,ny,nz]); } } } return c; };
+  const segs=[]; geo=[];
+  for(const [k,a] of wires){ const [x,y,z]=k.split(',').map(Number); for(const v of a){ const f=v>>4, c=v&15, key=k+','+v, arm=[0,0,0,0,0,0], seg={x,y,z,f,c,v,key,net:null}; mk(key);
+      for(const n of neigh(x,y,z,f,c)){ arm[n[4]]=1; uni(key,ck(n[0],n[1],n[2])+','+(n[3]*16+c)); }
+      for(const b of bundlesAt(x,y,z,f)){ if(b[3]>=0&&(b[3]>>1)!==(f>>1)) arm[b[3]]=1; const C=clusterOf(b[0],b[1],b[2]); C.cols.add(c); uni(key,'B'+C.id+':'+c); }
+      seg.boxes=segBoxes(x,y,z,f,c,arm); segs.push(seg); geo.push(seg); } }
+  const byRoot=new Map(), get=r=>{ let n=byRoot.get(r); if(!n){ n={c:-1,segs:[],terms:[],lv:0,live:false,rf:0,b1:0,b1t:null,b2:0,sup:0}; byRoot.set(r,n); nets.push(n); } return n; };
+  nets=[]; termIdx=new Map();
+  for(const s of segs){ const n=get(find(s.key)); n.c=s.c; n.segs.push(s); s.net=n; const t=tAt(s.x,s.y,s.z); if(t) n.terms.push({t,face:s.f}); }
+  for(const C of clusters) for(const c of C.cols){ const root=find('B'+C.id+':'+c); if(!par.has('B'+C.id+':'+c)) continue; const n=get(root); n.c=c;
+    for(const p of C.cells) for(let d=0;d<6;d++){ const v=D6[d], t=tAt(p[0]+v[0],p[1]+v[1],p[2]+v[2]); if(t&&!isBundle(world.get(t.x,t.y,t.z))) n.terms.push({t,face:OPP[d]}); } }
+  for(const n of nets) for(const e of n.terms){ const k=ck(e.t.x,e.t.y,e.t.z); let a=termIdx.get(k); if(!a) termIdx.set(k,a=[]); a.push({face:e.face,net:n}); } }
+
+// ---------------- the simulation: strongest signal wins, RF is shared out by demand ----------------
+function fair(dem,T){ const g=dem.map(()=>0); let rem=T, idx=dem.map((_,i)=>i); while(rem>1e-9&&idx.length){ const share=rem/idx.length, next=[]; for(const i of idx){ const need=dem[i]-g[i], give=Math.min(need,share); g[i]+=give; rem-=give; if(need-give>1e-9) next.push(i); } if(next.length===idx.length) break; idx=next; } return g; }
+function stepNet(n){ const seen=new Set(); let b1=0,b1t=null,b2=0; const P=[],C=[],Bt=[];
+  for(const e of n.terms){ const t=e.t; if(world.tiles.get(ck(t.x,t.y,t.z))!==t) continue;
+    const lv=X.sigLevel(t,e.face); if(lv>b1){ b2=b1; b1=lv; b1t=t; } else if(lv>b2) b2=lv;
+    if(seen.has(t)) continue; seen.add(t); const D=X.TDX(t); if(!D.cap) continue; const en=t.tech.e||0, rate=D.rate||0;
+    if(D.io==='out'){ if(en>1e-6) P.push([t,Math.min(rate,en)]); } else if(D.io==='in'){ const dm=Math.min(rate,D.cap-en); if(dm>1e-6) C.push([t,dm]); }
+    else { const sp=Math.min(rate,en), dm=Math.min(rate,D.cap-en); Bt.push([t,sp,dm]); } }
+  n.b1=b1; n.b1t=b1t; n.b2=b2;
+  // 1. producers feed everything that has room (consumers and batteries share fairly)
+  const all=C.map(c=>[c[0],c[1],0]).concat(Bt.filter(b=>b[2]>1e-6).map(b=>[b[0],b[2],1])), S1=P.reduce((a,p)=>a+p[1],0), D1=all.reduce((a,c)=>a+c[1],0), T1=Math.min(S1,D1);
+  let rf=0; const charged=new Set();
+  if(T1>1e-9){ const g=fair(all.map(c=>c[1]),T1); all.forEach((c,i)=>{ if(g[i]<=0) return; c[0].tech.e+=g[i]; c[0]._i=(c[0]._i||0)+g[i]; c[3]=g[i]; if(c[2]) charged.add(c[0]); }); P.forEach(p=>{ const d=T1*p[1]/S1; p[0].tech.e-=d; p[0]._o=(p[0]._o||0)+d; }); rf+=T1; }
+  // 2. batteries top up consumers that producers could not cover
+  const bs=Bt.filter(b=>b[1]>1e-6&&!charged.has(b[0])), S2=bs.reduce((a,b)=>a+b[1],0);
+  const rem=C.map(c=>{ const a=all.find(x=>x[0]===c[0]); return [c[0],Math.max(0,c[1]-(a&&a[3]||0))]; }).filter(c=>c[1]>1e-6), R=rem.reduce((a,c)=>a+c[1],0), T2=Math.min(S2,R);
+  if(T2>1e-9){ const g=fair(rem.map(c=>c[1]),T2); rem.forEach((c,i)=>{ if(g[i]<=0) return; c[0].tech.e+=g[i]; c[0]._i=(c[0]._i||0)+g[i]; }); bs.forEach(b=>{ const d=T2*b[1]/S2; b[0].tech.e-=d; b[0]._o=(b[0]._o||0)+d; }); rf+=T2; }
+  n.rf=rf; n.sup=S1+Bt.reduce((a,b)=>a+b[1],0); n.live=n.sup>1e-6||rf>1e-6; n.lv=Math.max(b1,n.live?16:0); }
+function step(){ if(!world||world.preview||!(['play','inv','cru','store','tech'].includes(mode))) return;
+  if(dirty||(cleanT-=1)<=0){ cleanT=20; rebuild(); }
+  for(const n of nets) stepNet(n); }
+setInterval(()=>{ try{ step(); }catch(e){ console.error('wires',e); } },50);
+// the tech blocks ask these when they look for input
+const lvEx=(n,t)=>Math.max(n.b1t===t?n.b2:n.b1,n.live?16:0);
+window.WIRE={ nets:()=>nets, rebuild, addSeg, delSeg, hasSeg, step,
+  inLevel(t,d){ const a=termIdx.get(ck(t.x,t.y,t.z)); if(!a) return 0; let m=0; for(const e of a) if(e.face===d) m=Math.max(m,lvEx(e.net,t)); return m; },
+  conn(t,d){ const a=termIdx.get(ck(t.x,t.y,t.z)); if(!a) return false; for(const e of a) if(e.face===d) return true; return false; } };
+
+// ---------------- placing and removing ----------------
+function useWire(){ if(!creative()){ const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); } }
+function have(){ if(creative()) return 1e9; const s=held(); return s?s.n:0; }
+function placeWire(sx,sy,c){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap the face of a block'); return; } const [x,y,z]=r.hit; if(!reachOK(x,y,z)){ toast('Too far away'); return; }
+  const hb=world.get(x,y,z); if(!(hb>0)||isW(hb)){ toast('Wires need a block to sit on'); return; }
+  const f=D6.findIndex(v=>v[0]===r.prev[0]-x&&v[1]===r.prev[1]-y&&v[2]===r.prev[2]-z); if(f<0) return;
+  if(hasSeg(x,y,z,f,c)){ delSeg(x,y,z,f,c); if(!creative()){ if(addItem(WID[c],1)) spawnDrop(x+.5,y+1,z+.5,WID[c],1); invChanged(); } lastW=null; toast(CN[c]+' wire removed'); return; }
+  // tap a second block on the same face in a straight line and the run between is laid for you
+  const L=lastW; let n=0;
+  if(L&&L.f===f&&L.c===c&&((L.x!==x)+(L.y!==y)+(L.z!==z))===1&&(f>>1)!==(L.x!==x?0:L.y!==y?1:2)){ const ax=L.x!==x?0:L.y!==y?1:2, len=Math.abs([x,y,z][ax]-[L.x,L.y,L.z][ax]), st=Math.sign([x,y,z][ax]-[L.x,L.y,L.z][ax]);
+    if(len<=64){ for(let i=1;i<=len&&have()>0;i++){ const p=[L.x,L.y,L.z]; p[ax]+=st*i; const b=world.get(p[0],p[1],p[2]); if(!(b>0)||isW(b)) continue; if(addSeg(p[0],p[1],p[2],f,c)){ n++; useWire(); } } } }
+  else if(have()>0&&addSeg(x,y,z,f,c)){ n=1; useWire(); }
+  if(!n){ toast(have()>0?'Nothing to lay there':'You are out of '+CN[c].toLowerCase()+' wire'); return; }
+  lastW={x,y,z,f,c}; sfx&&sfx('place',x+.5,y+.5,z+.5,.4,10); }
+{ const _ud=useDecor; useDecor=function(sx,sy){ const s=held(), it=s&&ITEMS[s.id]; if(it&&it.wireC!=null){ placeWire(sx,sy,it.wireC); return true; } return _ud(sx,sy); }; }
+// breaking the block takes its wires with it
+{ const _bb=breakBlock; breakBlock=function(){ const r=_bb.apply(this,arguments); cleanT=0; dirty=true; return r; }; }
+// tap a wired face with an empty hand to read the line
+{ const _t=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const s=held(); if(!s||!(ITEMS[s.id]&&ITEMS[s.id].wireC!=null)){ const r=pick(sx,sy); if(r&&r.prev){ const [x,y,z]=r.hit, a=Wm().get(ck(x,y,z)), f=D6.findIndex(v=>v[0]===r.prev[0]-x&&v[1]===r.prev[1]-y&&v[2]===r.prev[2]-z), b=world.get(x,y,z);
+        if(a&&!(b>0&&BLOCKS[b].tech)){ const parts=[]; for(const v of a) if(v>>4===f){ const sg=geo.find(g=>g.x===x&&g.y===y&&g.z===z&&g.v===v), n=sg&&sg.net; parts.push(CN[v&15]+' '+(n?(n.b1?'signal '+n.b1:n.live?'powered':'idle')+(n.rf>.5?' · '+n.rf.toFixed(0)+' RF/t':''):'')); } if(parts.length){ toast(parts.join(' · ')); return true; } } } } } return _t(sx,sy); }; }
+// recipes: copper wire plus wool in the colour you want; bundles from copper wire around a stone
+{ const cu=TECH.MI.copper.wire; for(const d of DYES) r_(I['CWIRE_'+d.k],4,['w','W'],{keys:{w:cu,W:[d.woolB]},cat:'decor'}); r_(B.BUNDLE,4,['www','wTw','www'],{keys:{w:cu,T:[B.STONE]},cat:'decor'}); }
+{ const _ic=itemIconCanvas; itemIconCanvas=function(id){ if(!WIDSET.has(id)) return _ic(id); const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d'), col=CC[WID.indexOf(id)];
+    g.lineCap='round'; g.strokeStyle='rgba(0,0,0,.35)'; g.lineWidth=9; g.beginPath(); g.arc(30,30,17,0,7); g.stroke(); g.strokeStyle=col; g.lineWidth=6; g.beginPath(); g.arc(30,30,17,0,7); g.stroke();
+    g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=2; g.beginPath(); g.arc(30,30,17,3.6,5.2); g.stroke(); g.strokeStyle=col; g.lineWidth=6; g.beginPath(); g.moveTo(46,34); g.lineTo(55,50); g.stroke(); return c; }; }
+
+// ---------------- drawing: thin strips on the block faces, glowing when live ----------------
+{ const _ed=emitDecor; emitDecor=function(vb){ _ed.apply(this,arguments); if(!geo.length) return; const px=player.x, pz=player.z; let lastK=null;
+    for(const s of geo){ if(Math.abs(s.x-px)>30||Math.abs(s.z-pz)>30) continue; const on=s.net&&s.net.lv>0, base=hex(CC[s.c]), k=s.x+','+s.y+','+s.z;
+      if(on) setVL(VL_EMISSIVE); else if(k!==lastK){ setVL(sampleLight(s.x+.5,s.y+.5,s.z+.5)); lastK=k; } if(!on) lastK=k+'|';
+      const col=on?[Math.min(255,base[0]*1.15+30),Math.min(255,base[1]*1.15+30),Math.min(255,base[2]*1.15+30)]:[base[0]*.7|0,base[1]*.7|0,base[2]*.7|0];
+      for(const [mn,mx] of s.boxes) emitBox(vb,mn,mx,col,IDT); }
+    setVL(sampleLight(player.x,player.y+1.2,player.z)); }; }
+window.__v38={ck,neigh,segBoxes};
 })();
 
 </script>
