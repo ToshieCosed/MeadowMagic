@@ -27,3 +27,9 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 
 ## Planned
 Nothing queued; ideas welcome.
+
+## v0.32.0 – Item Gallery & inventory speed
+
+- **Item Gallery** (Showcase world): a 30×30 building 110 blocks west of the start (signposted). 12 floors, every item in the game in a wall item frame with a sign in front of it. Floors: Blocks ×3, Weapons, Magic items, Tools & travel, Armor, Decor ×2, Machines & tech ×2, Items & materials. Ladders at the west end; the east face is glass and the iso camera peels the ceiling of the floor you are on. Crouch-tap a frame to take the item out. Old Showcase worlds get the gallery added the next time they load.
+- Gallery signs and frames are culled by height/distance, textures are created a few per frame and freed when you leave (so 1,100+ decor items don't stall rendering).
+- Inventory: item icons are pre-drawn in the background (idle time), the recipe list starts at 20 entries, and the creative catalog grid is no longer rebuilt on every click.
