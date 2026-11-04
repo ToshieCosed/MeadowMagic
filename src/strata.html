@@ -953,6 +953,14 @@ TB('bpack','Backpack','#8a5a34','#7a4e2c',{solid:false,noItem:1});
 // signal blocks: wired signal broadcaster and receiver (level logic on neighbours), and the basic on/off wireless terminal
 TB('sbcast','Signal broadcaster','#4a5a6e','#3c4a5c',{solid:false}); TB('srecv','Signal receiver','#5a4a6e','#4a3c5c',{solid:false});
 TB('wbasic','Wireless terminal','#3c4450','#323a44',{lightOpaque:1});
+/* ---------- v0.23.0 phase 2 blocks: witches glass, fireplace, witch's cauldron ---------- */
+var WGX='player'; const P2B={};
+const WGK={shadow:['Shadow','#6a3aa8',[.5,.28,.85],'player'],burn:['Burning','#e8541a',[1,.45,.12],'mob'],frost:['Frost','#7ac0f0',[.45,.75,1],'item'],life:['Life','#3fc04a',[.4,.9,.35],'passive'],arcane:['Arcane','#4a78f0',[.3,.5,1],'none']};
+const WGPASS={player:['player'],mob:['hostile','passive'],passive:['passive','player'],item:['item'],none:[]};
+const wgPass=(bd,ctx)=>WGPASS[bd.wg].includes(ctx);
+for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase()); def(id,n+' witches glass',c,c,0,{opaque:false,tint:t,wg:m,emit:t.map(v=>Math.round(v*7)),lightOpaque:0,p2:'wg_'+k}); pat(id,PT.GLASS); P2B['wg_'+k]=id; }
+{ const id=NB('FIREPLACE'); def(id,'Fireplace','#6f6f76','#5a5a62',0,{opaque:false,lightOpaque:0,shape:1,emit:[15,11,5],p2:'fireplace',boxes:[[0,0,0,1,.3,1],[0,.3,0,.18,.75,1],[.82,.3,0,1,.75,1],[.18,.3,.82,.82,.75,1]]}); pat(id,PT.COBBLE); P2B.fire=id; }
+{ const id=NB('CAULDRON'); def(id,"Witch's cauldron",'#2c2c34','#3a3a44',0,{opaque:false,lightOpaque:0,shape:1,p2:'cauldron',boxes:[[.08,.18,.08,.92,.3,.92],[0,.3,0,.12,.9,1],[.88,.3,0,1,.9,1],[.12,.3,0,.88,.9,.12],[.12,.3,.88,.88,.9,1],[.1,0,.1,.24,.18,.24],[.76,0,.1,.9,.18,.24],[.1,0,.76,.24,.18,.9],[.76,0,.76,.9,.18,.9]]}); pat(id,PT.METAL); P2B.cauldron=id; }
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -2158,7 +2166,7 @@ class World{
   solid(x,y,z){ // collision view: world walls and unloaded chunks block, sky does not
     if(y<0) return true; if(x<0||z<0||x>=this.size||z>=this.size) return true; if(y>=this.H) return false;
     const ch=this.chunk(x>>4,z>>4); if(!ch) return true;
-    return BLOCKS[ch.blocks[(y*CS+(z&15))*CS+(x&15)]].solid;
+    { const bd=BLOCKS[ch.blocks[(y*CS+(z&15))*CS+(x&15)]]; return bd.solid&&!(bd.wg&&wgPass(bd,WGX)); }
   }
   set(x,y,z,v){
     if(y<1||y>=this.H||x<0||z<0||x>=this.size||z>=this.size) return false;
@@ -2624,6 +2632,7 @@ function buildDynamic(){ PAT=0; CB=0;
   // dropped items (spinning, bobbing) and arrows
   for(const q of drops){ setVL(sampleLight(q.x,q.y,q.z)); const ca=Math.cos(q.spin), sa=Math.sin(q.spin), by=q.y-.12+Math.sin(q.age*3)*.05, k=.85;
     emitItem(dynVB,q.id,mc(mT(q.x,by,q.z),mY(q.spin),mS(isFlatItem(q.id)?.5:.28),mT(-.5,0,-.5))); }
+  if(window.drawP2) drawP2();
   for(const a of arrows){ if(a.fireball){ if(a.stuck) continue; setVL(VL_EMISSIVE); emitBox(dynVB,[a.x-.16,a.y-.16,a.z-.16],[a.x+.16,a.y+.16,a.z+.16],[255,120,30],IDT); emitBox(dynVB,[a.x-.09,a.y-.09,a.z-.09],[a.x+.09,a.y+.09,a.z+.09],[255,230,140],IDT); if(Math.random()<.5) parts.push({x:a.x,y:a.y,z:a.z,vx:0,vy:.5,vz:0,t:.4,c:[255,150,40],s:.07,ember:true}); continue; }
     setVL(sampleLight(a.x,a.y,a.z)); const l=Math.hypot(a.vx,a.vy,a.vz)||1, dx=a.vx/l, dy=a.vy/l, dz=a.vz/l, I3=(x,y,z)=>[x,y,z];
     const seg=(t,s,col)=>{const x=a.x-dx*t,y=a.y-dy*t,z=a.z-dz*t;emitBox(dynVB,[x-s,y-s,z-s],[x+s,y+s,z+s],col,I3);};
@@ -3461,6 +3470,8 @@ const r_=(out,n,pat,o)=>RECIPES.push(Object.assign({out,n,pat},o||{}));
 r_(B.SMELTER,1,['TCT','C.C','TTT'],{keys:{C:[I.COPPER]},tier:3,cat:'blocks'});
 r_(B.FORGE,1,['XXX','XUX','TTT'],{keys:{X:[I.IRON]},tier:7,cat:'blocks'});
 r_(B.TANNING,1,['RRR','PPP','S.S'],{cat:'blocks'});
+r_(P2B.fire,1,['CCC','CFC','CCC'],{keys:{C:[B.COBBLE],F:[I.COAL]},cat:'blocks'});
+r_(P2B.cauldron,1,['I.I','I.I','III'],{keys:{I:[I.IRON]},cat:'blocks'});
 r_(I.LEATHER,1,['H'],{station:'tan',cat:'items'});
 r_(I.RLEATHER,2,['EXE'],{keys:{X:[I.TIN]},station:'tan',cat:'items'});
 r_(I.SADDLE,1,['EEE','EFE'],{station:'tan',cat:'travel'});
@@ -3990,7 +4001,7 @@ function safeAhead(m,dx,dz){ const l=Math.hypot(dx,dz)||1, x=Math.floor(m.x+dx/l
 function stepMobs(dt){
   const holding=held();
   for(const m of mobs){
-    const dist=Math.hypot(m.x-player.x,m.z-player.z); if(dist>96) continue;
+    const dist=Math.hypot(m.x-player.x,m.z-player.z); if(dist>96) continue; WGX=MOB[m.type].hostile?'hostile':'passive';
     const d=MOB[m.type]; sfxMobTick(m,dt,dist); m.hurtT=Math.max(0,m.hurtT-dt); m.love=Math.max(0,m.love-dt); m.breedCd=Math.max(0,m.breedCd-dt);
     if(m.baby){ m.grow-=dt; if(m.grow<=0) m.baby=false; }
     if(m.rider){ mobGravity(m,dt); continue; }   // horses under the player are driven in stepRide
@@ -8091,7 +8102,7 @@ function tankModel(key){ const e=.09,f=TF[key],r='#e4ecf0',G='#9cd0dc',o=1-e; re
 function lampModel(bd){ const c=bd.lampCol, lit=bd.lit, bulb=c.map(v=>Math.min(255,lit?v*1.1+70:v*.75+20)); const m=[
  [.28,0,.28,.72,.08,.72,'#32323a'],[.43,.08,.43,.57,.46,.57,'#42424a'],[.26,.46,.26,.74,.94,.74,bulb],[.3,.94,.3,.7,1,.7,'#2a2a30'],[.3,.5,.74,.7,.9,.745,bulb.map(v=>Math.min(255,v+50))]];
  if(lit) m.push([.14,.34,.14,.86,1,.86,bulb,.28]); return m; }
-const modelFor=bd=>{ const key=bd.tech; return M[key]||(/^solar/.test(key)?M.solar:/^tank/.test(key)?tankModel(key):bd.lamp?lampModel(bd):null); };
+const modelFor=bd=>{ const key=bd.tech||bd.p2; return M[key]||(/^solar/.test(key)?M.solar:/^tank/.test(key)?tankModel(key):bd.lamp?lampModel(bd):null); };
 const col3=c=>typeof c==='string'?H(c):c;
 function techIcon(bd){ const k=modelFor(bd); if(!k) return null;
   const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d');
@@ -8106,12 +8117,12 @@ function techIcon(bd){ const k=modelFor(bd); if(!k) return null;
       g.restore(); g.strokeStyle=al<1?'rgba(0,0,0,0)':'rgba(0,0,0,.38)'; g.lineWidth=1; g.beginPath(); pts.forEach((p,i)=>{const t=P(...p); i?g.lineTo(t[0],t[1]):g.moveTo(t[0],t[1]);}); g.closePath(); g.stroke(); }
     g.globalAlpha=1; const t0=P(x0,y1,z1),t1=P(x1,y1,z1); g.strokeStyle='rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(t0[0],t0[1]); g.lineTo(t1[0],t1[1]); g.stroke(); }
   return c; }
-const _iF=iconFor; iconFor=function(id){ const bd=BLOCKS[id]; if(bd&&bd.tech){ const c=techIcon(bd); if(c) return c; } return _iF(id); };
-window.techIcon=techIcon;
+const _iF=iconFor; iconFor=function(id){ const bd=BLOCKS[id]; if(bd&&(bd.tech||bd.p2)){ const c=techIcon(bd); if(c) return c; } return _iF(id); };
+window.techIcon=techIcon; window.TECHM=M;
 // held + dropped item models (emitItem) and the older mini-model path (itemBoxes) use the same models, so UI, hand and ground all match
-const _eI=emitItem; emitItem=function(vb,id,Mx){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&bd.tech?modelFor(bd):null; if(!L) return _eI(vb,id,Mx);
+const _eI=emitItem; emitItem=function(vb,id,Mx){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&(bd.tech||bd.p2)?modelFor(bd):null; if(!L) return _eI(vb,id,Mx);
   for(const q of L){ if(q[7]!==undefined&&q[7]<1&&!/^tank/.test(bd.tech)) { if(!bd.lit) continue; } if(q[7]!==undefined&&q[7]<1) continue; emitBox(vb,[q[0],q[1],q[2]],[q[3],q[4],q[5]],col3(q[6]),(x,y,z)=>ap(Mx,x,y,z)); } };
-const _iB=itemBoxes; itemBoxes=function(id){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&bd.tech?modelFor(bd):null; if(!L) return _iB(id); const s=.3;
+const _iB=itemBoxes; itemBoxes=function(id){ const it=ITEMS[id], bd=it&&it.block&&BLOCKS[it.block]; const L=bd&&(bd.tech||bd.p2)?modelFor(bd):null; if(!L) return _iB(id); const s=.3;
   return L.filter(q=>q[7]===undefined).map(q=>[[(q[0]-.5)*s,q[1]*s,(q[2]-.5)*s],[(q[3]-.5)*s,q[4]*s,(q[5]-.5)*s],col3(q[6])]); };
 // tanks holding glowing fluids (liquid XP, lava) really emit light
 for(const k of ['tank1','tank2','tank3','tank4']) TANKIDS.add(TECHB[k]);
@@ -8175,6 +8186,80 @@ const _sHS=stepHostileSpawning; stepHostileSpawning=function(dt){
   if(!game()){ bolts.length=0; return _sHS(dt); }
   if(peaceful()){ for(let i=mobs.length-1;i>=0;i--) if(MOB[mobs[i].type].hostile) mobs.splice(i,1); bolts.length=0; return; }
   updBolts(dt); return _sHS(dt); };
+})();
+
+
+/* ---------- v0.23.0 phase 2: cauldron brewing, fireplaces, witches glass behaviour ---------- */
+(function(){
+const rnd=Math.random, tk=tileKey, nowS=()=>performance.now()/1000;
+const ESSCOL={[I.SHADOW_ESS]:[150,90,230],[I.BURN_ESS]:[235,100,30],[I.FROST_ESS]:[120,190,240],[I.ARCANE_ESS]:[70,120,240],[I.LIFE_ESS]:[70,200,80]};
+const ESSGLASS={[I.SHADOW_ESS]:'wg_shadow',[I.BURN_ESS]:'wg_burn',[I.FROST_ESS]:'wg_frost',[I.ARCANE_ESS]:'wg_arcane',[I.LIFE_ESS]:'wg_life'};
+const WATERC=[61,134,200];
+// ---- icon models for the new blocks ----
+const M=window.TECHM, frame=(f,g)=>{ const e=.1,o=.9; return [[0,0,0,.03,1,1,g,.4],[0,0,0,1,1,.03,g,.4],[0,0,0,e,1,e,f],[o,0,0,1,1,e,f],[0,0,o,e,1,1,f],[o,0,o,1,1,1,f],[0,0,0,1,e,e,f],[0,0,o,1,e,1,f],[0,0,0,e,e,1,f],[o,0,0,1,e,1,f],[0,o,0,1,1,e,f],[0,o,o,1,1,1,f],[0,o,0,e,1,1,f],[o,o,0,1,1,1,f],[.3,.3,.3,.7,.7,.7,g]]; };
+const rgbh=a=>'#'+a.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join('');
+for(const k in WGK){ const t=WGK[k][2].map(v=>v*255); M['wg_'+k]=frame(rgbh(t.map(v=>v*.55)),rgbh(t.map(v=>Math.min(255,v+40)))); }
+M.cauldron=[[.08,.18,.08,.92,.3,.92,'#23232a'],[0,.3,0,.12,.9,1,'#34343e'],[.88,.3,0,1,.9,1,'#34343e'],[.12,.3,0,.88,.9,.12,'#3c3c46'],[.12,.3,.88,.88,.9,1,'#3c3c46'],[0,.86,0,1,.92,.1,'#4a4a56'],[0,.86,.9,1,.92,1,'#4a4a56'],[.1,0,.1,.24,.18,.24,'#1c1c22'],[.76,0,.1,.9,.18,.24,'#1c1c22'],[.1,0,.76,.24,.18,.9,'#1c1c22'],[.76,0,.76,.9,.18,.9,'#1c1c22'],[.12,.3,.12,.88,.7,.88,'#4ac8a0']];
+M.fireplace=[[0,0,0,1,.3,1,'#6a6a72'],[0,.3,0,.18,.75,1,'#7a7a82'],[.82,.3,0,1,.75,1,'#7a7a82'],[.18,.3,.82,.82,.75,1,'#7a7a82'],[.28,.3,.28,.72,.6,.72,'#ff7a20'],[.4,.5,.4,.6,.85,.6,'#ffd040']];
+// ---- tiles ----
+let P2L=[]; const isP2=b=>b===P2B.fire||b===P2B.cauldron;
+function mkTile(x,y,z,type){ const t={kind:'p2',x,y,z,s:[],tech:type==='fire'?{type,col:null}:{type,w:0,col:null,items:{},act:0,bt:0}}; world.tiles.set(tk(x,y,z),t); P2L.push(t); return t; }
+const getT=(x,y,z,b)=>world.tiles.get(tk(x,y,z))||mkTile(x,y,z,b===P2B.fire?'fire':'cauldron');
+const _aP=afterPlace; afterPlace=function(x,y,z,id){ _aP.apply(this,arguments); if(isP2(id)) mkTile(x,y,z,id===P2B.fire?'fire':'cauldron'); };
+const heat=b=>b===P2B.fire||!!(BLOCKS[b]&&BLOCKS[b].lava);
+const toRGB=c=>typeof c==='string'?hex(c):c;
+// ---- cauldron recipes: {need:{itemId:count}, out:[[id,n]], time, act}; later phases push more ----
+window.CAULD=[{need:{[I.ARCANE_ESS]:10},act:1,time:3,out:[]}];
+for(const e in ESSGLASS) CAULD.push({need:{[e]:1,[B.SAND]:2},out:[[P2B[ESSGLASS[e]],4]],time:3});
+const matchRec=t=>{ const h=t.tech.items; for(const r of CAULD){ let ok=true; for(const id in r.need) if((h[id]||0)<r.need[id]){ ok=false; break; } if(ok) return r; } return null; };
+const cnt=t=>Object.values(t.tech.items).reduce((a,b)=>a+b,0);
+function spit(x,y,z,id,n){ spawnDrop(x+.5,y+1.05,z+.5,id,n); const q=drops[drops.length-1]; if(q){ q.nb=1; q.vy=7+rnd()*2; q.vx=(rnd()-.5)*2.5; q.vz=(rnd()-.5)*2.5; } }
+const take1=()=>{ if(creative()) return; const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); };
+function p2Tap(x,y,z,b){ const t=getT(x,y,z,b), T=t.tech, s=held(), it=s&&ITEMS[s.id];
+  if(b===P2B.fire){ if(it&&it.dye){ T.col=toRGB(it.dcol); take1(); toast('The smoke turns '+it.dye); burst(x+.5,y+.8,z+.5,T.col,8,1.5); return true; } return false; }
+  if(it&&it.bucket==='w'){ if(T.w){ toast('Already full'); return true; } T.w=1; if(!creative()) inv.slots[inv.sel]={id:I.BUCKET,n:1}; invChanged(); renderHotbar(); sfx('splashS',x,y,z,.6,14); return true; }
+  if(it&&it.bucket==='empty'&&T.w&&!cnt(t)){ T.w=0; T.col=null; T.act=0; take1(); if(addItem(I.BUCKET_WATER,1)) spawnDrop(player.x,player.y+1,player.z,I.BUCKET_WATER,1); return true; }
+  if(s){ if(!T.w){ toast('Fill the cauldron with water first'); return true; } if(cnt(t)>=48){ toast('The cauldron is full'); return true; } T.items[s.id]=(T.items[s.id]||0)+1; take1(); sfx('splashS',x,y,z,.35,12); return true; }
+  const ids=Object.keys(T.items); if(ids.length){ const id=+ids[ids.length-1]; if(--T.items[id]<=0) delete T.items[id]; if(addItem(id,1)) spawnDrop(player.x,player.y+1,player.z,id,1); return true; }
+  toast(!T.w?'Empty cauldron. Fill it with water':heat(world.get(x,y-1,z))?'Boiling. Throw in essences':'Cold. Put it over lava or a fireplace'); return true; }
+const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit, b=world.get(x,y,z); if(isP2(b)&&reachOK(x,y,z)&&p2Tap(x,y,z,b)) return true; } } return _tI(sx,sy); };
+// ---- thrown items land in cauldrons and fireplaces ----
+function absorb(){ if(!P2L.length||!drops.length) return; const m=new Map(); for(const t of P2L) m.set(tk(t.x,t.y,t.z),t);
+  for(let i=drops.length-1;i>=0;i--){ const q=drops[i]; if(q.nb||q.age<.3) continue; const ty=Math.floor(q.y-.95); if(q.y-ty-1>.7) continue; const t=m.get(tk(Math.floor(q.x),ty,Math.floor(q.z))); if(!t) continue; const T=t.tech, it=ITEMS[q.id];
+    if(T.type==='fire'){ if(it&&it.dye){ T.col=toRGB(it.dcol); q.n--; if(q.n<=0) drops.splice(i,1); burst(t.x+.5,t.y+.8,t.z+.5,T.col,6,1.5); } }
+    else if(T.w&&cnt(t)+q.n<=48){ T.items[q.id]=(T.items[q.id]||0)+q.n; drops.splice(i,1); sfx('splashS',t.x,t.y,t.z,.3,10); } } }
+const _sD=stepDrops; stepDrops=function(dt){ const o=WGX; WGX='item'; try{ _sD(dt); } finally{ WGX=o; } absorb(); };
+const _sM=stepMobs; stepMobs=function(dt){ try{ _sM(dt); } finally{ WGX='player'; } };
+// ---- slow tick: validate, brew, smoke, glass sparkle ----
+let last=nowS();
+setInterval(()=>{ try{ if(!world||!world.tiles||!game()) return; const dt=Math.min(1,nowS()-last); last=nowS();
+  if(!world._p2n||world._p2n!==world.tiles.size){ world._p2n=world.tiles.size; P2L=[...world.tiles.values()].filter(t=>t.kind==='p2'); }
+  for(let i=P2L.length-1;i>=0;i--){ const t=P2L[i], T=t.tech, b=world.get(t.x,t.y,t.z), want=T.type==='fire'?P2B.fire:P2B.cauldron;
+    if(b!==want){ if(world.chunk(t.x>>4,t.z>>4)){ if(T.items) for(const id in T.items) spawnDrop(t.x+.5,t.y+.8,t.z+.5,+id,T.items[id]); world.tiles.delete(tk(t.x,t.y,t.z)); P2L.splice(i,1); world._p2n=null; } continue; }
+    const d=Math.hypot(t.x-player.x,t.z-player.z); if(d>40) continue;
+    if(T.type==='fire'){ const c=T.col||[130,130,136]; parts.push({x:t.x+.3+rnd()*.4,y:t.y+.8,z:t.z+.3+rnd()*.4,vx:(rnd()-.5)*.3,vy:.8+rnd()*.5,vz:(rnd()-.5)*.3,t:2.6,c:T.col?c.map(v=>v*.85):c,s:.08,smoke:true}); if(rnd()<.4) parts.push({x:t.x+.5,y:t.y+.5,z:t.z+.5,vx:(rnd()-.5)*1,vy:2+rnd()*1.5,vz:(rnd()-.5)*1,t:.7,c:[255,170,60],s:.04,ember:true}); continue; }
+    const hot=heat(world.get(t.x,t.y-1,t.z)); T.hot=hot; if(!T.w){ T.items={}; T.bt=0; continue; }
+    if(hot){ const items=Object.keys(T.items); if(!T.col&&items.length){ const e=items.find(id=>ESSCOL[id]); if(e) T.col=ESSCOL[e]; }
+      const cl=T.col||WATERC; for(let k=0;k<2+(items.length?2:0);k++) parts.push({x:t.x+.2+rnd()*.6,y:t.y+.72,z:t.z+.2+rnd()*.6,vx:0,vy:1+rnd(),vz:0,t:.5,c:cl.map(v=>Math.min(255,v+60)),s:.05,ember:true});
+      if(T.act&&rnd()<.5) parts.push({x:t.x+.5+(rnd()-.5)*.5,y:t.y+.9,z:t.z+.5+(rnd()-.5)*.5,vx:0,vy:.8,vz:0,t:1.2,c:[110,170,255],s:.04,smoke:true});
+      const r=matchRec(t); if(!r){ T.bt=0; continue; } T.bt+=dt;
+      if(T.bt>=r.time){ T.bt=0; for(const id in r.need){ T.items[id]-=r.need[id]; if(T.items[id]<=0) delete T.items[id]; }
+        if(r.act){ T.act=1; toast('The cauldron hums with arcane power'); } else for(const [id,n] of r.out) spit(t.x,t.y,t.z,id,n);
+        if(!Object.keys(T.items).length&&!T.act) T.col=null; sfx('splashS',t.x,t.y,t.z,.6,16); burst(t.x+.5,t.y+1,t.z+.5,cl,12,2.5); } } }
+  // faint sparkles around witches glass near the player
+  for(let k=0;k<40;k++){ const x=Math.floor(player.x+(rnd()-.5)*20), y=Math.floor(player.y+(rnd()-.4)*10), z=Math.floor(player.z+(rnd()-.5)*20); const b=world.get(x,y,z), bd=b>0&&BLOCKS[b]; if(bd&&bd.wg){ parts.push({x:x+rnd(),y:y+rnd(),z:z+rnd(),vx:0,vy:.25,vz:0,t:1.4,c:bd.tint.map(v=>Math.min(255,v*255+50)),s:.03,smoke:true}); } }
+ }catch(e){} },250);
+// ---- dynamic drawing: boiling fluid, flames, orbiting ingredients ----
+window.drawP2=function(){ const T0=nowS(), p=player;
+  for(const t of P2L){ if(Math.abs(t.x-p.x)>44||Math.abs(t.z-p.z)>44) continue; const T=t.tech, x=t.x, y=t.y, z=t.z;
+    if(T.type==='fire'){ const f=Math.sin(T0*9+x*3+z)*.06; setVL(VL_EMISSIVE); emitBox(dynVB,[x+.3,y+.3,z+.3],[x+.7,y+.58+f,z+.7],[255,110,20],IDT); emitBox(dynVB,[x+.4,y+.4,z+.4],[x+.6,y+.8+f,z+.6],[255,215,80],IDT); continue; }
+    if(!T.w) continue; const c=T.col||WATERC, hot=T.hot, lv=.7+(hot?Math.sin(T0*5+x)*.012:0); if(hot) setVL(VL_EMISSIVE); else setVL(sampleLight(x+.5,y+.7,z+.5));
+    emitBox(dynVB,[x+.13,y+.3,z+.13],[x+.87,y+lv,z+.87],hot?c.map(v=>Math.min(255,v*1.15+20)):c.map(v=>v*.8),IDT);
+    if(T.act){ setVL(VL_EMISSIVE); emitBox(dynVB,[x+.1,y+.9,z+.1],[x+.9,y+.93,z+.9],[110,170,255],IDT); }
+    const list=[]; for(const id in T.items) for(let k=0;k<Math.min(T.items[id],4);k++) list.push(+id); const n=Math.min(list.length,12);
+    for(let k=0;k<n;k++){ const id=list[k], a=T0*.7+k*6.2832/n, px=x+.5+Math.cos(a)*.27, pz=z+.5+Math.sin(a)*.27, py=y+lv+.14+Math.sin(T0*2+k)*.05; setVL(sampleLight(px,py,pz)); emitItem(dynVB,id,mc(mT(px,py,pz),mY(-a+T0),mS(isFlatItem(id)?.28:.16),mT(-.5,0,-.5))); } } };
+// ---- phase 2 smoke test hook ----
+window.__p2={matchRec,mkTile,CAULD,wgPass};
 })();
 
 </script>
