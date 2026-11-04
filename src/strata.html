@@ -963,6 +963,7 @@ for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase());
 { const id=NB('CAULDRON'); def(id,"Witch's cauldron",'#2c2c34','#3a3a44',0,{opaque:false,lightOpaque:0,shape:1,p2:'cauldron',boxes:[[.08,.18,.08,.92,.3,.92],[0,.3,0,.12,.9,1],[.88,.3,0,1,.9,1],[.12,.3,0,.88,.9,.12],[.12,.3,.88,.88,.9,1],[.1,0,.1,.24,.18,.24],[.76,0,.1,.9,.18,.24],[.1,0,.76,.24,.18,.9],[.76,0,.76,.9,.18,.9]]}); pat(id,PT.METAL); P2B.cauldron=id; }
 { const id=NB('ANVIL'); def(id,'Anvil','#3a3a42','#2c2c34',0,{opaque:false,lightOpaque:0,shape:1,p2:'anvil',boxes:[[.15,0,.15,.85,.18,.85],[.3,.18,.3,.7,.55,.7],[.08,.55,.0,.92,1,1]]}); pat(id,PT.METAL); P2B.anvil=id; }
 const MLB=[]; DYES.forEach((d,i)=>{ let c=typeof d.dye==='string'?hex(d.dye):d.dye; const hs='#'+c.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join(''); const id=NB('MLIGHT_'+d.k); def(id,'Mage light',hs,hs,0,{solid:false,opaque:false,lightOpaque:0,noItem:1,shape:1,emit:c.map(v=>Math.max(2,Math.round(v/255*14))),boxes:[[.38,.38,.38,.62,.62,.62]],mlight:i}); MLB.push(id); });
+{ const id=NB('SHADOW_BLOCK'); def(id,'Shadow block','#2e2048','#2e2048',0,{opaque:false,tint:[.35,.22,.6],lightOpaque:0,noItem:1,shadowB:1}); pat(id,PT.GLASS); P2B.shadowb=id; }
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -8362,9 +8363,10 @@ const ST={arcane:{n:'Arcane staff',modes:['light','bolt'],mn:{light:'Light',bolt
 const SI={}; for(const k in ST){ const q=ST[k], hx='#'+q.c.map(v=>v.toString(16).padStart(2,'0')).join(''); SI[k]=NI('STAFF_'+k.toUpperCase(),q.n,{stack:1,staff:k});
   ispr(SI[k],P=>{ for(let i=0;i<9;i++) P(3+i,13-i,i%2?'#8a5a34':'#6e4626'); for(const [x,y] of [[10,3],[11,3],[12,4],[12,5],[11,6],[10,6],[9,5],[9,4],[10,4],[11,4],[10,5],[11,5]]) P(x,y,hx); P(10,4,'#ffffff'); P(11,4,'#ffffff'); }); 
   CAULD.push({need:{[I.STICK]:1,[q.ess]:50},needAct:1,out:[[SI[k],1]],time:4}); }
-window.STAFFS=SI; spec(MLB,.05);
+window.STAFFS=SI; window.STAFFDEF=ST; window.staffCd=v=>{ cd=v; }; spec(MLB,.05);
 const BASE_TIER=SPEC[B.ORE_IRON]?SPEC[B.ORE_IRON].req:5;
 // ---- mode handling ----
+window.staffMode0=s=>mode0(s);
 const mode0=s=>{ const m=ST[ITEMS[s.id].staff].modes; return (s.x&&m.includes(s.x.m)&&s.x.m)||m[0]; };
 function toggle(s){ const q=ST[ITEMS[s.id].staff], cur=mode0(s), nx=q.modes[(q.modes.indexOf(cur)+1)%q.modes.length]; s.x=Object.assign({},s.x,{m:nx}); sfx('click',player.x,player.y,player.z,.7,12); toast(`${q.n}: ${q.mn[nx]} mode`); invChanged(); renderHotbar(); upd(); }
 const btn=document.createElement('button'); btn.id='bStaff'; btn.hidden=true; btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M5 19L17 7M14 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/></svg><span>Mode</span>';
@@ -8375,7 +8377,7 @@ setInterval(upd,250);
 // ---- bolts ----
 const pb=[]; let cd=0; window.__pb=pb;
 function lightCol(s){ const i=(s.x&&s.x.lc)|0; const d=DYES[i]; const c=typeof d.dye==='string'?hex(d.dye):d.dye; return c; }
-window.staffUse=function(sx,sy,s,it){ if(player.crouch){ toggle(s); return true; } if(cd>0) return true; const k=it.staff, m=mode0(s), q=ST[k], p=player;
+window.staffUse=function(sx,sy,s,it){ if(player.crouch){ toggle(s); return true; } if(cd>0) return true; const k=it.staff, m=mode0(s), q=ST[k], p=player; if(q.use){ cd=q.cd||.3; return q.use(sx,sy,s,m); }
   const o=[p.x,p.y+1.4,p.z], ap=aimPoint(sx,sy), v=[ap[0]-o[0],ap[1]-o[1],ap[2]-o[2]], l=Math.hypot(...v)||1, sp=k==='flame'?20:24; cd=k==='flame'?.22:.3;
   const kind=k==='arcane'?(m==='light'?'light':'arcane'):'flame'; pb.push({x:o[0]+v[0]/l*.6,y:o[1]+v[1]/l*.6,z:o[2]+v[2]/l*.6,vx:v[0]/l*sp,vy:v[1]/l*sp,vz:v[2]/l*sp,k:kind,smelt:m==='smelt',t:0,c:kind==='light'?lightCol(s):q.c,lc:(s.x&&s.x.lc)|0,tier:(s.x&&s.x.tier)||BASE_TIER});
   p.face=Math.atan2(v[0],v[2]); sfx(k==='flame'?'ignite':'bowShoot',p.x,p.y,p.z,.6,16); return true; };
@@ -8398,6 +8400,61 @@ const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMod
       if(b===P2B.anvil&&it.staff==='flame'&&reachOK(x,y,z)){ const cur=(s.x&&s.x.tier)||BASE_TIER; let bi=-1,bt=cur; inv.slots.forEach((q,i)=>{ if(q&&ITEMS[q.id].tool==='pick'&&(ITEMS[q.id].tier||0)>bt){ bt=ITEMS[q.id].tier; bi=i; } });
         if(bi>=0){ inv.slots[bi]=null; s.x=Object.assign({},s.x,{tier:bt}); invChanged(); renderHotbar(); toast('The staff takes the pickaxe and can now smelt harder ores'); sfx('metalHit',x,y,z,.8,14); return true; } toast('Hold the flaming staff and carry a better pickaxe to upgrade it'); return true; } } } }
   return _tI(sx,sy); };
+})();
+
+
+/* ---------- v0.27.0 phase 5b-1: illusioner staff and shadow blocks ---------- */
+(function(){
+const rnd=Math.random, ST=window.STAFFDEF, SHB=P2B.shadowb; spec(SHB,.05);
+const id=NI('STAFF_ILLUSION','Illusioner staff',{stack:1,staff:'illusion'}); window.STAFFS.illusion=id;
+ispr(id,P=>{ for(let i=0;i<9;i++) P(3+i,13-i,i%2?'#3a2a50':'#2a1c3c'); for(const [x,y] of [[10,3],[11,3],[12,4],[12,5],[11,6],[10,6],[9,5],[9,4],[10,4],[11,4],[10,5],[11,5]]) P(x,y,'#a070ff'); P(10,4,'#ffffff'); P(11,4,'#ffffff'); });
+CAULD.push({need:{[I.STICK]:1,[I.SHADOW_ESS]:50},needAct:1,out:[[id,1]],time:4});
+let decoy=null, holdDone=0; const pb=[]; window.ILLU={pb};
+const col=[170,110,230];
+// ---- teleport ----
+function blink(ap){ const p=player, o=[p.x,p.y+1.2,p.z]; let v=[ap[0]-o[0],0,ap[2]-o[2]]; const l=Math.hypot(...v)||1, max=Math.min(l,11); v=[v[0]/l,0,v[2]/l];
+  for(let t=max;t>=1;t-=.5){ const x=Math.floor(p.x+v[0]*t), z=Math.floor(p.z+v[2]*t); for(const dy of [0,1,-1,-2,2,-3,3]){ const yy=Math.floor(Math.max(ap[1],p.y))+dy-(ap[1]<p.y?Math.min(1,Math.floor(p.y-ap[1])):0); const y0=Math.floor(p.y)+dy; if(!world.solid(x,y0,z)&&!world.solid(x,y0+1,z)&&world.solid(x,y0-1,z)){
+      burst(p.x,p.y+1,p.z,col,14,2.5); p.x=x+.5; p.z=z+.5; p.y=y0; p.vx=p.vy=p.vz=0; p.fallTop=p.y; burst(p.x,p.y+1,p.z,col,14,2.5); sfx('warp',p.x,p.y,p.z,.8,18); return true; } } }
+  toast('No room to blink there'); return true; }
+// ---- decoy ----
+function makeDecoy(ap){ let x=ap[0], z=ap[2], y=Math.floor(ap[1]); for(let k=0;k<8&&!world.solid(Math.floor(x),y-1,Math.floor(z));k++) y--; decoy={x,y,z,t:12,hp:6}; burst(x,y+1,z,col,16,2.5); sfx('warp',x,y,z,.7,18); }
+// ---- shadow blocks ----
+const free=(x,y,z)=>{ const b=world.get(x,y,z); return b===B.AIR||(b>0&&BLOCKS[b].replace); };
+function placeShadow(sx,sy){ if(Date.now()-holdDone<700) return true; const r=pick(sx,sy); if(!r||!r.prev||!reachOK(...r.hit)){ return true; } const [x,y,z]=r.prev, p=player; if(!free(x,y,z)) return true;
+  if(Math.abs(p.x-(x+.5))<.8&&Math.abs(p.z-(z+.5))<.8&&y+1>p.y&&y<p.y+ph()){ toast('You are in the way'); return true; } world.set(x,y,z,SHB); burst(x+.5,y+.5,z+.5,col,6,1.5); sfx('plink',x,y,z,.5,12); return true; }
+function connected(x,y,z){ const out=[], seen=new Set([x+','+y+','+z]), q=[[x,y,z]]; while(q.length&&out.length<2500){ const c=q.pop(); out.push(c); for(const [dx,dy,dz] of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]){ const n=[c[0]+dx,c[1]+dy,c[2]+dz], k=n.join(','); if(seen.has(k)||world.get(...n)!==SHB) continue; seen.add(k); q.push(n); } } return out; }
+function poof(x,y,z){ const L=connected(x,y,z); L.forEach(([a,b,c],i)=>{ world.set(a,b,c,B.AIR); if(i<80) burst(a+.5,b+.5,c+.5,col,4,2); }); sfx('pop',x,y,z,.8,18); toast(`${L.length} shadow blocks unsummoned`); }
+function fill(x,y,z,s,it){ const L=connected(x,y,z), bid=it.block, p=player; let n=0; for(const [a,b,c] of L){ if(!creative()&&s.n<=0) break; if(Math.abs(p.x-(a+.5))<.8&&Math.abs(p.z-(c+.5))<.8&&b+1>p.y&&b<p.y+ph()) continue; world.set(a,b,c,bid); afterPlace(a,b,c,bid,creative()?{n:99}:s); if(!creative()) s.n--; n++; }
+  if(!creative()&&s.n<=0) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); burst(x+.5,y+.5,z+.5,[220,220,230],8,2); toast(n?`Filled ${n} shadow blocks`:'Nothing to fill'); }
+const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const s=held(), it=s&&ITEMS[s.id]; if(it&&it.block&&!it.staff){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit; if(world.get(x,y,z)===SHB&&reachOK(x,y,z)){ fill(x,y,z,s,it); return true; } } } } return _tI(sx,sy); };
+// hold on a shadow block with the staff in blocks mode unsummons them all
+const illu=()=>{ const s=game()&&mode==='play'&&held(); return s&&ITEMS[s.id].staff==='illusion'&&window.staffMode0(s)==='blocks'; };
+let hd=null; document.addEventListener('pointerdown',e=>{ if(!illu()||(e.target.closest&&e.target.closest('button,#hotbar,#actions'))) return; hd={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ const r=pick(hd.x,hd.y); if(r&&world.get(...r.hit)===SHB&&reachOK(...r.hit)){ holdDone=Date.now(); poof(...r.hit); } hd=null; },1100)}; });
+document.addEventListener('pointermove',e=>{ if(hd&&Math.hypot(e.clientX-hd.x,e.clientY-hd.y)>14){ clearTimeout(hd.t); hd=null; } }); for(const ev of ['pointerup','pointercancel']) document.addEventListener(ev,()=>{ if(hd){ clearTimeout(hd.t); hd=null; } });
+const _mT=mineTime; mineTime=function(b,tool){ if(b===SHB&&illu()) return Infinity; return _mT(b,tool); };
+// ---- shadow bolt ----
+function bolt(ap){ const p=player, o=[p.x,p.y+1.4,p.z], v=[ap[0]-o[0],ap[1]-o[1],ap[2]-o[2]], l=Math.hypot(...v)||1; pb.push({x:o[0]+v[0]/l*.6,y:o[1]+v[1]/l*.6,z:o[2]+v[2]/l*.6,vx:v[0]/l*22,vy:v[1]/l*22,vz:v[2]/l*22,t:0}); sfx('bowShoot',p.x,p.y,p.z,.6,16); }
+ST.illusion={n:'Illusioner staff',modes:['teleport','decoy','shadow','blocks'],mn:{teleport:'Blink',decoy:'Decoy',shadow:'Blind',blocks:'Blocks'},c:col,ess:I.SHADOW_ESS,cd:.3,
+  use(sx,sy,s,m){ const ap=aimPoint(sx,sy); if(m==='teleport'){ window.staffCd(1.2); return blink(ap); } if(m==='decoy'){ window.staffCd(1); makeDecoy(ap); return true; } if(m==='shadow'){ bolt(ap); return true; } window.staffCd(.15); return placeShadow(sx,sy); } };
+// ---- mob behaviour ----
+const _sH=stepHostile; stepHostile=function(m,d,dt,dist){ if(m.blindT>0){ m.aggro=0; return null; }
+  if(decoy&&decoy.t>0){ const dd=Math.hypot(decoy.x-m.x,decoy.z-m.z); if(dd<32&&Math.abs(decoy.y-m.y)<8){ if(dd<1.3){ m.atkD=(m.atkD||0)-dt; if(m.atkD<=0){ m.atkD=1; decoy.hp--; m.swing=.3; burst(decoy.x,decoy.y+1,decoy.z,col,5,1.5); } return [0,0,0]; } return [decoy.x-m.x,decoy.z-m.z,d.speed]; } }
+  return _sH(m,d,dt,dist); };
+// ---- frame loop: bolts, decoy, blindness ----
+let last=performance.now();
+(function loop(){ requestAnimationFrame(loop); const now=performance.now(), DT=Math.min(.6,(now-last)/1000); last=now; if(!game()||mode!=='play') return;
+  if(decoy){ decoy.t-=DT; if(decoy.t<=0){ burst(decoy.x,decoy.y+1,decoy.z,col,14,2.5); decoy=null; } }
+  for(const m of mobs) if(m.blindT>0){ m.blindT-=DT; if(rnd()<DT*6) parts.push({x:m.x+(rnd()-.5)*.4,y:m.y+MOB[m.type].h*.8,z:m.z+(rnd()-.5)*.4,vx:0,vy:.5,vz:0,t:.7,c:[40,20,60],s:.06,smoke:true}); }
+  const NS=Math.ceil(DT/.04); for(let rep=0;rep<NS;rep++){ const dt=DT/NS; for(let i=pb.length-1;i>=0;i--){ const b=pb[i]; b.t+=dt; b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt; if(rnd()<.8) parts.push({x:b.x,y:b.y,z:b.z,vx:0,vy:0,vz:0,t:.4,c:col,s:.1,ember:true});
+    let end=b.t>2.5||world.solid(Math.floor(b.x),Math.floor(b.y),Math.floor(b.z)); if(!end) for(const m of mobs){ if(m.dead) continue; const {hw,h}=mobBox(m); if(Math.abs(m.x-b.x)<hw+.25&&Math.abs(m.z-b.z)<hw+.25&&b.y>m.y-.1&&b.y<m.y+h+.1){ m.blindT=40; m.aggro=0; burst(m.x,m.y+h*.8,m.z,[60,30,90],10,2); toast(MOB[m.type].name+' is blinded'); end=true; break; } }
+    if(end){ burst(b.x,b.y,b.z,col,6,2); pb.splice(i,1); } } } })();
+setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player;
+  for(const m of mobs){ if(m.dead||Math.hypot(m.x-p.x,m.z-p.z)>48) continue; const {hw,h}=mobBox(m); let touch=false; for(const [ox,oz] of [[hw+.15,0],[-hw-.15,0],[0,hw+.15],[0,-hw-.15]]) for(const yy of [m.y+.3,m.y+h*.6]) if(world.get(Math.floor(m.x+ox),Math.floor(yy),Math.floor(m.z+oz))===SHB) touch=true; if(world.get(Math.floor(m.x),Math.floor(m.y-.1),Math.floor(m.z))===SHB) touch=true; if(touch) hitMob(m,1,m.x,m.z); }
+  for(let k=0;k<40;k++){ const x=Math.floor(p.x+(rnd()-.5)*20), y=Math.floor(p.y+(rnd()-.4)*10), z=Math.floor(p.z+(rnd()-.5)*20); if(world.get(x,y,z)===SHB) parts.push({x:x+rnd(),y:y+rnd(),z:z+rnd(),vx:(rnd()-.5)*.2,vy:.5,vz:(rnd()-.5)*.2,t:1.3,c:[70,40,110],s:.07,smoke:true}); } }catch(e){} },500);
+// decoy figure
+const _d=window.drawP2; window.drawP2=function(){ if(_d) _d(); if(!decoy) return; const t=performance.now()/1000, f=.5+.3*Math.sin(t*6), c=[150*f+60,100*f+40,220], x=decoy.x, y=decoy.y, z=decoy.z, w=Math.sin(t*5)*.15; setVL(VL_EMISSIVE);
+  emitBox(dynVB,[x-.25,y+.75,z-.13],[x+.25,y+1.4,z+.13],c,IDT); emitBox(dynVB,[x-.22,y+1.4,z-.22],[x+.22,y+1.84,z+.22],c,IDT); emitBox(dynVB,[x-.25,y,z-.13+w],[x-.02,y+.76,z+.12+w],c,IDT); emitBox(dynVB,[x+.02,y,z-.13-w],[x+.25,y+.76,z+.12-w],c,IDT);
+  emitBox(dynVB,[x-.38,y+.8,z-.07],[x-.25,y+1.38,z+.07],c,IDT); emitBox(dynVB,[x+.25,y+.8,z-.07],[x+.38,y+1.38,z+.07],c,IDT); };
 })();
 
 </script>

@@ -15,6 +15,7 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 - New block ids must be allocated after the last existing `NB`/`TB` call (saves store raw ids), and before the pattern bake.
 - Tiles saved with the world keep only a fixed field list; custom tile data goes in `tech`.
 - Function declarations can be wrapped by reassignment; `const` arrows (like `enchText`) cannot.
+- **v0.27.0 illusioner staff:** stick + 50 shadow essence. Modes: Blink (short teleport, 1.2s cooldown), Decoy (12s illusion that lures hostiles within 32 blocks), Blind (shadow bolt, mobs blinded 40s), Blocks (placeable shadow blocks: translucent, smoky, mobs touching take damage and can't pass; mined instantly; tap with a held block to replace every connected shadow block; hold ~1s on one with the staff to unsummon them all). Test: `tools/tests/phase5b_illusioner.py`.
 
 ## Planned
-Illusioner and frozen staffs, shadow blocks, frost blocks and ice slides (phase 5b).
+Frozen staff: water-freezing bolt, ice bolt, frost blocks and ice slides (phase 5b-2).
