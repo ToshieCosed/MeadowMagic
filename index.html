@@ -963,6 +963,9 @@ for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase());
 { const id=NB('FIREPLACE'); def(id,'Fireplace','#6f6f76','#5a5a62',0,{opaque:false,lightOpaque:0,shape:1,emit:[15,11,5],p2:'fireplace',boxes:[[0,0,0,1,.3,1],[0,.3,0,.18,.75,1],[.82,.3,0,1,.75,1],[.18,.3,.82,.82,.75,1]]}); pat(id,PT.COBBLE); P2B.fire=id; }
 { const id=NB('CAULDRON'); def(id,"Witch's cauldron",'#2c2c34','#3a3a44',0,{opaque:false,lightOpaque:0,shape:1,p2:'cauldron',boxes:[[.08,.18,.08,.92,.3,.92],[0,.3,0,.12,.9,1],[.88,.3,0,1,.9,1],[.12,.3,0,.88,.9,.12],[.12,.3,.88,.88,.9,1],[.1,0,.1,.24,.18,.24],[.76,0,.1,.9,.18,.24],[.1,0,.76,.24,.18,.9],[.76,0,.76,.9,.18,.9]]}); pat(id,PT.METAL); P2B.cauldron=id; }
 { const id=NB('ANVIL'); def(id,'Anvil','#3a3a42','#2c2c34',0,{opaque:false,lightOpaque:0,shape:1,p2:'anvil',boxes:[[.15,0,.15,.85,.18,.85],[.3,.18,.3,.7,.55,.7],[.08,.55,.0,.92,1,1]]}); pat(id,PT.METAL); P2B.anvil=id; }
+const CAMPBOXES=[[0,0,.08,1,.24,.3],[0,0,.7,1,.24,.92],[.08,.24,0,.3,.46,1],[.7,.24,0,.92,.46,1]]; const CAMPV={};
+{ const id=NB('CAMPFIRE'); def(id,'Campfire','#6b4a2b','#5a3d22',0,{opaque:false,lightOpaque:0,shape:1,camp:1,emit:[15,10,4],boxes:CAMPBOXES}); pat(id,PT.BARK); P2B.camp=id;
+  for(const d of DYES){ const v=NB('CAMP_'+d.k); def(v,'Campfire','#6b4a2b','#5a3d22',0,{opaque:false,lightOpaque:0,shape:1,camp:1,noItem:1,drop:id,emit:d.k==='white'?[13,13,13]:d.k==='black'?[4,3,5]:vivid(d.dye).map(c=>Math.max(1,Math.round(c*.95))),boxes:CAMPBOXES}); pat(v,PT.BARK); CAMPV[d.k]=v; } }
 const MLB=[]; DYES.forEach((d,i)=>{ let c=typeof d.dye==='string'?hex(d.dye):d.dye; const hs='#'+c.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join(''); const id=NB('MLIGHT_'+d.k); def(id,'Mage light',hs,hs,0,{solid:false,opaque:false,lightOpaque:0,noItem:1,shape:1,emit:c.map(v=>Math.max(2,Math.round(v/255*14))),boxes:[[.38,.38,.38,.62,.62,.62]],mlight:i}); MLB.push(id); });
 { const id=NB('SHADOW_BLOCK'); def(id,'Shadow block','#2e2048','#2e2048',0,{opaque:false,tint:[.35,.22,.6],lightOpaque:0,noItem:1,shadowB:1}); pat(id,PT.GLASS); P2B.shadowb=id; }
 { const id=NB('FROST_BLOCK'); def(id,'Frost block','#bfe3ff','#a8d4f8',0,{opaque:false,tint:[.74,.88,1],glassy:200,lightOpaque:0,noItem:1,frostB:1}); pat(id,PT.ICE); P2B.frostb=id;
@@ -1579,7 +1582,7 @@ precision highp float;
 in vec3 vAlb; in vec3 vSky; in vec3 vBlk; in float vA; in vec3 vW; centroid in vec3 vWc; in vec3 vV; in float vS; flat in int vP; flat in uint vBid;
 uniform highp sampler2DArray uPack; uniform highp usampler2D uSlot; uniform int uPackOn;
 uniform vec3 uPV; uniform float uPY; uniform float uCut; uniform float uCutR; uniform vec3 uFog; uniform vec2 uFocus; uniform vec2 uFogR; uniform float uAlpha;
-uniform float uAmb; uniform float uTime; uniform highp int uMode; uniform highp sampler2DArray uPat; uniform float uRoof; uniform float uClouds; uniform float uCloudY; uniform vec2 uCloudA; uniform vec2 uWind; uniform vec2 uSunXZ;
+uniform vec4 uPL[8]; uniform vec3 uPC[8]; uniform int uNL; uniform float uAmb; uniform float uTime; uniform highp int uMode; uniform highp sampler2DArray uPat; uniform float uRoof; uniform float uClouds; uniform float uCloudY; uniform vec2 uCloudA; uniform vec2 uWind; uniform vec2 uSunXZ;
 out vec4 o;
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 
@@ -1598,6 +1601,7 @@ void main(){
   vec3 L=min(vSky*sh+vBlk+vec3(uAmb),vec3(1.2));
   vec3 alb=vAlb;
   vec3 nrm=normalize(cross(dFdx(vW),dFdy(vW)));
+  { float gate=clamp(max(vBlk.r,max(vBlk.g,vBlk.b))*3.,0.,1.); for(int i=0;i<8;i++){ if(i>=uNL) break; vec3 dpl=uPL[i].xyz-vW; float dd=length(dpl), rr=uPL[i].w; if(dd<rr){ float at=1.-dd/rr; at*=at; float nd=.6+.4*max(dot(nrm,dpl/max(dd,.001)),0.); L+=uPC[i]*at*nd*gate*.9; } } L=min(L,vec3(1.35)); }
   bool pk=false;
   if(uPackOn>0&&vBid>0u){ int s=int(vBid); ivec2 c=ivec2(s&127,(s>>7)*2); uvec4 A=texelFetch(uSlot,c,0);
     bool tp=nrm.y>.5, bt=nrm.y<-.5; uint lay=tp?A.y:bt?A.z:A.x;
@@ -1628,7 +1632,7 @@ void main(){
 }`));
 gl.linkProgram(prog); if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
 gl.useProgram(prog);
-const U={}; for(const n of ['uVP','uView','uPV','uPY','uCut','uCutR','uFog','uFocus','uFogR','uAlpha','uSun','uAmb','uTime','uMode','uClouds','uCloudY','uWind','uSunXZ','uCloudA','uRoof']) U[n]=gl.getUniformLocation(prog,n);
+const U={}; for(const n of ['uVP','uView','uPV','uPY','uCut','uCutR','uFog','uFocus','uFogR','uAlpha','uSun','uAmb','uTime','uMode','uClouds','uCloudY','uWind','uSunXZ','uCloudA','uRoof','uPL','uPC','uNL']) U[n]=gl.getUniformLocation(prog,n);
 
 // ---------- block textures: 16×16 pattern tiles baked once into a texture array (4 variants each) ----------
 // R = brightness ×2 · G = overlay amount · B = overlay colour (1 mortar, 2 moss, 3 white spots, 4 spines)
@@ -3479,6 +3483,7 @@ r_(B.TANNING,1,['RRR','PPP','S.S'],{cat:'blocks'});
 r_(P2B.fire,1,['CCC','CFC','CCC'],{keys:{C:[B.COBBLE],F:[I.COAL]},cat:'blocks'});
 r_(P2B.cauldron,1,['I.I','I.I','III'],{keys:{I:[I.IRON]},cat:'blocks'});
 r_(P2B.anvil,1,['III','.I.','III'],{keys:{I:[I.IRON]},cat:'blocks'});
+r_(P2B.camp,1,['.S.','SCS','LLL'],{keys:{S:[I.STICK],C:[I.COAL,I.CHARCOAL],L:[B.LOG]},cat:'blocks'});
 r_(I.LEATHER,1,['H'],{station:'tan',cat:'items'});
 r_(I.RLEATHER,2,['EXE'],{keys:{X:[I.TIN]},station:'tan',cat:'items'});
 r_(I.SADDLE,1,['EEE','EFE'],{station:'tan',cat:'travel'});
@@ -4504,7 +4509,7 @@ function draw(focusX,focusZ,showPlayer){
   gl.viewport(0,0,cam.W,cam.H); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   gl.uniformMatrix4fv(U.uVP,false,cam.vp); gl.uniformMatrix4fv(U.uView,false,cam.view);
   const tnow=performance.now()/1000; gl.uniform1f(U.uTime,tnow%10000); gl.uniform1i(U.uMode,0);
-  gl.uniform1f(U.uRoof,world.meta&&(world.meta.dim==='under'||world.meta.dim==='pocket')&&!cam.persp?Math.floor(player.y)+(world.meta.dim==='pocket'?3.99:5.99):(window.galleryRoof?galleryRoof():0));
+  if(window.campLights) campLights(); gl.uniform1f(U.uRoof,world.meta&&(world.meta.dim==='under'||world.meta.dim==='pocket')&&!cam.persp?Math.floor(player.y)+(world.meta.dim==='pocket'?3.99:5.99):(window.galleryRoof?galleryRoof():0));
   const di=dayInfo(); gl.uniform1f(U.uClouds,cam.mode==='fp'?1:0); gl.uniform1f(U.uCloudY,cloudH()); gl.uniform2f(U.uWind,1.2,.4);
   { const sd=sunDir()||[0,1,0]; gl.uniform2f(U.uSunXZ,sd[0]/Math.max(.25,sd[1]),sd[2]/Math.max(.25,sd[1])); }
   const pv=xform(cam.view,player.x,player.y+.9,player.z);
@@ -6062,7 +6067,7 @@ function sfxScan(){ const p=player, X=Math.floor(p.x), Y=Math.floor(p.y), Z=Math
   for(let dy=-6;dy<=6;dy++){ const y=Y+dy; if(y<1||y>=world.H) continue; for(let dz=-R;dz<=R;dz++) for(let dx=-R;dx<=R;dx++){ const x=X+dx, z=Z+dz, b=world.get(x,y,z); if(b<=0) continue; const bd=BLOCKS[b];
     const d=Math.hypot(dx,dy*.8,dz);
     if(b===B.FALL||bd.flow&&isW(b)){ if(d<near.water) near.water=d; }
-    else if(bd.fire){ if(d<near.fire) near.fire=d; if(SFX.fires.length<24) SFX.fires.push([x,y,z]); }
+    else if(bd.fire||bd.camp){ if(d<near.fire) near.fire=d; if(SFX.fires.length<24) SFX.fires.push([x,y,z]); }
     else if(LAVAID[b]){ if(world.get(x,y+1,z)===0){ if(d<near.lava) near.lava=d; if(SFX.lavas.length<24) SFX.lavas.push([x,y,z]); } }
     else if(bd.portal){ if(d<near.portal) near.portal=d; if(SFX.portals.length<24) SFX.portals.push([x,y,z]); }
     else if(bd.opaque&&SFX.drips.length<48&&world.get(x,y-1,z)===0){ const a=world.get(x,y+1,z); if(a>0&&(isW(a)||LAVAID[a])) SFX.drips.push([x,y,z,LAVAID[a]?1:0]); } } }
@@ -8776,6 +8781,67 @@ function buildGallery(w){
 window.galleryRoof=()=>{ const g=window.GALLERY; if(!g||cam.persp) return 0; const x=player.x-g.X0, z=player.z-g.Z0, y=player.y-g.S0; return x>0&&x<30&&z>0&&z<30&&y>0&&y<g.floors.length*g.PITCH?Math.floor(player.y)+3.99:0; };   // iso: peel the ceiling off the floor you are on
 window.buildGallery=buildGallery; window.galleryFloors=galleryFloors;
 { const _s=window.startWorld; window.startWorld=function(meta,save,preview){ const r=_s.apply(this,arguments); try{ if(meta&&meta.gen==='show'&&!preview&&!(world.meta&&world.meta.gallery)&&!world.decor.some(e=>e.gal)) buildGallery(world); }catch(e){ console.error('gallery',e); } return r; }; }
+})();
+
+/* ===== v0.33.0: Campfire — dyeable fire with real-time flicker light, flames, embers and smoke ===== */
+(function(){
+const CAMP=new Set([P2B.camp,...Object.values(CAMPV)]), isCamp=b=>CAMP.has(b), DEF=[255,120,30];
+const rgbOf=k=>{ const d=DYE_BY[k]; return d?(typeof d.dye==='string'?hex(d.dye):d.dye.slice()):null; };
+function ensure(x,y,z){ const k=tileKey(x,y,z); let t=world.tiles.get(k); if(!t){ t={kind:'camp',x,y,z,s:[],heat:0,tech:{col:null,dye:null}}; world.tiles.set(k,t); } return t; }
+const _aP=afterPlace; afterPlace=function(x,y,z,id){ _aP.apply(this,arguments); if(isCamp(id)) ensure(x,y,z); };
+let CL=[];
+const rnd=Math.random;
+function dyeCamp(x,y,z,k){ const t=ensure(x,y,z); t.tech.col=k?rgbOf(k):null; t.tech.dye=k||null; world.set(x,y,z,k?CAMPV[k]:P2B.camp); world.changed=true; }
+window.__camp={dye:dyeCamp,get CL(){ return CL; }};
+const use1=()=>{ if(creative()) return; const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); };
+const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit, b=world.get(x,y,z);
+    if(isCamp(b)&&reachOK(x,y,z)){ const s=held(), it=s&&ITEMS[s.id];
+      if(it&&it.dye){ dyeCamp(x,y,z,it.dye); use1(); toast('The campfire burns '+it.dye.replace('_',' ')); const c=rgbOf(it.dye); burst(x+.5,y+.8,z+.5,c,10,2); return true; }
+      if(it&&it.bucket==='w'){ dyeCamp(x,y,z,null); toast('Doused: the flames return to orange'); burst(x+.5,y+.8,z+.5,[150,150,155],10,1.5); return true; } } } }
+  return _tI(sx,sy); };
+{ const _sD=stepDrops; stepDrops=function(dt){ _sD(dt); if(CL.length&&drops.length) for(let i=drops.length-1;i>=0;i--){ const q=drops[i], it=ITEMS[q.id]; if(!it||!it.dye||q.age<.3) continue;
+    for(const t of CL){ if(Math.abs(q.x-t.x-.5)<.55&&Math.abs(q.z-t.z-.5)<.55&&q.y>t.y&&q.y<t.y+1.3){ dyeCamp(t.x,t.y,t.z,it.dye); burst(t.x+.5,t.y+.8,t.z+.5,rgbOf(it.dye),8,1.5); q.n--; if(q.n<=0) drops.splice(i,1); break; } } } }; }
+// ---- slow tick: tile upkeep, embers, smoke column ----
+setInterval(()=>{ try{ if(!world||!world.tiles||!game()) return; const p=player, L=[];
+  for(const t of world.tiles.values()){ if(t.kind!=='camp') continue; const b=world.get(t.x,t.y,t.z);
+    if(!isCamp(b)){ if(world.chunk(t.x>>4,t.z>>4)) world.tiles.delete(tileKey(t.x,t.y,t.z)); continue; }
+    if(Math.hypot(t.x-p.x,t.z-p.z)<64) L.push(t); }
+  CL=L;
+  for(const t of L){ if(Math.hypot(t.x-p.x,t.z-p.z)>40) continue; const c=t.tech.col, fl=c||DEF, hi=fl.map(v=>Math.min(255,v*.6+110));
+    for(let k=0;k<2;k++) parts.push({x:t.x+.5+(rnd()-.5)*.3,y:t.y+.4,z:t.z+.5+(rnd()-.5)*.3,vx:(rnd()-.5)*.8,vy:1.6+rnd()*1.6,vz:(rnd()-.5)*.8,t:.5+rnd()*.5,c:hi,s:.035,ember:true});
+    const sm=c?c.map(v=>Math.min(255,v*.8+30)):[72,72,78];
+    parts.push({x:t.x+.5+(rnd()-.5)*.25,y:t.y+.75,z:t.z+.5+(rnd()-.5)*.25,vx:(rnd()-.5)*.35+.12,vy:1.0+rnd()*.5,vz:(rnd()-.5)*.35,t:4+rnd()*1.2,c:sm,s:.1+rnd()*.05,smoke:true}); }
+ }catch(e){} },140);
+// ---- flames ----
+{ const _d=window.drawP2; window.drawP2=function(){ if(_d) _d.apply(this,arguments); const T0=performance.now()/1000, p=player; setVL(VL_EMISSIVE);
+  for(const t of CL){ if(Math.abs(t.x-p.x)>44||Math.abs(t.z-p.z)>44) continue; const c=t.tech.col||DEF, hi=c.map(v=>Math.min(255,v*.55+120)), core=c.map(v=>Math.min(255,v*.25+205)), x=t.x, y=t.y, z=t.z;
+    for(let i=0;i<6;i++){ const ph=i*1.9+x*3.1+z*1.3, a=T0*(6+i*1.1)+ph, h=.3+.2*Math.sin(a)*Math.sin(a*.53+1)+.07*Math.sin(T0*23+ph*3)+(i===0?.14:0), sw=.04*Math.sin(T0*4+ph), cx=x+.5+(i?Math.cos(i*1.05)*.16:0)+sw, cz=z+.5+(i?Math.sin(i*1.05)*.16:0)-sw, w=i?.07:.11;
+      emitBox(dynVB,[cx-w,y+.18,cz-w],[cx+w,y+.18+h,cz+w],i?c:hi,IDT); }
+    emitBox(dynVB,[x+.41,y+.18,z+.41],[x+.59,y+.3+.1*Math.sin(T0*17+x),z+.59],core,IDT); } }; }
+// ---- real-time flickering light: the 8 nearest campfires are handed to the shader every frame ----
+const PL=new Float32Array(32), PC=new Float32Array(24);
+window.campLights=function(){ const fx=cam.tx??player.x, fz=cam.tz??player.z, T0=performance.now()/1000; let near=[];
+  for(const t of CL){ const d=Math.hypot(t.x+.5-fx,t.z+.5-fz); if(d<60) near.push([d,t]); }
+  near.sort((a,b)=>a[0]-b[0]); const n=Math.min(8,near.length);
+  for(let i=0;i<n;i++){ const t=near[i][1], c=t.tech.col||DEF, ph=t.x*1.7+t.z*2.9;
+    const nz=Math.sin(T0*11.3+ph)+.7*Math.sin(T0*17.9+ph*1.7)+.4*Math.sin(T0*41+ph*.3)+.3*Math.sin(T0*67+ph*2.1), f=.72+.2*nz/2.4+(rnd()<.03?-.18:0), m=Math.max(c[0],c[1],c[2])||1;
+    PL[i*4]=t.x+.5; PL[i*4+1]=t.y+.65; PL[i*4+2]=t.z+.5; PL[i*4+3]=9.5;
+    for(let k=0;k<3;k++) PC[i*3+k]=c[k]/m*1.05*f; }
+  gl.uniform1i(U.uNL,n); if(n){ gl.uniform4fv(U.uPL,PL); gl.uniform3fv(U.uPC,PC); } };
+// ---- icon ----
+{ const _ic=itemIconCanvas; itemIconCanvas=function(id){ if(id!==P2B.camp) return _ic(id); const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d');
+  g.fillStyle='#4a2f18'; g.fillRect(8,44,44,8); g.fillRect(8,38,44,6); g.fillStyle='#6b4a2b'; g.fillRect(8,40,44,4); g.save(); g.translate(30,38); g.rotate(.5); g.fillStyle='#5a3d22'; g.fillRect(-22,-4,44,8); g.rotate(-1); g.fillRect(-22,-4,44,8); g.restore();
+  const fl=(col,x,y,w,h)=>{ g.fillStyle=col; g.beginPath(); g.moveTo(x-w,y); g.quadraticCurveTo(x-w*.8,y-h*.6,x,y-h); g.quadraticCurveTo(x+w*.8,y-h*.6,x+w,y); g.closePath(); g.fill(); };
+  fl('#ff6a14',30,42,13,30); fl('#ffa628',30,42,9,22); fl('#ffe27a',30,42,5,14); return c; }; }
+// ---- showcase: a small demo beside the gallery entrance (also added to older Showcase worlds) ----
+window.buildCampDemo=function(w){ const C=w.gen.C, G=SHOW_G+1, X=C-110+36, Z0=C-15+8, touched=new Set();
+  const put=(x,y,z,v)=>{ const cx=x>>4, cz=z>>4, k=w.key(cx,cz); touched.add(k); let e=w.edits.get(k); if(!e){ e=new Map(); w.edits.set(k,e); } e.set((y*CS+(z&15))*CS+(x&15),v); };
+  const set=[[null,'Plain campfire\nOrange flames,\nflickering light'],['blue','Tap or throw a\ndye on a campfire:\nflame, light, embers\nand smoke change'],['purple','Dyed purple'],['lime','Dyed lime'],['red','Dyed red']];
+  set.forEach(([k,txt],i)=>{ const z=Z0+i*3; put(X,G,z,k?CAMPV[k]:P2B.camp); w.tiles.set(tileKey(X,G,z),{kind:'camp',x:X,y:G,z,s:[],heat:0,tech:{col:k?rgbOf(k):null,dye:k||null}});
+    w.decor.push({kind:'sign',gal:1,c:[X-1+.5,G+.72,z+.5],n:[1,0,0],u:[0,0,-1],v:[0,1,0],w:1,h:.6,sup:[X-1,G-1,z],cell:[X-1,G,z],post:1,fixU:1,text:txt,frame:'wood',bg:'parchment'}); });
+  w.meta.campdemo=1; w.changed=true;
+  for(const k of touched){ const ch=w.chunks.get(k); if(ch){ freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); w.chunks.delete(k); } } };
+{ const _s=window.startWorld; window.startWorld=function(meta,save,preview){ const r=_s.apply(this,arguments); try{ if(meta&&meta.gen==='show'&&!preview&&!(world.meta&&world.meta.campdemo)) buildCampDemo(world); }catch(e){ console.error('campdemo',e); } return r; }; }
 })();
 
 </script>

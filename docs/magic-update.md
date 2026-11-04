@@ -33,3 +33,10 @@ Nothing queued; ideas welcome.
 - **Item Gallery** (Showcase world): a 30×30 building 110 blocks west of the start (signposted). 12 floors, every item in the game in a wall item frame with a sign in front of it. Floors: Blocks ×3, Weapons, Magic items, Tools & travel, Armor, Decor ×2, Machines & tech ×2, Items & materials. Ladders at the west end; the east face is glass and the iso camera peels the ceiling of the floor you are on. Crouch-tap a frame to take the item out. Old Showcase worlds get the gallery added the next time they load.
 - Gallery signs and frames are culled by height/distance, textures are created a few per frame and freed when you leave (so 1,100+ decor items don't stall rendering).
 - Inventory: item icons are pre-drawn in the background (idle time), the recipe list starts at 20 entries, and the creative catalog grid is no longer rebuilt on every click.
+
+## v0.33.0 – Campfire
+
+- **Campfire** block (recipe: 3 logs, 3 sticks, coal/charcoal). Animated flames, rising embers, a tall smoke column and a fire-crackle loop.
+- **Dyeable**: tap with any of the 16 dyes, or throw a dye onto it; flames, embers, smoke and light all take the colour. Tap with a water bucket to return it to orange. Breaking it drops a plain campfire.
+- **Real-time flickering light**: the 8 nearest campfires are passed to the shader each frame as point lights (radius ~9, colour from the dye, noisy flicker) on top of the normal baked coloured block light (which also stops the glow leaking through walls). Works on terrain, mobs and the player.
+- Showcase: five demo campfires (plain, blue, purple, lime, red) with signs by the gallery entrance; added to older Showcase worlds on load.
