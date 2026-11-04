@@ -64,3 +64,7 @@ Nothing queued; ideas welcome.
 - Mobs with a skin are redrawn with vanilla-proportioned models and the standard Minecraft skin layout (64x32 and 64x64 both handled, hi-res packs scale automatically). Hurt flash, baby size, slime squash, sheep shearing and dye colour still work.
 - Packs imported before this version have no entity textures saved: re-import the pack once.
 - Test: `tools/tests/phase13_mobskins.py` builds a fake pack and screenshots every skinned mob.
+
+## v0.36.1 — more mob skins
+- Added pack skins for horse (first `horse_*.png` found), bat, squid, glow squid (`squid/glow_squid.png`, drawn fully lit), parrot (first `parrot_*.png` found), the Duskwalker (uses the enderman skin, scaled up) and the Lost (uses the villager skin).
+- Demons and mages have no direct vanilla equivalent and keep their built-in look. Re-import the pack once to pick up the new textures.

@@ -9230,7 +9230,7 @@ function boxQuads(out,pt,xf,tw,th,rw,rh){ const [x0a,y0a,z0a]=pt.p, [w,h,d]=pt.s
   if(mir){ const t=F[3].r; F[3].r=F[4].r; F[4].r=t; }
   for(const f of F){ const [ru,rv,rwid,rhei]=f.r, V=[]; for(const [a,b] of [[0,0],[1,0],[1,1],[0,1]]){ const q=[f.o[0]+f.a[0]*a+f.b[0]*b,f.o[1]+f.a[1]*a+f.b[1]*b,f.o[2]+f.a[2]*a+f.b[2]*b], W=xf(q), uu=(ru+(mir?1-a:a)*rwid)/rw, vv=(rv+b*rhei)/rh; V.push([W[0],W[1],W[2],uu,vv]); }
     for(const i of [0,1,2,0,2,3]) out.push(...V[i]); } }
-function partsOut(parts,m,K,sy,tex,out){ const e=ENT[tex]; const rw=64, rh=64*e.h/e.w, S=m.size?m.size*.5:m.baby?.55:1, cf=Math.cos(m.face), sf=Math.sin(m.face);
+function partsOut(parts,m,K,sy,tex,out,ref){ const e=ENT[tex]; const rw=ref||64, rh=rw*e.h/e.w, S=m.size?m.size*.5:m.baby?.55:1, cf=Math.cos(m.face), sf=Math.sin(m.face);
   for(const pt of parts){ const rot=pt.rot||[]; boxQuads(out,pt,(q)=>{ let p=q; for(const [ax,a,c1,c2] of rot) p=ax==='x'?rX(p,a,c1,c2):ax==='y'?rY(p,a,c1,c2):rZ(p,a,c1,c2);
       const lx=p[0]*K, ly=p[1]*K*(sy||1), lz=p[2]*K; return [m.x+(lx*cf+lz*sf)*S, m.y+ly*S, m.z+(-lx*sf+lz*cf)*S]; },e.w,e.h,rw,rh); } }
 
@@ -9242,7 +9242,8 @@ function drawSkins(){ if(!PACK.on||!world||!mobs.length) return; let used=false,
     if(!used){ used=true; gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform3fv(TU.uFog,FOG); const fr=world.radius*CS; gl.uniform2f(TU.uFocus,cam.tx??player.x,cam.tz??player.z); gl.uniform2f(TU.uFogR,fr-22,fr-6); gl.bindVertexArray(skVAO); wasCull=gl.isEnabled(gl.CULL_FACE); gl.disable(gl.CULL_FACE); }
     const L=sampleLight(m.x,m.y+.6,m.z), hurt=m.hurtT>.18?[1,.45,.45]:m.frozen>0?[.7,.8,1.1]:[1,1,1];
     const lit=[Math.min(1.1,(L[0]/255*SUNV[0]+L[4]/255+.04)),Math.min(1.1,(L[1]/255*SUNV[1]+L[5]/255+.04)),Math.min(1.1,(L[2]/255*SUNV[2]+L[6]/255+.04))];
-    const pass=(parts,tex,mul,blend)=>{ if(!parts.length||!ENT[tex]) return; const out=[]; partsOut(parts,m,M.k,M.sy,tex,out); if(out.length>SK_CAP) return; const d=new Float32Array(out);
+    if(M.glow){ lit[0]=lit[1]=lit[2]=1; }
+    const pass=(parts,tex,mul,blend)=>{ if(!parts.length||!ENT[tex]) return; const out=[]; partsOut(parts,m,M.k,M.sy,tex,out,M.ref); if(out.length>SK_CAP) return; const d=new Float32Array(out);
       gl.uniform3f(TU.uL,lit[0]*hurt[0]*mul[0],lit[1]*hurt[1]*mul[1],lit[2]*hurt[2]*mul[2]); gl.uniform1f(TU.uBlend,blend?1:0);
       if(blend){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); }
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,ENT[tex].tex); gl.activeTexture(gl.TEXTURE0); gl.bindBuffer(gl.ARRAY_BUFFER,skVBO); gl.bufferSubData(gl.ARRAY_BUFFER,0,d); gl.drawArrays(gl.TRIANGLES,0,d.length/5);
@@ -9253,6 +9254,34 @@ function drawSkins(){ if(!PACK.on||!world||!mobs.length) return; let used=false,
   if(used){ gl.uniform1f(TU.uBlend,0); if(wasCull) gl.enable(gl.CULL_FACE); gl.useProgram(prog); gl.bindVertexArray(null); } }
 { const _dt=drawTextured; drawTextured=function(){ _dt.apply(this,arguments); try{ drawSkins(); }catch(e){ if(!drawSkins.err){ drawSkins.err=1; console.error('skins',e); } } }; }
 window.__skins={MODELS,modelFor,partsOut};
+})();
+
+/* ===== v0.36.1: skins for horse, bat, squid, glow squid, parrot, Duskwalker (enderman) and Lost (villager) ===== */
+(function(){
+ENT_FILES.push(['horse',['horse/horse_brown.png','horse/horse_chestnut.png','horse/horse_darkbrown.png','horse/horse_black.png','horse/horse_gray.png','horse/horse_white.png','horse/horse_creamy.png']],
+ ['bat',['bat.png','bat/bat.png']],['squid',['squid/squid.png','squid.png']],['glow_squid',['squid/glow_squid.png']],
+ ['parrot',['parrot/parrot_red_blue.png','parrot/parrot_blue.png','parrot/parrot_green.png','parrot/parrot_yellow_blue.png','parrot/parrot_grey.png']],
+ ['walker',['enderman/enderman.png']],['lost',['villager/villager.png']]);
+const P=(p,s,uv,o)=>Object.assign({p,s,uv},o||{}), sw4=(m,i)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0; return (i%3===0?1:-1)*sw; };
+Object.assign(__skins.MODELS,{
+ horse:(m)=>{ const R=[['x',.52,22,10]]; return {k:.0625*.9,tex:'horse',parts:[ P([-5,13,-12],[10,10,24],[0,32]),
+   P([-5,0,7],[4,13,4],[48,21],{rot:[['x',sw4(m,0),13,9]]}), P([1,0,7],[4,13,4],[48,21],{rot:[['x',sw4(m,1),13,9]]}), P([-5,0,-11],[4,13,4],[48,21],{rot:[['x',sw4(m,1),13,-9]]}), P([1,0,-11],[4,13,4],[48,21],{rot:[['x',sw4(m,0),13,-9]]}),
+   P([-2,20,6],[4,14,8],[0,35],{rot:R}), P([-2.5,33,7],[5,5,7],[0,0],{rot:R}), P([-2,33,14],[4,3,6],[0,25],{rot:R}), P([-2,31,14],[4,2,5],[0,13],{rot:R}),
+   P([-.5,21,3],[1,14,4],[56,36],{rot:R}), P([-2.5,38,8],[2,3,1],[19,16],{rot:R}), P([.5,38,8],[2,3,1],[19,16],{rot:R}),
+   P([-1.5,6,-16],[3,14,4],[42,36],{rot:[['x',.45,20,-12]]})]}; },
+ bat:(m)=>{ const f=Math.sin(m.phase||0)*.9, R=[['x',1.0,8,0]]; return {k:.0625*.85,tex:'bat',parts:[ P([-3,2,-3],[6,12,6],[0,16],{rot:R}), P([-3,14,-3],[6,6,6],[0,0],{rot:R}),
+   P([-4,19,-2],[3,4,1],[24,0],{rot:R}), P([1,19,-2],[3,4,1],[24,0],{mir:1,rot:R}),
+   P([-13,4,-.5],[10,16,1],[42,0],{rot:[['z',-f,-3,10]]}), P([3,4,-.5],[10,16,1],[42,0],{mir:1,rot:[['z',f,3,10]]}),
+   P([-21,6,-.5],[8,12,1],[24,16],{rot:[['z',-f*.6,-13,10],['z',-f,-3,10]]}), P([13,6,-.5],[8,12,1],[24,16],{mir:1,rot:[['z',f*.6,13,10],['z',f,3,10]]})]}; },
+ squid:(m)=>{ const t=performance.now()/450, parts=[P([-6,16,-6],[12,16,12],[0,0])]; for(let i=0;i<8;i++){ const a=i*Math.PI/4, cx=Math.cos(a)*5, cz=Math.sin(a)*5; parts.push(P([cx-1,-2,cz-1],[2,18,2],[48,0],{rot:[['x',Math.sin(t+i)*.25,16,cz]]})); }
+   return {k:.0625*.55,tex:'squid',parts}; },
+ glow_squid:(m)=>{ const M=__skins.MODELS.squid(m); M.tex='glow_squid'; M.glow=1; return M; },
+ parrot:(m)=>{ const f=m.onGround===false?Math.sin(performance.now()/60)*.9:0, R=[['x',.6,3,0]]; return {k:.0625*1.25,ref:32,tex:'parrot',parts:[ P([-1.5,3,-1.5],[3,6,3],[2,8],{rot:R}), P([-1,9,-1],[2,3,2],[2,2],{rot:R}), P([-.5,10,1],[1,2,1],[11,7],{rot:R}), P([-1.5,1,-3.5],[3,4,1],[22,1],{rot:R}),
+   P([1.5,3,-1.5],[1,5,3],[19,8],{rot:[['z',f,1.5,8]]}), P([-2.5,3,-1.5],[1,5,3],[19,8],{mir:1,rot:[['z',-f,-1.5,8]]}), P([-1.5,0,-.5],[1,2,1],[14,18]), P([.5,0,-.5],[1,2,1],[14,18])]}; },
+ walker:(m)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0; return {k:.0625*4.1/2.875,tex:'walker',parts:[ P([-4,38,-4],[8,8,8],[0,0]), P([-4,38,-4],[8,8,8],[0,16],{g:-.4}), P([-4,26,-2],[8,12,4],[32,16]),
+   P([-3,0,-1],[2,30,2],[56,0],{rot:[['x',sw,28,0]]}), P([1,0,-1],[2,30,2],[56,0],{rot:[['x',-sw,28,0]]}), P([-6,8,-1],[2,30,2],[56,0],{rot:[['x',-sw*.7,36,0]]}), P([4,8,-1],[2,30,2],[56,0],{rot:[['x',sw*.7,36,0]]})]}; },
+ lost:(m)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0; return {k:.0625*.86,tex:'lost',parts:[ P([-4,24,-4],[8,10,8],[0,0]), P([-1,26,4],[2,4,2],[24,0]), P([-4,12,-3],[8,12,6],[16,20]), P([-4,6,-3],[8,18,6],[0,38],{g:.5}),
+   P([-4,15,1],[8,4,4],[40,38]), P([-4,0,-2],[4,12,4],[0,22],{rot:[['x',sw,12,0]]}), P([0,0,-2],[4,12,4],[0,22],{mir:1,rot:[['x',-sw,12,0]]})]}; } });
 })();
 
 </script>
