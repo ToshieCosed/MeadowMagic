@@ -97,3 +97,9 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - Tap a wired face with an empty hand to read its signal/RF. Wires with no block under them drop as items.
 - Not integrated: pressure plates and plate-driven iron doors are not tech tiles.
 - Test: `tools/tests/phase15_wires.py`.
+
+### v0.38.1 — braided, flowing wires
+- Wires are twisted two-strand braids (light/dark bands) in their colour; idle wires are dimmer, live ones brighter.
+- The bands crawl along the wire away from the power source; the speed follows signal strength (or RF flow). Updates every tick, so rapid lever flicking changes it immediately.
+- Each colour on a shared face animates independently (red one way, white the other). All six faces of a block hold their own wires.
+- Test: `tools/tests/phase16_wire_look.py`.
