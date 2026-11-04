@@ -5540,6 +5540,7 @@ function saveGame(){
     mobs:mobs.filter(m=>!MOB[m.type].hostile).map(m=>({type:m.type,x:m.x,y:m.y,z:m.z,hp:m.hp,baby:m.baby,grow:m.grow,saddled:m.saddled,face:m.face,wool:m.wool,sheared:m.sheared,tame:m.tame,sit:m.sit,col:m.col})),
     vehicles:vehicles.filter(v=>v!==player.mount).map(v=>v.kind==='cart'?{kind:'cart',id:v.id,cell:v.cell}:{kind:'boat',x:v.x,y:v.y,z:v.z}),
     mount:player.mount?(player.mount.type?{mob:mobs.indexOf(player.mount)}:{veh:player.mount.kind,id:player.mount.id,cell:player.mount.cell,x:player.mount.x,y:player.mount.y,z:player.mount.z}):null,
+    drops:drops.slice(0,600).map(q=>({x:q.x,y:q.y,z:q.z,vx:q.vx,vy:q.vy,vz:q.vz,id:q.id,n:q.n,d:q.d,bag:q.bag,sx:q.sx,age:q.age})),
     time:world.time,dayLen:world.dayLen,nightLen:world.nightLen,
     decor:world.decor.map(d=>{ const o={...d,item:d.item?packS(d.item):null}; delete o.texObj; delete o.texKey; delete o.tex; delete o.canvas; return o; }), arts:world.arts, maps:world.maps.map(m=>({cx:m.cx,cz:m.cz,px:b64(m.px)})),
     techLinks:world.techLinks||[],
@@ -5572,7 +5573,7 @@ function startWorld(meta,save,preview){
   if(meta.gameMode==='creative'&&!inv.slots.some(Boolean)) [B.GRASS,B.STONE,B.PLANKS,B.GLASS,B.TORCH,B.CHEST_WOOD,B.RAIL,GEN['diamond:pick'],GEN['diamond:sword']].forEach((id,i)=>inv.slots[i]=mkStack(id,ITEMS[id].stack));
   inv.armor=[null,null,null,null]; if(save&&save.armor) save.armor.forEach((t,i)=>inv.armor[i]=unpackS(t));
   mobs=[]; vehicles=[]; booms=[]; hook=null; player.mount=null; player.sitting=false;
-  drops.length=0; arrows.length=0; decay.length=0; mining=null; hudDirty=true; invChanged();
+  drops.length=0; if(save&&save.drops) for(const q of save.drops) if(ITEMS[q.id]) drops.push({...q,spin:0}); arrows.length=0; decay.length=0; mining=null; hudDirty=true; invChanged();
   world.decor=(save&&save.decor||[]).map(d=>{ const o={...d,item:d.item?unpackS(d.item):null}; if(!o.fixU&&o.n&&o.n[1]===0&&o.u&&o.u[0]===-o.n[2]&&o.u[2]===o.n[0]){ o.u=[-o.u[0],0,-o.u[2]]; } o.fixU=1; return o; }); world.arts=save&&save.arts||[]; world.maps=(save&&save.maps||[]).map(m=>({cx:m.cx,cz:m.cz,px:unb64(m.px),dirty:true}));
   world.pocketInfo=save&&save.pocketInfo||{}; world.lootDone=save&&save.lootDone||{};
   world.tiles=new Map(); world.time=save&&save.time!=null?save.time:40; world.dayLen=save&&save.dayLen||600; world.nightLen=save&&save.nightLen||600;
@@ -8543,22 +8544,29 @@ function flowAt(x,y,z){ const f=FL[world.get(x,y,z)]; if(!f||f.k!=='w') return n
 window.flowAt=flowAt;
 // slipperiness: how fast sliding momentum dies on each floor (default drop friction is 3/s)
 const ICEFR={[B.ICE]:.9,[B.PACKED_ICE]:.45,[FRB]:.8,[SLB]:.22};
-// ---- loose items ----
+// ---- loose items: own position and velocity; water adds acceleration, floors add friction ----
+// parameters are exposed so the relay can be tuned against Minecraft 1.13-1.15 behaviour
+const IP=window.ITEMPHYS={accel:18, drag:4, air:.12, ground:3, maxV:1e9, maxVy:20, ...{ice:.9,packed:.45,frost:.8,slide:.22}};
+const surfFr=b=>b===B.ICE?IP.ice:b===B.PACKED_ICE?IP.packed:b===FRB?IP.frost:b===SLB?IP.slide:IP.ground;
 const _sD=stepDrops; stepDrops=function(dt){
-  const pv=drops.map(q=>[q.vx,q.vz]);
-  for(const q of drops){ if(q.age<=.4) continue; const cx=Math.floor(q.x), cy=Math.floor(q.y+.05), cz=Math.floor(q.z), f=flowAt(cx,cy,cz);
-    if(f){ // buoyancy and current
-      let tvy; if(f.fall) tvy=-2.6; else if(isWat(world.get(cx,cy+1,cz))) tvy=1.4; else tvy=Math.max(-1,Math.min(1.2,(cy+.85-q.y)*3));
-      q.vy=tvy+18*dt; q.vx+=((f.x*(f.fall?0:2.1))-q.vx)*(1-Math.exp(-5*dt))*1.0+f.x*dt*2.2; q.vz+=((f.z*(f.fall?0:2.1))-q.vz)*(1-Math.exp(-5*dt))+f.z*dt*2.2; q.wet=1; }
-    else { q.wet=0;
-      const sb=world.get(cx,Math.floor(q.y-.2),cz), onS=sb===SLB||world.get(cx,Math.floor(q.y+.05),cz)===SLB;
-      if(onS){ const y0=Math.floor(q.y+.05); for(const [dx,dz] of DIR4) if(world.get(cx+dx,y0-1,cz+dz)===SLB&&!world.solid(cx+dx,y0,cz+dz)){ q.vx+=dx*dt*5; q.vz+=dz*dt*5; } } }
-    // pressure plates feel items too
-    const px=cx, py=Math.floor(q.y+.05), pz=cz, pb=world.get(px,py,pz); if(pb>0&&BLOCKS[pb].plate){ if(!BLOCKS[pb].plate.pr) world.set(px,py,pz,pb+1); plates.set(px+','+py+','+pz,{x:px,y:py,z:pz,t:.5}); } }
-  const wasWet=drops.map(q=>q.wet);
-  _sD(dt);
-  drops.forEach((q,i)=>{ if(pv[i]===undefined) return; if(wasWet[i]||q.vy!==0||(q.vx===0&&q.vz===0)) return;
-    const fr=ICEFR[world.get(Math.floor(q.x),Math.floor(q.y-.2),Math.floor(q.z))]; if(fr===undefined) return; q.vx=pv[i][0]*Math.exp(-fr*dt); q.vz=pv[i][1]*Math.exp(-fr*dt); }); };
+  const hold=[]; for(let i=drops.length-1;i>=0;i--){ const q=drops[i]; if(!world.chunk(Math.floor(q.x)>>4,Math.floor(q.z)>>4)){ hold.push(q); drops.splice(i,1); } }   // unloaded chunk: paused, velocity kept
+  const N=Math.max(1,Math.ceil(dt/.034)), h=dt/N;
+  for(let n=0;n<N;n++){
+    for(const q of drops){ if(q.age<=.4) continue; const cx=Math.floor(q.x), cy=Math.floor(q.y+.05), cz=Math.floor(q.z), f=flowAt(cx,cy,cz); q.wet=0;
+      q._k=Math.exp(3*h);                                          // cancel the stock 3/s damping; friction is applied per environment below
+      if(f){ q.wet=1; let tvy; if(f.fall) tvy=-2.6; else if(isWat(world.get(cx,cy+1,cz))) tvy=1.4; else tvy=Math.max(-1,Math.min(1.2,(cy+.85-q.y)*3));
+        q.vy=tvy+18*h; if(!f.fall){ q.vx+=f.x*IP.accel*h; q.vz+=f.z*IP.accel*h; } }
+      else if(isWat(world.get(cx,cy,cz))){ q.wet=1; }
+      else { const y0=Math.floor(q.y+.05), on=world.get(cx,y0,cz)===SLB||world.get(cx,Math.floor(q.y-.2),cz)===SLB;
+        if(on) for(const [dx,dz] of DIR4) if(world.get(cx+dx,y0-1,cz+dz)===SLB&&!world.solid(cx+dx,y0,cz+dz)){ q.vx+=dx*h*5; q.vz+=dz*h*5; } }
+      q.vx*=q._k; q.vz*=q._k;
+      const pb=world.get(cx,Math.floor(q.y+.05),cz); if(pb>0&&BLOCKS[pb].plate){ const py=Math.floor(q.y+.05); if(!BLOCKS[pb].plate.pr) world.set(cx,py,cz,pb+1); plates.set(cx+','+py+','+cz,{x:cx,y:py,z:cz,t:.5}); } }
+    const wet=drops.map(q=>q.wet), pre=drops.map(q=>q.vy);
+    _sD(h);
+    drops.forEach((q,i)=>{ if(q.age<=.4+h) return; const fr=wet[i]?IP.drag:q.vy!==0?IP.air:surfFr(world.get(Math.floor(q.x),Math.floor(q.y-.2),Math.floor(q.z)));
+      if(q.vx!==0||q.vz!==0){ const k=Math.exp(-fr*h); q.vx*=k; q.vz*=k; const sp=Math.hypot(q.vx,q.vz); if(sp>IP.maxV){ q.vx*=IP.maxV/sp; q.vz*=IP.maxV/sp; } }
+      if(q.vy>IP.maxVy) q.vy=IP.maxVy; }); }
+  for(const q of hold) drops.push(q); };
 // ---- mobs ----
 let FR=0; const _mm=mobMove; mobMove=function(m,vx,vz,dt,a){ if(dt<=.1&&!m.dead){ m._mvf=FR;
     const f=flowAt(Math.floor(m.x),Math.floor(m.y+.3),Math.floor(m.z)); if(f&&!f.fall){ vx+=f.x*1.5; vz+=f.z*1.5; }
