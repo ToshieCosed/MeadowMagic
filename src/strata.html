@@ -8336,10 +8336,16 @@ setInterval(()=>{ try{ const now=performance.now(), dt=Math.min(1,(now-last)/100
   if(buff('burn')){ p.fireT=0; if(BLOCKS[Math.max(0,world.get(Math.floor(p.x),Math.floor(p.y+.5),Math.floor(p.z)))]?.lava){ p.vy=Math.max(p.vy,-1.2); if(input.jump||input.jumpEdge) p.vy=3.2; p.fallTop=p.y; } }
   gl.style.filter=buff('arcane')?'brightness(1.6) contrast(1.06) saturate(1.1)':'';
   if(buff('arcane')){ if(rnd()<.8) parts.push({x:p.x+(rnd()-.5)*.8,y:p.y+rnd()*1.6,z:p.z+(rnd()-.5)*.8,vx:0,vy:.4,vz:0,t:1,c:[130,180,255],s:.04,smoke:true});
-    if((oreT-=dt)<=0){ oreT=.8; ores=[]; const X=Math.floor(p.x),Y=Math.floor(p.y),Z=Math.floor(p.z); for(let dx=-10;dx<=10&&ores.length<80;dx++) for(let dy=-8;dy<=8;dy++) for(let dz=-10;dz<=10;dz++){ const b=world.get(X+dx,Y+dy,Z+dz); if(b>0&&BLOCKS[b].ore) ores.push([X+dx,Y+dy,Z+dz,BLOCKS[b].ore]); } } } else ores.length=0;
+    if((oreT-=dt)<=0){ oreT=.8; ores=[]; const X=Math.floor(p.x),Y=Math.floor(p.y),Z=Math.floor(p.z); for(let dx=-22;dx<=22&&ores.length<600;dx++) for(let dy=-20;dy<=6;dy++) for(let dz=-22;dz<=22;dz++){ const b=world.get(X+dx,Y+dy,Z+dz); if(b>0&&BLOCKS[b].ore) ores.push([X+dx,Y+dy,Z+dz,BLOCKS[b].ore]); } } } else ores.length=0;
   if(buff('frost')===false&&false) return; ui();
  }catch(e){} },200);
-const _d=window.drawP2; window.drawP2=function(){ if(_d) _d(); if(ores.length&&buff('arcane')){ const t=performance.now()/1000; setVL(VL_EMISSIVE); for(const [x,y,z,c] of ores){ const k=.75+.25*Math.sin(t*3+x+z); emitBox(dynVB,[x-.015,y-.015,z-.015],[x+1.015,y+1.015,z+1.015],c.map(v=>Math.min(255,v*k+40)),IDT); } } };
+// ores glow through solid terrain: a 2D additive overlay projected from world positions (only while the arcane potion is active)
+const oc=document.createElement('canvas'); oc.id='oreGlow'; oc.style.cssText='position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none'; gl.parentNode.insertBefore(oc,gl.nextSibling); const og=oc.getContext('2d'), spr={};
+const sprite=c=>{ const k=c.join(); if(spr[k]) return spr[k]; const s=document.createElement('canvas'); s.width=s.height=48; const g=s.getContext('2d'), r=g.createRadialGradient(24,24,0,24,24,24); const q=c.map(v=>Math.min(255,v+70|0)); r.addColorStop(0,'rgba(255,255,255,.95)'); r.addColorStop(.18,`rgba(${q},.9)`); r.addColorStop(.5,`rgba(${c},.35)`); r.addColorStop(1,`rgba(${c},0)`); g.fillStyle=r; g.fillRect(0,0,48,48); return spr[k]=s; };
+(function loop(){ requestAnimationFrame(loop); const on=ores.length&&buff('arcane')&&game(); if(!on){ if(oc._on){ og.clearRect(0,0,oc.width,oc.height); oc._on=0; } return; } oc._on=1;
+  const W=innerWidth, H=innerHeight, d=Math.min(2,devicePixelRatio||1); if(oc.width!==(W*d|0)||oc.height!==(H*d|0)){ oc.width=W*d|0; oc.height=H*d|0; } og.setTransform(d,0,0,d,0,0); og.clearRect(0,0,W,H); og.globalCompositeOperation='lighter'; const t=performance.now()/1000;
+  for(const [x,y,z,c] of ores){ const sc=toScreen(x+.5,y+.5,z+.5); if(!(sc[2]>0)||sc[0]<-30||sc[1]<-30||sc[0]>W+30||sc[1]>H+30) continue; const k=(.8+.35*Math.sin(t*3+x*1.7+z*2.3+y)), sz=30*k; og.globalAlpha=.9; og.drawImage(sprite(c),sc[0]-sz/2,sc[1]-sz/2,sz,sz); }
+  og.globalAlpha=1; og.globalCompositeOperation='source-over'; })();
 // ---- shadow potion: mobs lose you; fire potion: no burn damage ----
 const _sH=stepHostile; stepHostile=function(m,d,dt,dist){ if(buff('shadow')&&!(m.hurtT>0)){ m.aggro=0; return null; } return _sH(m,d,dt,dist); };
 const _h=hurt; hurt=function(n,why){ if(buff('burn')&&/burn|fire|lava|flame/i.test(String(why||''))) return; return _h(n,why); };
