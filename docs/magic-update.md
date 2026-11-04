@@ -23,5 +23,7 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 
 - **v0.30.0 plate-and-water momentum relay (docs/relay-spec.md):** dropped items now have independent velocity. Water adds acceleration (`ITEMPHYS.accel`) and drag while an item is in it; leaving water keeps the velocity, and only the floor's friction slows it (ground 3/s, ice, packed ice, frost, slides lower; air drag tiny). Physics substeps at ~30 Hz so fast items can't skip water. Pressure plates stop water but not items. Items in unloaded chunks are paused with their velocity, and loose items are saved and restored with the world. All values are in `window.ITEMPHYS`. Test: `tools/tests/phase7_relay.py`. Passes A-E, G and H with channel walls (with or without ice); the open-field no-wall case (F) stalls where neighbouring sections' water meets, see README note.
 
+- **v0.31.0 showcase district:** new Showcase worlds get a Magic & Physics district east of the avenue (about 50 signs): a nine-cage mob zoo, brewing hall with ready cauldrons, anvil and essence armour, witches glass wall, staff range with mob pits and freeze pond, ice slide hill, potion lab, water flow, friction lanes, the plate relay, normal vs low hoppers, mobs in currents, and an info hall. Cage occupants and item feeders refill while you are near. Older showcase worlds need a new world to get it. Test: `tools/tests/phase8_showcase.py`.
+
 ## Planned
 Nothing queued; ideas welcome.

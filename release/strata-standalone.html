@@ -966,7 +966,7 @@ for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase());
 const MLB=[]; DYES.forEach((d,i)=>{ let c=typeof d.dye==='string'?hex(d.dye):d.dye; const hs='#'+c.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join(''); const id=NB('MLIGHT_'+d.k); def(id,'Mage light',hs,hs,0,{solid:false,opaque:false,lightOpaque:0,noItem:1,shape:1,emit:c.map(v=>Math.max(2,Math.round(v/255*14))),boxes:[[.38,.38,.38,.62,.62,.62]],mlight:i}); MLB.push(id); });
 { const id=NB('SHADOW_BLOCK'); def(id,'Shadow block','#2e2048','#2e2048',0,{opaque:false,tint:[.35,.22,.6],lightOpaque:0,noItem:1,shadowB:1}); pat(id,PT.GLASS); P2B.shadowb=id; }
 { const id=NB('FROST_BLOCK'); def(id,'Frost block','#bfe3ff','#a8d4f8',0,{opaque:false,tint:[.74,.88,1],glassy:200,lightOpaque:0,noItem:1,frostB:1}); pat(id,PT.ICE); P2B.frostb=id;
-  const sid=NB('ICE_SLIDE'); def(sid,'Ice slide','#d4efff','#bfe3ff',0,{opaque:false,lightOpaque:0,boxes:[[0,0,0,1,.14,1]],shape:1,noItem:1,slideB:1,drop:0}); pat(sid,PT.ICE); P2B.slideb=sid; }
+  const sid=NB('ICE_SLIDE'); def(sid,'Ice slide','#d4efff','#bfe3ff',0,{opaque:false,lightOpaque:0,boxes:[[0,0,0,1,.14,1]],shape:1,solid:false,noItem:1,slideB:1,drop:0}); pat(sid,PT.ICE); P2B.slideb=sid; }
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -7354,7 +7354,7 @@ W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } 
 /* ---------- hoppers and droppers ---------- */
 function stepHopper(t,dt){ const T=t.tech; T.cd=(T.cd||0)-dt; if(T.cd>0) return; T.cd=T.low?.2:.4; const fl=T.slots[5], me=invAt(t.x,t.y,t.z);
   const above=invAt(t.x,t.y+1,t.z); if(above){ const s=invPeek(above,fl); if(s&&invInsert(me,{...s,n:1},true)===0){ const g=invExtract(above,fl,1); if(g) invInsert(me,g); } }
-  else for(let i=drops.length-1;i>=0;i--){ const q=drops[i], ax=Math.abs(q.x-t.x-.5), az=Math.abs(q.z-t.z-.5); if((T.low?(ax<.85&&az<.6||az<.85&&ax<.6)&&q.y>t.y-.3&&q.y<t.y+1:ax<.7&&az<.7&&q.y>t.y+.5&&q.y<t.y+1.8)&&(!fl||fMatch(fl,q.id))){ const left=invInsert(me,{id:q.id,n:q.n,d:q.d,x:q.sx,bag:q.bag}); if(left<q.n){ if(!left) drops.splice(i,1); else q.n=left; if(!T.low) break; } } }
+  else for(let i=drops.length-1;i>=0;i--){ const q=drops[i], ax=Math.abs(q.x-t.x-.5), az=Math.abs(q.z-t.z-.5); if((T.low?(ax<.85&&az<.6||az<.85&&ax<.6)&&q.y>t.y-.3&&q.y<t.y+1.5:ax<.7&&az<.7&&q.y>t.y+.5&&q.y<t.y+1.8)&&(!fl||fMatch(fl,q.id))){ const left=invInsert(me,{id:q.id,n:q.n,d:q.d,x:q.sx,bag:q.bag}); if(left<q.n){ if(!left) drops.splice(i,1); else q.n=left; if(!T.low) break; } } }
   const tgt=invAt(...posOf(t,T.f)); if(!tgt) return; for(let i=0;i<5;i++){ const s=T.slots[i]; if(!s) continue; if(invInsert(tgt,{...s,n:1},true)===0){ invInsert(tgt,{...s,n:1}); s.n--; if(!s.n) T.slots[i]=null; break; } } }
 function stepDropper(t){ const T=t.tech, on=anySig(t,T.f); if(on&&!T.was){ const fl=T.slots[9], i=T.slots.findIndex((s,k)=>k<9&&s&&(!fl||fMatch(fl,s.id)));
     if(i>=0){ const s=T.slots[i], tgt=invAt(...posOf(t,T.f)), one={...s,n:1}; let done=false; if(tgt) done=invInsert(tgt,one)===0;
@@ -7715,7 +7715,7 @@ function buildShowcase(w){ const C=w.gen.C, G=SHOW_G+1, T=TECH.TECHB, X=T19;
   for(const [k,x,z,o] of w.__mobs||[]){ spawnMob(k,x+.5,(o&&o.y)||G,z+.5,false); Object.assign(mobs[mobs.length-1],o||{}); }
   w.mobsInit=true; delete w.__mobs; X.techDirty();
 }
-{ const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview){ buildShowcase(world); if(meta.gameMode!=='creative'){ } } }; }
+{ const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview){ buildShowcase(world); if(window.buildMagicShowcase) buildMagicShowcase(world); if(meta.gameMode!=='creative'){ } } else if(meta&&meta.gen==='show'&&save&&!preview&&meta.magic&&window.buildMagicShowcase) buildMagicShowcase(world,true); }; }
 /* ---------- stage 22: item and panel size setting, easier touch dragging ---------- */
 { const css=document.createElement('style'); css.textContent=`
 :root{--iscale:1}
@@ -8563,7 +8563,7 @@ const _sD=stepDrops; stepDrops=function(dt){
       const pb=world.get(cx,Math.floor(q.y+.05),cz); if(pb>0&&BLOCKS[pb].plate){ const py=Math.floor(q.y+.05); if(!BLOCKS[pb].plate.pr) world.set(cx,py,cz,pb+1); plates.set(cx+','+py+','+cz,{x:cx,y:py,z:cz,t:.5}); } }
     const wet=drops.map(q=>q.wet), pre=drops.map(q=>q.vy);
     _sD(h);
-    drops.forEach((q,i)=>{ if(q.age<=.4+h) return; const fr=wet[i]?IP.drag:q.vy!==0?IP.air:surfFr(world.get(Math.floor(q.x),Math.floor(q.y-.2),Math.floor(q.z)));
+    drops.forEach((q,i)=>{ if(q.age<=.4+h) return; const fx=Math.floor(q.x), fz=Math.floor(q.z), fb=world.get(fx,Math.floor(q.y+.05),fz)===SLB?SLB:world.get(fx,Math.floor(q.y-.2),fz); const fr=wet[i]?IP.drag:q.vy!==0?IP.air:surfFr(fb);
       if(q.vx!==0||q.vz!==0){ const k=Math.exp(-fr*h); q.vx*=k; q.vz*=k; const sp=Math.hypot(q.vx,q.vz); if(sp>IP.maxV){ q.vx*=IP.maxV/sp; q.vz*=IP.maxV/sp; } }
       if(q.vy>IP.maxVy) q.vy=IP.maxVy; }); }
   for(const q of hold) drops.push(q); };
@@ -8581,6 +8581,113 @@ const _sM=stepMobs; stepMobs=function(dt){ FR++; _sM(dt);
 const _sP=stepPlayer; stepPlayer=function(dt){ _sP(dt); try{ const p=player; if(!p.inWater||p.mount) return; const f=flowAt(Math.floor(p.x),Math.floor(p.y+.4),Math.floor(p.z)); if(f&&f.moving&&!f.fall){ p.vx+=f.x*dt*7; p.vz+=f.z*dt*7; } }catch(e){} };
 // stream bits: foam where water runs
 setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player; for(let k=0;k<30;k++){ const x=Math.floor(p.x+(rnd()-.5)*16), y=Math.floor(p.y+(rnd()-.4)*6), z=Math.floor(p.z+(rnd()-.5)*16), f=flowAt(x,y,z); if(f&&f.moving&&!isWat(world.get(x,y+1,z))&&rnd()<.5) parts.push({x:x+rnd(),y:y+.85,z:z+rnd(),vx:f.x*.8,vy:.1,vz:f.z*.8,t:.6,c:[225,240,255],s:.05,smoke:true}); } }catch(e){} },350);
+})();
+
+
+/* ---------- v0.31.0: magic and physics district for the showcase world ---------- */
+(function(){
+const IT=re=>{ for(const k of Object.keys(ITEMS)) if(re.test(ITEMS[k].name)) return +k; return null; };
+const ITS=re=>Object.keys(ITEMS).filter(k=>re.test(ITEMS[k].name)).map(Number);
+const CAGES=[], FEEDS=[], SRCS=[]; window.MAGICDISTRICT={CAGES,FEEDS,SRCS};
+function buildMagicShowcase(w,dry){
+  const C=w.gen.C, G=SHOW_G+1, T=TECH.TECHB, X=T19, PLATE=PLATE_MATS[0].plate;
+  CAGES.length=FEEDS.length=SRCS.length=0; if(!dry) w.meta.magic=1;
+  const put=(x,y,z,v)=>{ if(dry||v==null||y<1||y>=w.H) return; const cx=x>>4, cz=z>>4, k=w.key(cx,cz); let e=w.edits.get(k); if(!e){ e=new Map(); w.edits.set(k,e); } e.set((y*CS+(z&15))*CS+(x&15),v); };
+  const fill=(x0,y0,z0,x1,y1,z1,v)=>{ if(dry) return; for(let x=Math.min(x0,x1);x<=Math.max(x0,x1);x++) for(let y=y0;y<=y1;y++) for(let z=Math.min(z0,z1);z<=Math.max(z0,z1);z++) put(x,y,z,v); };
+  const N=[0,0,1], S=[0,0,-1];
+  const sign=(x,z,n,text,y)=>{ if(dry) return; y=y??G; put(x,y,z,0); w.decor.push({kind:'sign',c:[x+.5,y+.95,z+.5],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:[x,y-1,z],cell:[x,y,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
+  const chest=(x,y,z,items,id)=>{ if(dry) return; id=id||B.CHEST_WOOD; put(x,y,z,id); const s=new Array(CHEST_SLOTS[id]).fill(null); items.forEach((it,i)=>{ if(it&&it[0]!=null&&ITEMS[it[0]]) s[i]=mkStack(it[0],it[1]||1); }); w.tiles.set(tileKey(x,y,z),{kind:'chest',x,y,z,s}); };
+  const tech=(x,y,z,k,f,o)=>{ if(dry) return; put(x,y,z,T[k]); const t=X.newTech(x,y,z,k,f??4); Object.assign(t.tech,o||{}); return t; };
+  const station=(x,z)=>{ if(dry) return; put(x,G,z,P2B.fire); put(x,G+1,z,P2B.cauldron); w.tiles.set(tileKey(x,G,z),{kind:'p2',x,y:G,z,s:[],tech:{type:'fire',col:null}}); w.tiles.set(tileKey(x,G+1,z),{kind:'p2',x,y:G+1,z,s:[],tech:{type:'cauldron',w:1,col:null,items:{},act:0,bt:0}}); };
+  // glass cage (3x3 inside, dark roof so nothing burns), registered so its occupant is topped up
+  const cage=(x,z,type,label,n)=>{ fill(x,G-1,z,x+4,G-1,z+4,B.STONE_BRICK); fill(x,G,z,x+4,G+2,z+4,B.GLASS); fill(x+1,G,z+1,x+3,G+2,z+3,0); fill(x,G+3,z,x+4,G+3,z+4,B.STONE_BRICK); put(x+2,G-1,z+2,B.SEA_LANTERN); CAGES.push({type,x0:x,x1:x+5,z0:z,z1:z+5,cx:x+2.5,cz:z+2.5,y:G}); if(label) sign(x+2,z+5,n||N,label); };
+  const pit=(x,z,type,label)=>{ fill(x,G-4,z,x+4,G-1,z+4,B.STONE_BRICK); fill(x+1,G-3,z+1,x+3,G-1,z+3,0); fill(x+1,G,z+1,x+3,G+1,z+3,0); for(let i=0;i<5;i++){ put(x+i,G,z,B.STONE_BRICK); put(x+i,G,z+4,B.STONE_BRICK); put(x,G,z+i,B.STONE_BRICK); put(x+4,G,z+i,B.STONE_BRICK); }
+    CAGES.push({type,x0:x,x1:x+5,z0:z,z1:z+5,cx:x+2.5,cz:z+2.5,y:G-3}); if(label) sign(x+2,z+5,N,label); };
+  const X0=C+68, P=18, nx=i=>X0+P*i, END=nx(8);
+  // clear and flatten the whole district, then lay the avenue
+  fill(C+64,G-2,C-19,END,G+11,C+24,0); fill(C+64,G-3,C-19,END,G-2,C+24,B.DIRT); fill(C+64,G-1,C-19,END,G-1,C+24,B.GRASS);
+  fill(C+64,G-1,C-1,END,G-1,C+1,B.STONE_BRICK);
+  const lant=DYES.find(d=>d.k==='purple'||d.k==='white').lantern; for(let x=C+70;x<=END;x+=9) for(const z of [-2,2]){ put(x,G,C+z,B.FENCE); put(x,G+1,C+z,B.FENCE); put(x,G+2,C+z,lant); }
+  sign(C+64,C+3,S,'MAGIC & PHYSICS\nDISTRICT (east)\nNorth: mobs, brewing,\nstaffs · South: water,ice');
+  sign(C+64,C-3,N,'Tip: switch to\nSurvival to see mobs\nhunt you. In creative\nthey stand and watch');
+  // ===== NORTH ROW =====
+  // N0-N2: zoo, nine cages
+  const zoo=[['zombie','ZOMBIE\n20 hp. Burns in\nsunlight, drops\nflesh & iron'],['skeleton','SKELETON\nShoots arrows.\nDrops bones &\narrows'],['walker','DUSKWALKER\nTeleports when hit.\nTall and quiet'],
+    ['spider','SPIDER\nClimbs walls.\nDrops string'],['mage_illusion','ILLUSION MAGE\nBolt makes a clone.\nTwo hits kill it\nDrops shadow ess.'],['mage_fire','FIRE MAGE\nFire bolts, keeps\nits distance.\nDrops burning ess.'],
+    ['mage_magick','MAGICK MAGE\nLeaves a light\ntrail with its bolt.\nDrops arcane ess.'],['mage_ice','ICE MAGE\nIts bolt slows you.\nDrops frost ess.'],['mage_summoner','SUMMONER MAGE\nOne lesser mob at\na time.\nDrops life ess.']];
+  zoo.forEach(([t,l],i)=>{ const col=i%3, plot=Math.floor(i/3); cage(nx(plot)+col*6,C-9,t,l); });
+  sign(nx(0)+7,C-12,N,'MOB ZOO\nEvery hostile in a\nglass cage with a\ndark roof (no burning)'); sign(nx(1)+7,C-12,N,'Monsters spawn at night\nor in the dark and never\nmore than 50 blocks\nbelow you'); sign(nx(2)+7,C-12,N,'Modes: Survival, Peaceful\n(no hostiles), Creative.\nChoose when you make\na world');
+  // N3: brewing hall: fireplace + witch's cauldron
+  { const x0=nx(3), z0=C-16; station(x0+2,z0+3); station(x0+8,z0+3);
+    chest(x0+4,G,z0+3,[[I.ARCANE_ESS,40],[I.SHADOW_ESS,60],[I.BURN_ESS,60],[I.FROST_ESS,60],[I.LIFE_ESS,40],[I.STICK,16],[B.SAND,64],[I.SUGAR,16],[IT(/glass bottle/i),16]].map(a=>a));
+    chest(x0+6,G,z0+3,[[IT(/dye|ink/i)||I.STICK,4],[I.BUCKET_WATER,1],[B.GLASS,16]]);
+    sign(x0+2,z0+6,N,'WITCH\'S CAULDRON\nFireplace beneath it\nboils the water. Drop\n10 arcane ess. to wake'); sign(x0+8,z0+6,N,'RECIPES (drop in)\nStick+50 ess = staff\nEss.+2 sand = witches glass\nEss.+leather = robes');
+    sign(x0+5,z0+10,N,'Chest has essences,\nsticks, sand, sugar,\nbottles. Cauldron is\nalready full of water'); }
+  // N4: anvil + robes
+  { const x0=nx(4), z0=C-16; put(x0+3,G,z0+4,P2B.anvil); put(x0+9,G,z0+4,P2B.anvil);
+    const armour=ITS(/^Leather (helmet|chestplate|leggings|boots)$/i); chest(x0+6,G,z0+4,[...armour.map(a=>[a,1]),[I.SHADOW_ESS,8],[I.BURN_ESS,8],[I.FROST_ESS,8],[I.ARCANE_ESS,8],[I.LIFE_ESS,8],...ITS(/enchant.*book|book.*enchant/i).slice(0,10).map(a=>[a,1])]);
+    sign(x0+3,z0+7,N,'ANVIL\nLine armour with an\nessence leather piece.\nMerge lower books'); sign(x0+9,z0+7,N,'ESSENCE ARMOUR\nResists that essence\'s\nattacks. Robes do too\n(cauldron recipe)'); }
+  // N5: witches glass
+  { const x0=nx(5), z0=C-16, defs=[['wg_burn','MOBS ONLY\nBurning glass: mobs\nwalk through, you\ndon\'t'],['wg_shadow','PLAYER ONLY\nShadow glass: you\nwalk through, mobs\ndon\'t'],['wg_life','PASSIVE + YOU\nLife glass: animals\nand you pass,\nmonsters don\'t'],['wg_frost','ITEMS ONLY\nFrost glass: loose\nitems pass, nothing\nelse'],['wg_arcane','SOLID\nArcane glass is a\nglowing solid wall']];
+    fill(x0-1,G,z0+3,x0+13,G+3,z0+3,B.STONE_BRICK);
+    defs.forEach(([k,l],i)=>{ const x=x0+i*3; fill(x,G,z0+3,x,G+2,z0+3,P2B[k]); sign(x,z0+2,N,l); });
+    fill(x0-1,G,z0+8,x0+13,G,z0+8,B.FENCE); fill(x0-1,G,z0+4,x0-1,G,z0+8,B.FENCE); fill(x0+13,G,z0+4,x0+13,G,z0+8,B.FENCE);
+    CAGES.push({type:'cow',x0:x0,x1:x0+13,z0:z0+4,z1:z0+8,cx:x0+6,cz:z0+6,y:G});
+    sign(x0+6,z0+10,N,'Walk through each glass\ncolour to test it. A cow\nis penned behind. Mix 1 ess.\n+ 2 sand for 4 panes'); }
+  // N6: staff range
+  { const x0=nx(6), z0=C-16; chest(x0+6,G,z0+2,[[STAFFS.arcane,1],[STAFFS.flame,1],[STAFFS.illusion,1],[STAFFS.frost,1],[B.STONE,64],[B.COBBLE,64]]);
+    sign(x0+4,z0+2,N,'STAFF CHEST\nArcane, Flaming,\nIllusioner, Frozen.\nCrouch+tap = mode'); pit(x0+1,z0+6,'zombie','PIT: try Blind\n(Illusioner) & Ice bolt\n(Frozen) on the zombie'); pit(x0+7,z0+6,'skeleton','PIT: Flame bolt sets\nit alight, ice bolt\nslows it');
+    fill(x0+12,G-4,z0+4,x0+16,G-1,z0+10,B.STONE_BRICK); fill(x0+12,G-3,z0+4,x0+16,G-1,z0+10,B.WATER); put(x0+14,G-1,z0+7,B.WATER); fill(x0+12,G-3,z0+3,x0+16,G-3,z0+11,B.STONE_BRICK);
+    sign(x0+14,z0+12,N,'FREEZE POND\nFrozen staff, Freeze\nmode: turns water to\npermanent ice'); }
+  // N7: blocks of shadow & frost, slides
+  { const x0=nx(7), z0=C-16; for(let s=0;s<5;s++) fill(x0+s*3,G,z0+3,x0+s*3+2,G+s,z0+10,B.STONE);
+    sign(x0+1,z0+11,N,'ICE SLIDE HILL\nFrozen staff, Slide\nmode: lays a slippery\nbed that follows terrain'); sign(x0+10,z0+11,N,'Shadow & frost blocks\nare made with the\nstaffs. Hold on one to\nunsummon them all'); }
+  // ===== SOUTH ROW =====
+  const zS=C+4;
+  // S0: potion lab
+  { const x0=nx(0); station(x0+3,zS+3); chest(x0+6,G,zS+3,[[I.GLASS_BOTTLE,16],[I.SUGAR,16],[I.ARCANE_ESS,20],[I.SHADOW_ESS,20],[I.BURN_ESS,20],[I.FROST_ESS,20],...ITS(/potion/i).map(a=>[a,1])]);
+    sign(x0+3,zS-1,S,'POTION LAB\nBottle an essence,\nadd sugar in the\ncauldron = potion'); sign(x0+9,zS+3,S,'Four potions: frost,\nshadow (mobs lose you),\nfire, arcane (ores\nglow through rock)'); }
+  // S1: flowing water like Minecraft
+  { const x0=nx(1); fill(x0+1,G,zS+2,x0+13,G,zS+2,B.STONE_BRICK); put(x0+2,G,zS+4,B.WATER); SRCS.push([x0+2,G,zS+4]);
+    // terraces and a hole: water heads for the nearest drop within 4 blocks
+    fill(x0+1,G-1,zS+7,x0+13,G-1,zS+13,B.STONE_BRICK); fill(x0+8,G-1,zS+9,x0+8,G-1,zS+9,0); fill(x0+8,G-3,zS+9,x0+8,G-2,zS+9,0); put(x0+8,G-3,zS+9,B.STONE_BRICK); put(x0+5,G,zS+9,B.WATER); SRCS.push([x0+5,G,zS+9]);
+    for(let s=0;s<4;s++){ fill(x0+1+s*3,G,zS+14,x0+3+s*3,G+3-s,zS+16,B.STONE_BRICK); } put(x0+2,G+4,zS+15,B.WATER); SRCS.push([x0+2,G+4,zS+15]);
+    sign(x0+2,zS+1,S,'FLOWING WATER\nA source spreads 7\nblocks, falls and\nrenews at drops'); sign(x0+7,zS+6,S,'It seeks the nearest\ndrop within 4 blocks\n(the hole) before\nspreading evenly'); sign(x0+1,zS+13,S,'Staircase fall:\nevery step restarts\nthe stream; it pushes\nitems, mobs and you'); }
+  // S2: friction lanes
+  { const x0=nx(2), fl=[B.STONE,B.ICE,B.PACKED_ICE,P2B.frostb,B.STONE]; fl.forEach((f,i)=>{ const z=zS+2+i*3; fill(x0+1,G-1,z,x0+16,G-1,z,f); if(i===4) fill(x0+1,G,z,x0+16,G,z,P2B.slideb); fill(x0+1,G,z-1,x0+16,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+16,G,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK); FEEDS.push({x:x0+1.5,y:G+.3,z:z+.5,id:I.STICK,vx:6,every:7,max:2});
+      put(x0+3,G+1,z-1,B.TORCH); put(x0+7,G+1,z-1,B.TORCH); put(x0+11,G+1,z-1,B.TORCH); put(x0+15,G+1,z-1,B.TORCH); });
+    sign(x0+1,zS-1,S,'FRICTION LANES\nSame kick, five floors:\nstone, ice, packed ice,\nfrost block, ice slide'); sign(x0+8,zS+16,S,'Torches every 4 blocks.\nSlide is slickest; stone\nstops fast. Items drift,\nmobs slip too'); }
+  // S3: plate relay (two plots wide)
+  { const x0=nx(3), SEC=3, LEN=9; fill(x0+1,G-1,zS+3,x0+SEC*LEN+2,G-1,zS+3,B.STONE_BRICK);
+    for(let s=0;s<SEC;s++){ const ox=x0+1+s*LEN; fill(ox,G,zS+2,ox+LEN-2,G,zS+2,B.STONE_BRICK); fill(ox,G,zS+4,ox+LEN-2,G,zS+4,B.STONE_BRICK); put(ox+LEN-1,G,zS+3,PLATE); put(ox,G,zS+3,B.WATER); SRCS.push([ox,G,zS+3]); }
+    FEEDS.push({x:x0+2.5,y:G+.6,z:zS+3.5,id:I.STICK,vx:0,every:9,max:2});
+    sign(x0+1,zS,S,'PLATE RELAY\nWater stops at the\npressure plate but the\nitem keeps its speed'); sign(x0+13,zS,S,'The next stream\nadds speed again.\nNo drops needed, any\nlength'); sign(x0+22,zS,S,'Each section: 1 source\n+ 7 flowing blocks\n+ 1 plate. Ice is\noptional'); }
+  // S4: hoppers
+  { const x0=nx(5); for(let k=0;k<2;k++){ const z=zS+3+k*5; fill(x0+1,G-1,z,x0+8,G-1,z,B.ICE); fill(x0+1,G,z-1,x0+8,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+8,G,z+1,B.STONE_BRICK); fill(x0+10,G,z-1,x0+11,G+1,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK);
+      FEEDS.push({x:x0+1.5,y:G+.3,z:z+.5,id:I.STICK,vx:7,every:6,max:3});
+      chest(x0+9,G-1,z,[]); tech(x0+9,G,z,'hopper',3,{slots:[null,null,null,null,null,null],low:k===1}); put(x0+9,G+1,z,0); }
+    sign(x0+1,zS+1,S,'NORMAL HOPPER\nOnly takes items\nresting on top. Sliding\nitems stop at its side'); sign(x0+1,zS+6,S,'LOW-PROFILE HOPPER\nNearly flat: grabs items\nthat slide into its sides'); sign(x0+8,zS+11,S,'Tap a hopper to open\nits menu and flip Low\nprofile. Chests below\nshow what was caught'); }
+  // S5: mobs in currents
+  { const x0=nx(6); fill(x0+1,G-1,zS+3,x0+14,G-1,zS+3,B.STONE_BRICK); fill(x0+9,G-1,zS+3,x0+14,G-1,zS+3,B.ICE); fill(x0,G,zS+2,x0+15,G+1,zS+2,B.GLASS); fill(x0,G,zS+4,x0+15,G+1,zS+4,B.GLASS); fill(x0+15,G,zS+3,x0+15,G+1,zS+3,B.GLASS); fill(x0,G,zS+3,x0,G+1,zS+3,B.GLASS); fill(x0,G+2,zS+2,x0+15,G+2,zS+4,B.GLASS);
+    put(x0+1,G,zS+3,B.WATER); SRCS.push([x0+1,G,zS+3]); CAGES.push({type:'cow',x0:x0+1,x1:x0+15,z0:zS+2.5,z1:zS+4,cx:x0+4,cz:zS+3.5,y:G,free:true});
+    sign(x0+1,zS+1,S,'MOBS IN CURRENTS\nWater pushes this cow\ndown the glass channel\nonto slippery ice'); sign(x0+8,zS+1,S,'Mobs and you drift with\nflowing water, then keep\nsliding on ice.\nItems do the same'); }
+  // S6: info hall
+  { const x0=nx(7); fill(x0,G,zS+2,x0+12,G+3,zS+8,B.STONE_BRICK); fill(x0+1,G,zS+3,x0+11,G+2,zS+7,0); fill(x0+5,G,zS+2,x0+7,G+2,zS+2,0); put(x0+6,G+2,zS+5,lant);
+    const t=[['GAME MODES\nSurvival: monsters,\nhunger-free hearts.\nPeaceful: no hostiles'],['ESSENCES\nShadow, Burning, Frost,\nArcane, Life. Dropped\nby the five mages'],['STAFFS\nStick + 50 essence in\nan awake cauldron.\nCrouch-tap: mode'],['PHYSICS KNOBS\nwindow.ITEMPHYS holds\naccel, drag, friction\nfor tuning']];
+    t.forEach((s,i)=>sign(x0+2+i*3,zS+7,S,s[0],G)); sign(x0+6,zS+1,S,'INFO HALL\nWalk in for the rules\nof the magic update'); }
+  // spiral of trees removed: finish with return sign
+  sign(END-2,C+3,S,'END OF DISTRICT\nHead west to return\nto the main avenue'); 
+}
+window.buildMagicShowcase=buildMagicShowcase;
+// ---- runtime: cage occupants, item feeders, water starters ----
+setInterval(()=>{ try{ if(!world||world.preview||!world.meta||world.meta.gen!=='show'||mode==='menu') return; const p=player;
+  if(!window.MAGICDISTRICT._ready){ const C=world.gen.C; if(Math.abs(p.x-C)<700) { /* registry lives in memory only for new worlds; rebuild for saved ones */ } }
+  for(const c of CAGES){ if(Math.hypot(c.cx-p.x,c.cz-p.z)>70||!world.chunk(Math.floor(c.cx)>>4,Math.floor(c.cz)>>4)) continue;
+    if(!mobs.some(m=>!m.dead&&m.type===c.type&&m.x>=c.x0&&m.x<=c.x1&&m.z>=c.z0&&m.z<=c.z1&&m.y>c.y-4)){ spawnMob(c.type,c.cx,c.y+.2,c.cz,false); mobs[mobs.length-1].keep=1; } }
+  for(const s of SRCS){ if(s.done||Math.hypot(s[0]-p.x,s[2]-p.z)>60||!world.chunk(s[0]>>4,s[2]>>4)) continue; s.done=1; fluidNotify(s[0],s[1],s[2]); }
+  FEEDS.forEach((f,i)=>{ if(Math.hypot(f.x-p.x,f.z-p.z)>60||!world.chunk(Math.floor(f.x)>>4,Math.floor(f.z)>>4)) return; f.t=(f.t||0)+1; if(f.t<f.every) return; f.t=0;
+    const mine=drops.filter(q=>q.feed===i); for(const q of mine) if(q.age>45){ drops.splice(drops.indexOf(q),1); } if(mine.length>=f.max) return;
+    spawnDrop(f.x,f.y,f.z,f.id,1); const q=drops[drops.length-1]; q.feed=i; q.vx=f.vx; q.vy=0; q.vz=0; q.age=1; }); }catch(e){} },1000);
 })();
 
 </script>
