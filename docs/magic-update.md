@@ -9,10 +9,12 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 
 - **v0.25.0 potions:** glass bottle (3 glass), bottled essence (bottle + essence in a boiling cauldron), potions (bottled essence + sugar; 1 min, +1 min per extra 5 sugar, max 9). Frost, shadow, fire, arcane. Buff column top-left; potion resist is 30%, doubled when armour already resists that element.
 
+- **v0.26.0 staffs (part 1):** arcane staff (mage lights dyeable in an activated cauldron, magick bolts) and flaming staff (flame bolts, set mobs alight, light portals, heat smelters, smelt-mode turns ore into ingots up to the staff's pickaxe tier, upgraded by pickaxe at the anvil). Made from a stick + 50 essence in an activated cauldron (10 arcane essence in boiling water). Crouch + tap or the on-screen Mode button changes mode.
+
 ## Conventions learned
 - New block ids must be allocated after the last existing `NB`/`TB` call (saves store raw ids), and before the pattern bake.
 - Tiles saved with the world keep only a fixed field list; custom tile data goes in `tech`.
 - Function declarations can be wrapped by reassignment; `const` arrows (like `enchText`) cannot.
 
 ## Planned
-Potions and the buff column (phase 4); staffs, shadow and frost blocks, ice slides (phase 5). Full spec is in the project notes.
+Illusioner and frozen staffs, shadow blocks, frost blocks and ice slides (phase 5b).

@@ -963,6 +963,7 @@ for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase());
 { const id=NB('FIREPLACE'); def(id,'Fireplace','#6f6f76','#5a5a62',0,{opaque:false,lightOpaque:0,shape:1,emit:[15,11,5],p2:'fireplace',boxes:[[0,0,0,1,.3,1],[0,.3,0,.18,.75,1],[.82,.3,0,1,.75,1],[.18,.3,.82,.82,.75,1]]}); pat(id,PT.COBBLE); P2B.fire=id; }
 { const id=NB('CAULDRON'); def(id,"Witch's cauldron",'#2c2c34','#3a3a44',0,{opaque:false,lightOpaque:0,shape:1,p2:'cauldron',boxes:[[.08,.18,.08,.92,.3,.92],[0,.3,0,.12,.9,1],[.88,.3,0,1,.9,1],[.12,.3,0,.88,.9,.12],[.12,.3,.88,.88,.9,1],[.1,0,.1,.24,.18,.24],[.76,0,.1,.9,.18,.24],[.1,0,.76,.24,.18,.9],[.76,0,.76,.9,.18,.9]]}); pat(id,PT.METAL); P2B.cauldron=id; }
 { const id=NB('ANVIL'); def(id,'Anvil','#3a3a42','#2c2c34',0,{opaque:false,lightOpaque:0,shape:1,p2:'anvil',boxes:[[.15,0,.15,.85,.18,.85],[.3,.18,.3,.7,.55,.7],[.08,.55,.0,.92,1,1]]}); pat(id,PT.METAL); P2B.anvil=id; }
+const MLB=[]; DYES.forEach((d,i)=>{ let c=typeof d.dye==='string'?hex(d.dye):d.dye; const hs='#'+c.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join(''); const id=NB('MLIGHT_'+d.k); def(id,'Mage light',hs,hs,0,{solid:false,opaque:false,lightOpaque:0,noItem:1,shape:1,emit:c.map(v=>Math.max(2,Math.round(v/255*14))),boxes:[[.38,.38,.38,.62,.62,.62]],mlight:i}); MLB.push(id); });
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -4267,6 +4268,7 @@ function tapEntity(sx,sy){
 }
 function useHeld(sx,sy){ // items that act on a tap instead of mining or building
   const s=held(), it=s&&ITEMS[s.id]; if(!it) return false; if(mode!=='play') return true;
+  if(it.staff) return staffUse(sx,sy,s,it);
   if(farmUse(sx,sy,s,it)) return true; if(it.milk){ drinkMilk(s); return true; }
   if(it.decorItem) return useDecor(sx,sy);
   if(it.bucket) return useBucket(sx,sy);
@@ -8215,7 +8217,7 @@ const toRGB=c=>typeof c==='string'?hex(c):c;
 // ---- cauldron recipes: {need:{itemId:count}, out:[[id,n]], time, act}; later phases push more ----
 window.CAULD=[{need:{[I.ARCANE_ESS]:10},act:1,time:3,out:[]}];
 for(const e in ESSGLASS) CAULD.push({need:{[e]:1,[B.SAND]:2},out:[[P2B[ESSGLASS[e]],4]],time:3});
-const matchRec=t=>{ const h=t.tech.items; for(const r of CAULD){ let ok=true; for(const id in r.need) if((h[id]||0)<r.need[id]){ ok=false; break; } if(ok) return r; } return null; };
+const matchRec=t=>{ const h=t.tech.items; for(const r of CAULD){ if(r.needAct&&!t.tech.act) continue; let ok=true; for(const id in r.need) if((h[id]||0)<r.need[id]){ ok=false; break; } if(ok) return r; } return null; };
 const cnt=t=>Object.values(t.tech.items).reduce((a,b)=>a+b,0);
 function spit(x,y,z,id,n,sx){ spawnDrop(x+.5,y+1.05,z+.5,id,n); const q=drops[drops.length-1]; if(q){ q.nb=1; if(sx) q.sx=sx; q.vy=7+rnd()*2; q.vx=(rnd()-.5)*2.5; q.vz=(rnd()-.5)*2.5; } }
 const take1=()=>{ if(creative()) return; const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); };
@@ -8223,7 +8225,8 @@ function p2Tap(x,y,z,b){ const t=getT(x,y,z,b), T=t.tech, s=held(), it=s&&ITEMS[
   if(b===P2B.fire){ if(it&&it.dye){ T.col=toRGB(it.dcol); take1(); toast('The smoke turns '+it.dye); burst(x+.5,y+.8,z+.5,T.col,8,1.5); return true; } return false; }
   if(it&&it.bucket==='w'){ if(T.w){ toast('Already full'); return true; } T.w=1; if(!creative()) inv.slots[inv.sel]={id:I.BUCKET,n:1}; invChanged(); renderHotbar(); sfx('splashS',x,y,z,.6,14); return true; }
   if(it&&it.bucket==='empty'&&T.w&&!cnt(t)){ T.w=0; T.col=null; T.act=0; take1(); if(addItem(I.BUCKET_WATER,1)) spawnDrop(player.x,player.y+1,player.z,I.BUCKET_WATER,1); return true; }
-  if(s){ if(!T.w){ toast('Fill the cauldron with water first'); return true; } if(cnt(t)>=48){ toast('The cauldron is full'); return true; } T.items[s.id]=(T.items[s.id]||0)+1; take1(); sfx('splashS',x,y,z,.35,12); return true; }
+  if(it&&it.staff==='arcane'&&T.act){ const dy=Object.keys(T.items).find(id=>ITEMS[id].dye); if(!dy){ toast('Throw a dye into the activated cauldron to dye the light'); return true; } s.x=Object.assign({},s.x,{lc:DYES.findIndex(d=>d.k===ITEMS[dy].dye)}); if(--T.items[dy]<=0) delete T.items[dy]; invChanged(); renderHotbar(); toast('The staff light is now '+ITEMS[dy].dye); return true; }
+  if(s){ if(!T.w){ toast('Fill the cauldron with water first'); return true; } if(cnt(t)>=64){ toast('The cauldron is full'); return true; } const add=player.crouch?Math.min(s.n,64-cnt(t)):1; T.items[s.id]=(T.items[s.id]||0)+add; if(creative()) add; else { s.n-=add; if(s.n<=0) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); } sfx('splashS',x,y,z,.35,12); return true; }
   const ids=Object.keys(T.items); if(ids.length){ const id=+ids[ids.length-1]; if(--T.items[id]<=0) delete T.items[id]; if(addItem(id,1)) spawnDrop(player.x,player.y+1,player.z,id,1); return true; }
   toast(!T.w?'Empty cauldron. Fill it with water':heat(world.get(x,y-1,z))?'Boiling. Throw in essences':'Cold. Put it over lava or a fireplace'); return true; }
 const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit, b=world.get(x,y,z); if(isP2(b)&&reachOK(x,y,z)&&p2Tap(x,y,z,b)) return true; } } return _tI(sx,sy); };
@@ -8231,7 +8234,7 @@ const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMod
 function absorb(){ if(!P2L.length||!drops.length) return; const m=new Map(); for(const t of P2L) m.set(tk(t.x,t.y,t.z),t);
   for(let i=drops.length-1;i>=0;i--){ const q=drops[i]; if(q.nb||q.age<.3) continue; const ty=Math.floor(q.y-.95); if(q.y-ty-1>.7) continue; const t=m.get(tk(Math.floor(q.x),ty,Math.floor(q.z))); if(!t) continue; const T=t.tech, it=ITEMS[q.id];
     if(T.type==='fire'){ if(it&&it.dye){ T.col=toRGB(it.dcol); q.n--; if(q.n<=0) drops.splice(i,1); burst(t.x+.5,t.y+.8,t.z+.5,T.col,6,1.5); } }
-    else if(T.w&&cnt(t)+q.n<=48){ T.items[q.id]=(T.items[q.id]||0)+q.n; drops.splice(i,1); sfx('splashS',t.x,t.y,t.z,.3,10); } } }
+    else if(T.w&&cnt(t)+q.n<=64){ T.items[q.id]=(T.items[q.id]||0)+q.n; drops.splice(i,1); sfx('splashS',t.x,t.y,t.z,.3,10); } } }
 const _sD=stepDrops; stepDrops=function(dt){ const o=WGX; WGX='item'; try{ _sD(dt); } finally{ WGX=o; } absorb(); };
 const _sM=stepMobs; stepMobs=function(dt){ try{ _sM(dt); } finally{ WGX='player'; } };
 // ---- slow tick: validate, brew, smoke, glass sparkle ----
@@ -8350,6 +8353,52 @@ const sprite=c=>{ const k=c.join(); if(spr[k]) return spr[k]; const s=document.c
 // ---- shadow potion: mobs lose you; fire potion: no burn damage ----
 const _sH=stepHostile; stepHostile=function(m,d,dt,dist){ if(buff('shadow')&&!(m.hurtT>0)){ m.aggro=0; return null; } return _sH(m,d,dt,dist); };
 const _h=hurt; hurt=function(n,why){ if(buff('burn')&&/burn|fire|lava|flame/i.test(String(why||''))) return; return _h(n,why); };
+})();
+
+
+/* ---------- v0.26.0 phase 5a: arcane staff and flaming staff ---------- */
+(function(){
+const rnd=Math.random;
+const ST={arcane:{n:'Arcane staff',modes:['light','bolt'],mn:{light:'Light',bolt:'Bolt'},c:[110,170,255],ess:I.ARCANE_ESS},flame:{n:'Flaming staff',modes:['bolt','smelt'],mn:{bolt:'Flame',smelt:'Smelt'},c:[255,140,40],ess:I.BURN_ESS}};
+const SI={}; for(const k in ST){ const q=ST[k], hx='#'+q.c.map(v=>v.toString(16).padStart(2,'0')).join(''); SI[k]=NI('STAFF_'+k.toUpperCase(),q.n,{stack:1,staff:k});
+  ispr(SI[k],P=>{ for(let i=0;i<9;i++) P(3+i,13-i,i%2?'#8a5a34':'#6e4626'); for(const [x,y] of [[10,3],[11,3],[12,4],[12,5],[11,6],[10,6],[9,5],[9,4],[10,4],[11,4],[10,5],[11,5]]) P(x,y,hx); P(10,4,'#ffffff'); P(11,4,'#ffffff'); }); 
+  CAULD.push({need:{[I.STICK]:1,[q.ess]:50},needAct:1,out:[[SI[k],1]],time:4}); }
+window.STAFFS=SI; spec(MLB,.05);
+const BASE_TIER=SPEC[B.ORE_IRON]?SPEC[B.ORE_IRON].req:5;
+// ---- mode handling ----
+const mode0=s=>{ const m=ST[ITEMS[s.id].staff].modes; return (s.x&&m.includes(s.x.m)&&s.x.m)||m[0]; };
+function toggle(s){ const q=ST[ITEMS[s.id].staff], cur=mode0(s), nx=q.modes[(q.modes.indexOf(cur)+1)%q.modes.length]; s.x=Object.assign({},s.x,{m:nx}); sfx('click',player.x,player.y,player.z,.7,12); toast(`${q.n}: ${q.mn[nx]} mode`); invChanged(); renderHotbar(); upd(); }
+const btn=document.createElement('button'); btn.id='bStaff'; btn.hidden=true; btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M5 19L17 7M14 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/></svg><span>Mode</span>';
+const st=document.createElement('style'); st.textContent='#bStaff{right:calc(var(--btn)*0.3);bottom:calc(var(--btn)*3.7);width:calc(var(--btn)*.8);height:calc(var(--btn)*.8)}'; document.head.appendChild(st);
+document.getElementById('actions').appendChild(btn); btn.addEventListener('click',e=>{ e.stopPropagation(); const s=held(); if(s&&ITEMS[s.id].staff) toggle(s); });
+function upd(){ const s=game()&&held(), on=!!(s&&ITEMS[s.id].staff); btn.hidden=!on; if(on) btn.querySelector('span').textContent=ST[ITEMS[s.id].staff].mn[mode0(s)]; }
+setInterval(upd,250);
+// ---- bolts ----
+const pb=[]; let cd=0; window.__pb=pb;
+function lightCol(s){ const i=(s.x&&s.x.lc)|0; const d=DYES[i]; const c=typeof d.dye==='string'?hex(d.dye):d.dye; return c; }
+window.staffUse=function(sx,sy,s,it){ if(player.crouch){ toggle(s); return true; } if(cd>0) return true; const k=it.staff, m=mode0(s), q=ST[k], p=player;
+  const o=[p.x,p.y+1.4,p.z], ap=aimPoint(sx,sy), v=[ap[0]-o[0],ap[1]-o[1],ap[2]-o[2]], l=Math.hypot(...v)||1, sp=k==='flame'?20:24; cd=k==='flame'?.22:.3;
+  const kind=k==='arcane'?(m==='light'?'light':'arcane'):'flame'; pb.push({x:o[0]+v[0]/l*.6,y:o[1]+v[1]/l*.6,z:o[2]+v[2]/l*.6,vx:v[0]/l*sp,vy:v[1]/l*sp,vz:v[2]/l*sp,k:kind,smelt:m==='smelt',t:0,c:kind==='light'?lightCol(s):q.c,lc:(s.x&&s.x.lc)|0,tier:(s.x&&s.x.tier)||BASE_TIER});
+  p.face=Math.atan2(v[0],v[2]); sfx(k==='flame'?'ignite':'bowShoot',p.x,p.y,p.z,.6,16); return true; };
+function smelt(x,y,z,tier){ const b=world.get(x,y,z), bd=BLOCKS[b]; if(!bd||!bd.ore) return false; const req=SPEC[b]?SPEC[b].req:0; if(req>tier){ toast('The staff needs a better pickaxe to take that ore'); return true; }
+  const rec=SMELTS.find(r=>r.a.includes(b)&&!r.b), outs=rec?[[rec.out,rec.n||1]]:dropsFor(b,'pick'); world.set(x,y,z,B.AIR); for(const [id,n] of outs) spawnDrop(x+.5,y+.5,z+.5,id,n); burst(x+.5,y+.5,z+.5,[255,160,60],14,3); sfx('sizzle',x,y,z,.7,16); return true; }
+function endBolt(b,x,y,z,px,py,pz){ window.__lastEnd=[b.k,x,y,z,world.get(x,y,z)]; if(b.k==='light'){ if(world.get(px,py,pz)===B.AIR) world.set(px,py,pz,MLB[b.lc]); }
+  else if(b.k==='flame'){ const hb=world.get(x,y,z); if(isFurnace(hb)){ const t=getTile(x,y,z); t.burn=Math.max(t.burn||0,5); t.burnMax=Math.max(t.burnMax||0,5); }
+    if(b.smelt) smelt(x,y,z,b.tier); else { try{ lightPortalAt(px,py,pz); lightPortalAt(x,y,z); }catch(e){} } }
+  burst(b.x,b.y,b.z,b.c,6,2); }
+let last=performance.now();
+(function loop(){ requestAnimationFrame(loop); const now=performance.now(), DT=Math.min(.6,(now-last)/1000); last=now; if(!game()||mode!=='play'){ return; } cd=Math.max(0,cd-DT); const NS=Math.ceil(DT/.04); for(let rep=0;rep<NS;rep++){ const dt=DT/NS;
+  for(const m of mobs) if(m.fireT>0){ m.fireT-=dt; m.fireH=(m.fireH||0)-dt; if(m.fireH<=0){ m.fireH=.7; hitMob(m,1,m.x,m.z); } if(rnd()<dt*12) parts.push({x:m.x+(rnd()-.5)*.4,y:m.y+rnd()*1.2,z:m.z+(rnd()-.5)*.4,vx:0,vy:1.4,vz:0,t:.4,c:[255,150,40],s:.06,ember:true}); }
+  for(let i=pb.length-1;i>=0;i--){ const b=pb[i]; b.t+=dt; let px=Math.floor(b.x),py=Math.floor(b.y),pz=Math.floor(b.z); b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt; const cx=Math.floor(b.x),cy=Math.floor(b.y),cz=Math.floor(b.z), arc=b.k==='arcane'||b.k==='light';
+    for(let k=0;k<2;k++) parts.push({x:b.x+(rnd()-.5)*.14,y:b.y+(rnd()-.5)*.14,z:b.z+(rnd()-.5)*.14,vx:0,vy:arc?0:.6,vz:0,t:arc?.5:.3,c:b.c,s:arc?.12:.1,ember:true});
+    let end=b.t>2.5, hit=false; if(world.solid(cx,cy,cz)){ endBolt(b,cx,cy,cz,px,py,pz); pb.splice(i,1); continue; }
+    if(b.k!=='light') for(const m of mobs){ if(m.dead) continue; const {hw,h}=mobBox(m); if(Math.abs(m.x-b.x)<hw+.25&&Math.abs(m.z-b.z)<hw+.25&&b.y>m.y-.1&&b.y<m.y+h+.1){ hitMob(m,b.k==='flame'?4:7,b.x-b.vx,b.z-b.vz); if(b.k==='flame') m.fireT=3; hit=true; break; } }
+    if(hit||end){ if(b.k==='light'&&end&&world.get(px,py,pz)===B.AIR) world.set(px,py,pz,MLB[b.lc]); burst(b.x,b.y,b.z,b.c,6,2); pb.splice(i,1); } } } })();
+// ---- tapping the cauldron or anvil with a staff ----
+const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const s=held(), it=s&&ITEMS[s.id]; if(it&&it.staff){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit, b=world.get(x,y,z);
+      if(b===P2B.anvil&&it.staff==='flame'&&reachOK(x,y,z)){ const cur=(s.x&&s.x.tier)||BASE_TIER; let bi=-1,bt=cur; inv.slots.forEach((q,i)=>{ if(q&&ITEMS[q.id].tool==='pick'&&(ITEMS[q.id].tier||0)>bt){ bt=ITEMS[q.id].tier; bi=i; } });
+        if(bi>=0){ inv.slots[bi]=null; s.x=Object.assign({},s.x,{tier:bt}); invChanged(); renderHotbar(); toast('The staff takes the pickaxe and can now smelt harder ores'); sfx('metalHit',x,y,z,.8,14); return true; } toast('Hold the flaming staff and carry a better pickaxe to upgrade it'); return true; } } } }
+  return _tI(sx,sy); };
 })();
 
 </script>
