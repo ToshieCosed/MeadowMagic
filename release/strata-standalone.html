@@ -4569,8 +4569,12 @@ function fluidUpdate(x,y,z){
   const below=world.get(x,y-1,z), bf=FL[below];
   if(canFlow(below)||bf&&bf.k!==f.k){ putFluid(x,y-1,z,f.k,1); return; }
   if(bf&&bf.k===f.k) return;
-  if(f.lv<max) for(const [dx,dz] of DIRS){ const nb=world.get(x+dx,y,z+dz), nf=FL[nb]; if(canFlow(nb)||nf&&(nf.k!==f.k||nf.lv>f.lv+1)) putFluid(x+dx,y,z+dz,f.k,f.lv+1); }
+  if(f.lv<max){ const ds=DIRS.map(([dx,dz],i)=>[dx,dz,slopeDist(x+dx,y,z+dz,f.k,0,i)]), md=Math.min(...ds.map(d=>d[2]));
+    for(const [dx,dz,dd] of ds){ if(md<99&&dd!==md) continue; const nb=world.get(x+dx,y,z+dz), nf=FL[nb]; if(canFlow(nb)||nf&&(nf.k!==f.k||nf.lv>f.lv+1)) putFluid(x+dx,y,z+dz,f.k,f.lv+1); } }
 }
+// Minecraft's rule: flowing fluid heads for the nearest drop within 4 blocks, and only spreads evenly when there is none
+function slopeDist(x,y,z,k,depth,from){ const nb=world.get(x,y,z), nf=FL[nb]; if(!(canFlow(nb)||nf&&nf.k===k)) return 99; const bl=world.get(x,y-1,z), bf=FL[bl]; if(canFlow(bl)||bf&&bf.k===k) return depth; if(depth>=3) return 99;
+  let best=99; for(let i=0;i<4;i++){ if(i===(from^1)) continue; const d=DIRS[i]; best=Math.min(best,slopeDist(x+d[0],y,z+d[1],k,depth+1,i)); } return best; }
 function stepFire(){ /* fire blocks are short-lived: removed on chunk revisit */ }
 function stepFluids(dt){ fluidT-=dt; if(fluidT>0||!fluidQ.size) return; fluidT=.25; lavaTurn=(lavaTurn+1)%4;
   const batch=[...fluidQ.entries()].slice(0,400); for(const [k,p] of batch){ const f=FL[world.get(...p)]; if(f&&f.k==='l'&&lavaTurn) continue; fluidQ.delete(k); fluidUpdate(...p); } }
@@ -7079,6 +7083,7 @@ function renderTech(full){ const t=cur; if(!t) return; if(!world.tiles.has(TK(t.
   const B2=document.getElementById('tuB'); const html=body(t)+(!WIRELESS.has(t.tech.type)?clRow(t):'')+(TD(t).slots?hotbarRow():''); if(!full&&B2._h===html) return; if(!full&&B2.contains(document.activeElement)&&document.activeElement.tagName==='INPUT') return; B2._h=html; B2.innerHTML=html;
   B2.querySelectorAll('[data-ts]').forEach(b=>b.onclick=()=>slotClick(t,+b.dataset.ts));
   B2.querySelectorAll('[data-hb]').forEach(b=>b.onclick=()=>{ inv.sel=+b.dataset.hb; renderHotbar(); renderTech(true); });
+  B2.querySelectorAll('[data-low]').forEach(b=>b.onclick=()=>{ t.tech.low=!t.tech.low; markMesh(t); renderTech(true); });
   B2.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ t.tech.g=b.dataset.g; t._q=null; t.tech.st=false; markMesh(t); renderTech(true); });
   B2.querySelectorAll('[data-dl]').forEach(b=>b.oninput=()=>{ t.tech.dl=+b.value; renderTech(true); });
   B2.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>{ t.tech.shape=b.dataset.sh; renderTech(true); });
@@ -7346,9 +7351,9 @@ function deliver(k){ const last=k.path[k.path.length-1]; if(!world.tiles.has(TK(
 W('saveGame',o=>function(){ while(PKT.length){ const k=PKT.pop(); deliver(k); } if(window.finishPistons) finishPistons(); return o.apply(this,arguments); });
 
 /* ---------- hoppers and droppers ---------- */
-function stepHopper(t,dt){ const T=t.tech; T.cd=(T.cd||0)-dt; if(T.cd>0) return; T.cd=.4; const fl=T.slots[5], me=invAt(t.x,t.y,t.z);
+function stepHopper(t,dt){ const T=t.tech; T.cd=(T.cd||0)-dt; if(T.cd>0) return; T.cd=T.low?.2:.4; const fl=T.slots[5], me=invAt(t.x,t.y,t.z);
   const above=invAt(t.x,t.y+1,t.z); if(above){ const s=invPeek(above,fl); if(s&&invInsert(me,{...s,n:1},true)===0){ const g=invExtract(above,fl,1); if(g) invInsert(me,g); } }
-  else for(let i=drops.length-1;i>=0;i--){ const q=drops[i]; if(Math.abs(q.x-t.x-.5)<.7&&Math.abs(q.z-t.z-.5)<.7&&q.y>t.y+.5&&q.y<t.y+1.8&&(!fl||fMatch(fl,q.id))){ const left=invInsert(me,{id:q.id,n:q.n,d:q.d,x:q.sx,bag:q.bag}); if(left<q.n){ if(!left) drops.splice(i,1); else q.n=left; break; } } }
+  else for(let i=drops.length-1;i>=0;i--){ const q=drops[i], ax=Math.abs(q.x-t.x-.5), az=Math.abs(q.z-t.z-.5); if((T.low?(ax<.85&&az<.6||az<.85&&ax<.6)&&q.y>t.y-.3&&q.y<t.y+1:ax<.7&&az<.7&&q.y>t.y+.5&&q.y<t.y+1.8)&&(!fl||fMatch(fl,q.id))){ const left=invInsert(me,{id:q.id,n:q.n,d:q.d,x:q.sx,bag:q.bag}); if(left<q.n){ if(!left) drops.splice(i,1); else q.n=left; if(!T.low) break; } } }
   const tgt=invAt(...posOf(t,T.f)); if(!tgt) return; for(let i=0;i<5;i++){ const s=T.slots[i]; if(!s) continue; if(invInsert(tgt,{...s,n:1},true)===0){ invInsert(tgt,{...s,n:1}); s.n--; if(!s.n) T.slots[i]=null; break; } } }
 function stepDropper(t){ const T=t.tech, on=anySig(t,T.f); if(on&&!T.was){ const fl=T.slots[9], i=T.slots.findIndex((s,k)=>k<9&&s&&(!fl||fMatch(fl,s.id)));
     if(i>=0){ const s=T.slots[i], tgt=invAt(...posOf(t,T.f)), one={...s,n:1}; let done=false; if(tgt) done=invInsert(tgt,one)===0;
@@ -7452,7 +7457,7 @@ window.body20=function(t){ const T=t.tech, k=T.type, D=TD(t);
         <button class="tu-slot" data-ts="${1+d}">${fl?`<img src="${ico(fl.id)}">`:''}</button><span class="tu-lab">Filter${fl&&fl.x&&fl.x.flt?` · ${fl.x.flt.deny?'blocks':'allows'} ${fl.x.flt.ids.length}`:''}</span></div></div>`; }).join('');
     return `<div class="tu-lab" style="text-align:left">Distributors join up with each other. On each side touching a chest, backpack, hopper or machine, choose Pick up or Deposit, and add a filter if you like. Items flow from pick-up sides to deposit sides, and a load is shared evenly at every fork. A stack upgrade moves whole stacks, twice as fast.</div>${rows||'<div class="tu-lab">Nothing beside it yet</div>'}
       <div class="tu-row"><button class="tu-slot" data-ts="0">${T.slots[0]?`<img src="${ico(T.slots[0].id)}">`:''}</button><span class="tu-lab">Upgrade slot (stack upgrade)</span></div>`; }
-  if(k==='hopper'||k==='dropper') return `<div class="tu-lab" style="text-align:left">${k==='hopper'?`Pulls from the inventory above (or catches items dropped on it) and passes them ${t.tech.f===3?'down':'sideways'} into what it points at.`:'Gives out one item each time it gets a signal: into an inventory in front of it, or out into the world.'} The filter slot limits which items it handles.</div>`+slotsRowX(t);
+  if(k==='hopper'||k==='dropper') return `<div class="tu-lab" style="text-align:left">${k==='hopper'?`Pulls from the inventory above (or catches items dropped on it) and passes them ${t.tech.f===3?'down':'sideways'} into what it points at.`:'Gives out one item each time it gets a signal: into an inventory in front of it, or out into the world.'} The filter slot limits which items it handles.</div><div class="tu-row" style="margin:6px 0"><button class="tu-b" data-low aria-pressed="${!!t.tech.low}">Low profile</button><span class="tu-lab" style="text-align:left">${t.tech.low?'Almost flat: catches items that slide into its sides, e.g. from an ice slide.':'Switch on to make it nearly flat and let it catch items that slide against its sides.'}</span></div>`+slotsRowX(t);
   if(k==='cgen') return `<div class="tu-box">${T.burn>0?`Burning · ${Math.ceil(T.burn)}s left · 10 RF/t`:'Idle · put coal, charcoal or wood in the fuel slot'}<div class="tu-bar" style="margin-top:6px"><b style="width:${T.burnMax?T.burn/T.burnMax*100:0}%"></b></div></div>`+X.rfBox(t)+X.slotsRow(t);
   return null; };
 // the shared panel pieces from stage 19 are private; small copies here
@@ -7478,6 +7483,7 @@ window.techMesh20=function(vb,vg,b,bd,wx,y,wz,t,k,f,T,ID){ const D=TT[k]||{};
     for(let d=0;d<6;d++){ const n=t&&tN(t,d), m=t?fmode(t,d):'off', link=(n&&isPipe(n))||m!=='off'; if(!link) continue; const v=DIR6[d], lo=[.36,.36,.36], hi=[.64,.64,.64];
       for(let a=0;a<3;a++){ if(v[a]>0){ lo[a]=.68; hi[a]=1; } if(v[a]<0){ lo[a]=0; hi[a]=.32; } } ID(lo,hi,c);
       if(m!=='off'&&!(n&&isPipe(n))){ const l2=lo.slice(), h2=hi.slice(); for(let a=0;a<3;a++){ if(v[a]>0){ l2[a]=.9; h2[a]=1; } if(v[a]<0){ l2[a]=0; h2[a]=.1; } if(!v[a]){ l2[a]-=.04; h2[a]+=.04; } } ID(l2,h2,m==='in'?[240,150,50]:[70,140,240]); } } return true; }
+  if(k==='hopper'&&t&&t.tech.low){ ID([0,0,0],[1,.26,1],[74,74,80]); ID([.1,.25,.1],[.9,.262,.9],[40,40,44]); const d=t.tech.f; if(d!==3){ const v=DIR6[d], lo=[.38,.04,.38], hi=[.62,.22,.62]; if(v[0]>0){ lo[0]=.75; hi[0]=1; } if(v[0]<0){ lo[0]=0; hi[0]=.25; } if(v[2]>0){ lo[2]=.75; hi[2]=1; } if(v[2]<0){ lo[2]=0; hi[2]=.25; } ID(lo,hi,[100,100,108]); } return true; }
   if(k==='hopper'){ ID([0,.62,0],[1,1,1],[74,74,80]); ID([.12,.66,.12],[.88,1.001,.88],[40,40,44]); ID([.25,.3,.25],[.75,.62,.75],[74,74,80]);
     const d=t?t.tech.f:3; if(d===3) ID([.38,0,.38],[.62,.3,.62],[74,74,80]); else { const v=DIR6[d], lo=[.38,.3,.38], hi=[.62,.5,.62]; if(v[0]>0){ lo[0]=.75; hi[0]=1; } if(v[0]<0){ lo[0]=0; hi[0]=.25; } if(v[2]>0){ lo[2]=.75; hi[2]=1; } if(v[2]<0){ lo[2]=0; hi[2]=.25; } ID(lo,hi,[74,74,80]); } return true; }
   if(k==='dropper'){ const tr=X.oT(wx,y,wz,f); emitBox(vb,[wx,y,wz],[wx+1,y+1,wz+1],[126,126,128],IDT); emitBox(vb,[.3,.3,.98],[.7,.7,1.01],[40,40,42],tr); emitBox(vb,[.38,.38,.99],[.62,.62,1.02],[20,20,22],tr); return true; }
@@ -8520,6 +8526,53 @@ let last=performance.now();
 setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player;
   for(const m of mobs){ if(m.dead||Math.hypot(m.x-p.x,m.z-p.z)>48) continue; const {hw,h}=mobBox(m); let touch=false; for(const [ox,oz] of [[hw+.15,0],[-hw-.15,0],[0,hw+.15],[0,-hw-.15]]) for(const yy of [m.y+.3,m.y+h*.6]) if(world.get(Math.floor(m.x+ox),Math.floor(yy),Math.floor(m.z+oz))===FRB) touch=true; if(touch) m.frostT=Math.max(m.frostT||0,3); }
   for(let k=0;k<50;k++){ const x=Math.floor(p.x+(rnd()-.5)*22), y=Math.floor(p.y+(rnd()-.4)*10), z=Math.floor(p.z+(rnd()-.5)*22), b=world.get(x,y,z); if(b===FRB) parts.push({x:x+rnd(),y:y+rnd(),z:z+rnd(),vx:(rnd()-.5)*.2,vy:.3,vz:(rnd()-.5)*.2,t:1.4,c:[210,235,255],s:.07,smoke:true}); else if(b===SLB) parts.push({x:x+rnd(),y:y+.15,z:z+rnd(),vx:(rnd()-.5)*.3,vy:.15,vz:(rnd()-.5)*.3,t:1.6,c:[225,242,255],s:.09,smoke:true}); } }catch(e){} },400);
+})();
+
+
+/* ---------- v0.29.0: water currents, ice friction, item streams, plates ---------- */
+(function(){
+const rnd=Math.random, FRB=P2B.frostb, SLB=P2B.slideb, DIR4=[[1,0],[-1,0],[0,1],[0,-1]];
+const isWat=b=>{ const f=FL[b]; return !!f&&f.k==='w'; };
+// current at a water cell: unit horizontal vector toward lower water, plus whether it is a falling column
+function flowAt(x,y,z){ const f=FL[world.get(x,y,z)]; if(!f||f.k!=='w') return null; let fx=0,fz=0;
+  const up=isWat(world.get(x,y+1,z)), fall=up&&f.lv>0;
+  if(!fall) for(const [dx,dz] of DIR4){ const nb=world.get(x+dx,y,z+dz), nf=FL[nb]; let d=0;
+    if(nf&&nf.k==='w') d=nf.lv-f.lv; else if(canFlow(nb)) d=f.lv<7?(canFlow(world.get(x+dx,y-1,z+dz))?3:1):0;
+    fx+=dx*d; fz+=dz*d; }
+  const l=Math.hypot(fx,fz); return {x:l?fx/l:0,z:l?fz/l:0,fall,lv:f.lv,moving:l>0}; }
+window.flowAt=flowAt;
+// slipperiness: how fast sliding momentum dies on each floor (default drop friction is 3/s)
+const ICEFR={[B.ICE]:.9,[B.PACKED_ICE]:.45,[FRB]:.8,[SLB]:.22};
+// ---- loose items ----
+const _sD=stepDrops; stepDrops=function(dt){
+  const pv=drops.map(q=>[q.vx,q.vz]);
+  for(const q of drops){ if(q.age<=.4) continue; const cx=Math.floor(q.x), cy=Math.floor(q.y+.05), cz=Math.floor(q.z), f=flowAt(cx,cy,cz);
+    if(f){ // buoyancy and current
+      let tvy; if(f.fall) tvy=-2.6; else if(isWat(world.get(cx,cy+1,cz))) tvy=1.4; else tvy=Math.max(-1,Math.min(1.2,(cy+.85-q.y)*3));
+      q.vy=tvy+18*dt; q.vx+=((f.x*(f.fall?0:2.1))-q.vx)*(1-Math.exp(-5*dt))*1.0+f.x*dt*2.2; q.vz+=((f.z*(f.fall?0:2.1))-q.vz)*(1-Math.exp(-5*dt))+f.z*dt*2.2; q.wet=1; }
+    else { q.wet=0;
+      const sb=world.get(cx,Math.floor(q.y-.2),cz), onS=sb===SLB||world.get(cx,Math.floor(q.y+.05),cz)===SLB;
+      if(onS){ const y0=Math.floor(q.y+.05); for(const [dx,dz] of DIR4) if(world.get(cx+dx,y0-1,cz+dz)===SLB&&!world.solid(cx+dx,y0,cz+dz)){ q.vx+=dx*dt*5; q.vz+=dz*dt*5; } } }
+    // pressure plates feel items too
+    const px=cx, py=Math.floor(q.y+.05), pz=cz, pb=world.get(px,py,pz); if(pb>0&&BLOCKS[pb].plate){ if(!BLOCKS[pb].plate.pr) world.set(px,py,pz,pb+1); plates.set(px+','+py+','+pz,{x:px,y:py,z:pz,t:.5}); } }
+  const wasWet=drops.map(q=>q.wet);
+  _sD(dt);
+  drops.forEach((q,i)=>{ if(pv[i]===undefined) return; if(wasWet[i]||q.vy!==0||(q.vx===0&&q.vz===0)) return;
+    const fr=ICEFR[world.get(Math.floor(q.x),Math.floor(q.y-.2),Math.floor(q.z))]; if(fr===undefined) return; q.vx=pv[i][0]*Math.exp(-fr*dt); q.vz=pv[i][1]*Math.exp(-fr*dt); }); };
+// ---- mobs ----
+let FR=0; const _mm=mobMove; mobMove=function(m,vx,vz,dt,a){ if(dt<=.1&&!m.dead){ m._mvf=FR;
+    const f=flowAt(Math.floor(m.x),Math.floor(m.y+.3),Math.floor(m.z)); if(f&&!f.fall){ vx+=f.x*1.5; vz+=f.z*1.5; }
+    const fr=ICEFR[world.get(Math.floor(m.x),Math.floor(m.y-.05),Math.floor(m.z))];
+    if(fr!==undefined&&!f&&m.onGround!==false){ const k=Math.exp(-fr*2*dt); m.ix=(m.ix||0)*k+vx*(1-k); m.iz=(m.iz||0)*k+vz*(1-k); vx=m.ix; vz=m.iz; } else { m.ix=vx; m.iz=vz; } }
+  return _mm(m,vx,vz,dt,a); };
+const _sM=stepMobs; stepMobs=function(dt){ FR++; _sM(dt);
+  for(const m of mobs){ if(m.dead||m._mvf===FR||m.fly||MOB[m.type].fly||MOB[m.type].swim) continue; const f=flowAt(Math.floor(m.x),Math.floor(m.y+.3),Math.floor(m.z)), fr=ICEFR[world.get(Math.floor(m.x),Math.floor(m.y-.05),Math.floor(m.z))];
+    if(f&&f.moving&&!f.fall) mobMove(m,f.x*1.5,f.z*1.5,dt,false);
+    else if(fr!==undefined&&(m.ix||m.iz)){ const k=Math.exp(-fr*2*dt); m.ix*=k; m.iz*=k; if(Math.hypot(m.ix,m.iz)>.05) _mm(m,m.ix,m.iz,dt,false); } } };
+// ---- player: currents push you too ----
+const _sP=stepPlayer; stepPlayer=function(dt){ _sP(dt); try{ const p=player; if(!p.inWater||p.mount) return; const f=flowAt(Math.floor(p.x),Math.floor(p.y+.4),Math.floor(p.z)); if(f&&f.moving&&!f.fall){ p.vx+=f.x*dt*7; p.vz+=f.z*dt*7; } }catch(e){} };
+// stream bits: foam where water runs
+setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player; for(let k=0;k<30;k++){ const x=Math.floor(p.x+(rnd()-.5)*16), y=Math.floor(p.y+(rnd()-.4)*6), z=Math.floor(p.z+(rnd()-.5)*16), f=flowAt(x,y,z); if(f&&f.moving&&!isWat(world.get(x,y+1,z))&&rnd()<.5) parts.push({x:x+rnd(),y:y+.85,z:z+rnd(),vx:f.x*.8,vy:.1,vz:f.z*.8,t:.6,c:[225,240,255],s:.05,smoke:true}); } }catch(e){} },350);
 })();
 
 </script>

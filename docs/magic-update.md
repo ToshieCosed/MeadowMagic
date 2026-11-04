@@ -19,5 +19,7 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 
 - **v0.28.0 frozen staff:** stick + 50 frost essence. Modes: Freeze (bolt turns water to permanent ice, 4 blocks around and 3 deep, works on the ocean), Ice bolt (6 damage + slowness), Frost (placeable frost blocks: icy and translucent, enemies touching them are slowed, you move faster on them, hold ~1s to unsummon a connected group), Slide (lays a thin slippery ice bed from you toward the aim point that follows the terrain, up to 24 blocks; you get grip and extra speed while holding the staff, slide downhill, mobs slip; hold to unsummon). Frost blocks and slides are ordinary block ids so they save with the world. Test: `tools/tests/phase5c_frozen.py`.
 
+- **v0.29.0 currents and item streams:** flowing water now seeks the nearest drop within 4 blocks like Minecraft before spreading evenly, and pushes loose items (which float), mobs and swimmers along its flow; falling columns sink items. Each water source carries a stream 7 blocks; a drop or slope renews it. Floors have friction: ice (slippery), packed ice, frost blocks, ice slides (slickest, and items/mobs run downhill on them), so items carried by water keep sliding onto ice. Pressure plates now feel loose items, and (as before) dam water, so a plate across a stream stops the flow and can drive gates/trapdoors. Hoppers have a Low profile switch (nearly flat, catches items that slide against any side). Test: `tools/tests/phase6_currents.py`.
+
 ## Planned
 Nothing queued; ideas welcome.
