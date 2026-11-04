@@ -74,3 +74,6 @@ Cow, pig, chicken and wolf bodies were rotated the wrong way, so the belly textu
 
 ## v0.36.3 — tolerant skin lookup
 If a pack has no cow/pig/chicken/sheep/wolf texture at the usual path, the importer now picks any matching PNG in that mob's entity folder (preferring "temperate"), so renamed or newer-layout packs still skin them. Re-import the pack to apply.
+
+## v0.36.4 — horse model
+Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5, mane, ears, tail, vanilla proportions) so skins map correctly.
