@@ -961,6 +961,7 @@ const wgPass=(bd,ctx)=>WGPASS[bd.wg].includes(ctx);
 for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase()); def(id,n+' witches glass',c,c,0,{opaque:false,tint:t,wg:m,emit:t.map(v=>Math.round(v*7)),lightOpaque:0,p2:'wg_'+k}); pat(id,PT.GLASS); P2B['wg_'+k]=id; }
 { const id=NB('FIREPLACE'); def(id,'Fireplace','#6f6f76','#5a5a62',0,{opaque:false,lightOpaque:0,shape:1,emit:[15,11,5],p2:'fireplace',boxes:[[0,0,0,1,.3,1],[0,.3,0,.18,.75,1],[.82,.3,0,1,.75,1],[.18,.3,.82,.82,.75,1]]}); pat(id,PT.COBBLE); P2B.fire=id; }
 { const id=NB('CAULDRON'); def(id,"Witch's cauldron",'#2c2c34','#3a3a44',0,{opaque:false,lightOpaque:0,shape:1,p2:'cauldron',boxes:[[.08,.18,.08,.92,.3,.92],[0,.3,0,.12,.9,1],[.88,.3,0,1,.9,1],[.12,.3,0,.88,.9,.12],[.12,.3,.88,.88,.9,1],[.1,0,.1,.24,.18,.24],[.76,0,.1,.9,.18,.24],[.1,0,.76,.24,.18,.9],[.76,0,.76,.9,.18,.9]]}); pat(id,PT.METAL); P2B.cauldron=id; }
+{ const id=NB('ANVIL'); def(id,'Anvil','#3a3a42','#2c2c34',0,{opaque:false,lightOpaque:0,shape:1,p2:'anvil',boxes:[[.15,0,.15,.85,.18,.85],[.3,.18,.3,.7,.55,.7],[.08,.55,.0,.92,1,1]]}); pat(id,PT.METAL); P2B.anvil=id; }
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -3472,6 +3473,7 @@ r_(B.FORGE,1,['XXX','XUX','TTT'],{keys:{X:[I.IRON]},tier:7,cat:'blocks'});
 r_(B.TANNING,1,['RRR','PPP','S.S'],{cat:'blocks'});
 r_(P2B.fire,1,['CCC','CFC','CCC'],{keys:{C:[B.COBBLE],F:[I.COAL]},cat:'blocks'});
 r_(P2B.cauldron,1,['I.I','I.I','III'],{keys:{I:[I.IRON]},cat:'blocks'});
+r_(P2B.anvil,1,['III','.I.','III'],{keys:{I:[I.IRON]},cat:'blocks'});
 r_(I.LEATHER,1,['H'],{station:'tan',cat:'items'});
 r_(I.RLEATHER,2,['EXE'],{keys:{X:[I.TIN]},station:'tan',cat:'items'});
 r_(I.SADDLE,1,['EEE','EFE'],{station:'tan',cat:'travel'});
@@ -4632,7 +4634,7 @@ const ENCH={speedy:{name:'Speedy',max:3,on:['weapon','tool','bow']},infinity:{na
 const ROMAN=['','I','II','III','IV','V'];
 const ench=(s,k)=>s&&s.x&&s.x.ench&&s.x.ench[k]||0;
 const enchKind=it=>!it?null:it.armor!==undefined?'armor':it.tool==='bow'?'bow':(it.weapon||it.throwing||it.type==='knife'||it.type==='sword')?'weapon':it.tool||it.hook||it.rod?'tool':null;
-const enchText=s=>s&&s.x&&s.x.ench?Object.entries(s.x.ench).map(([k,v])=>ENCH[k].name+(ENCH[k].max>1?' '+ROMAN[v]:'')).join(', '):'';
+const enchText=s=>{ let r=s&&s.x&&s.x.ench?Object.entries(s.x.ench).map(([k,v])=>ENCH[k].name+(ENCH[k].max>1?' '+ROMAN[v]:'')).join(', '):''; if(s&&s.x&&s.x.es&&window.ESSK) r=(r?r+', ':'')+ESSK[s.x.es][1]+' lined'; return r; };
 // ---------- orbs ----------
 const orbs=[];
 function giveXP(n,x,y,z){ while(n>0){ const v=Math.min(n,1+(Math.random()*4|0)); n-=v; orbs.push({x,y,z,vx:(Math.random()-.5)*3,vy:2+Math.random()*2,vz:(Math.random()-.5)*3,v,t:0,h:Math.random()*360}); } }
@@ -8260,6 +8262,43 @@ window.drawP2=function(){ const T0=nowS(), p=player;
     for(let k=0;k<n;k++){ const id=list[k], a=T0*.7+k*6.2832/n, px=x+.5+Math.cos(a)*.27, pz=z+.5+Math.sin(a)*.27, py=y+lv+.14+Math.sin(T0*2+k)*.05; setVL(sampleLight(px,py,pz)); emitItem(dynVB,id,mc(mT(px,py,pz),mY(-a+T0),mS(isFlatItem(id)?.28:.16),mT(-.5,0,-.5))); } } };
 // ---- phase 2 smoke test hook ----
 window.__p2={matchRec,mkTile,CAULD,wgPass};
+})();
+
+
+/* ---------- v0.24.0 phase 3: essence robes, essence-lined armour, anvil ---------- */
+(function(){
+const EK={shadow:[I.SHADOW_ESS,'Shadow',[110,70,170]],burn:[I.BURN_ESS,'Burning',[220,90,30]],frost:[I.FROST_ESS,'Frost',[110,180,230]],arcane:[I.ARCANE_ESS,'Arcane',[70,110,230]],life:[I.LIFE_ESS,'Life',[70,190,80]]};
+window.ESSK=EK; const RES=.6, tint=(a,b)=>a.map((v,i)=>Math.round(v*.45+b[i]*.55));
+// ---- model for icon ----
+window.TECHM.anvil=[[.15,0,.15,.85,.18,.85,'#2a2a32'],[.3,.18,.3,.7,.55,.7,'#3a3a44'],[.08,.55,0,.92,1,1,'#4a4a56'],[.08,.95,.1,.92,1,.9,'#6a6a78']];
+// ---- essence-lined leather pieces (leather and reinforced leather x 4 pieces x 5 essences) ----
+const ER={}; for(const mk of ['leather','rleather']){ const mi=ARMATS.findIndex(m=>m.k===mk); PIECES.forEach((p,pi)=>{ const base=2000+mi*4+pi, bi=ITEMS[base]; if(!bi) return;
+  for(const k in EK){ const [eid,en,ec]=EK[k]; const id=NI('ER_'+mk+'_'+p.k+'_'+k,`${en} ${mk==='leather'?'leather':'tough leather'} ${p.name}`,{stack:1,armor:p.slot,def:bi.def,col:tint(Array.isArray(bi.col)?bi.col:[138,90,52],ec),amat:'leather',ess:k});
+    ER[id]=k; CAULD.push({need:{[base]:1,[eid]:1},out:[[id,1]],time:3}); } }); }
+// ---- resistance: robes and essence-lined armour ----
+const resist=ty=>{ let r=0; for(let i=0;i<4;i++){ const s=inv.armor[i]; if(!s) continue; const it=ITEMS[s.id], w=PIECES[i].w; if(it.ess===ty||(s.x&&s.x.es===ty)) r+=w*RES; } return Math.min(.9,r); };
+window.essResist=resist;
+const dmgType=w=>{ w=String(w||''); return /burn|fire|lava|flame/i.test(w)?'burn':/frozen|ice|frost/i.test(w)?'frost':/magick|arcane/i.test(w)?'arcane':/illusion|shadow/i.test(w)?'shadow':/slain|bitten|squished|shot/i.test(w)?'life':null; };
+const _h=hurt; hurt=function(n,why){ const ty=dmgType(why); if(ty&&surv()) n=n*(1-resist(ty)); return _h(n,why); };
+// ---- anvil ----
+function anvilUI(){ let el=document.getElementById('anvilUI'); if(!el){ el=document.createElement('div'); el.id='anvilUI'; el.style.cssText='position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)'; document.body.appendChild(el); } el.hidden=false; mode='ui'; mining=null; render(el); }
+function close(el){ el.hidden=true; if(mode==='ui'){ mode='play'; last=performance.now(); } renderHotbar(); }
+function render(el){ const card=document.createElement('div'); card.style.cssText='background:#1b2230;color:#e8ecf2;border-radius:14px;padding:16px;max-width:min(92vw,420px);max-height:80vh;overflow:auto;display:flex;flex-direction:column;gap:8px;font:14px system-ui';
+  card.innerHTML='<b style="font-size:16px">Anvil</b><span style="opacity:.7">Combine grimoires, or line armour with an essence robe piece.</span>';
+  const add=(txt,fn,dis)=>{ const b=document.createElement('button'); b.className='ghost'; b.textContent=txt; b.disabled=!!dis; b.addEventListener('click',()=>{ fn(); render(el); }); card.appendChild(b); }; let n=0;
+  const S=inv.slots; const refs=[]; for(let i=0;i<36;i++) if(S[i]) refs.push([S,i]); for(let i=0;i<4;i++) if(inv.armor[i]) refs.push([inv.armor,i]);
+  // essence lining
+  for(let i=0;i<36;i++){ const r=S[i]; if(!r||!ITEMS[r.id].ess) continue; const rk=ITEMS[r.id].ess, slot=ITEMS[r.id].armor;
+    for(const [arr,j] of refs){ const t=arr[j]; if(!t||t===r) continue; const ti=ITEMS[t.id]; if(ti.armor!==slot||ti.ess||(t.x&&t.x.es)) continue;
+      n++; add(`Line ${ti.name} with ${EK[rk][1]} essence (${ITEMS[r.id].name})`,()=>{ t.x=Object.assign({},t.x,{es:rk}); r.n--; if(r.n<=0) S[i]=null; invChanged(); renderHotbar(); renderArmor(); toast(`${ti.name} lined with ${EK[rk][1]} essence`); }); } }
+  // grimoire combining
+  const gs=[]; for(let i=0;i<36;i++){ const g=S[i]; if(g&&g.id===I.GRIMOIRE&&g.x&&g.x.g) gs.push(i); }
+  const seen=new Set(); for(let a=0;a<gs.length;a++) for(let b=a+1;b<gs.length;b++){ const A=S[gs[a]].x.g, B_=S[gs[b]].x.g, key=A.k+A.lv; if(A.k!==B_.k||A.lv!==B_.lv||A.lv>=ENCH[A.k].max||seen.has(key)) continue; seen.add(key);
+    const cost=(A.lv+1)*2; n++; add(`${ENCH[A.k].name} ${ROMAN[A.lv]} + ${ROMAN[A.lv]} → ${ROMAN[A.lv+1]} · ${cost} lv`,()=>{ if(!creative()){ player.xp-=cost*XPL; hudDirty=true; } const i1=gs[a], i2=gs[b]; S[i1]=null; S[i2]=null; const left=addItem(I.GRIMOIRE,1); if(!left) inv.slots[inv.landed].x={g:{k:A.k,lv:A.lv+1}}; invChanged(); renderHotbar(); toast('Combined into '+ENCH[A.k].name+' '+ROMAN[A.lv+1]); }, lvOf()<cost&&!creative()); }
+  if(!n){ const p=document.createElement('span'); p.style.opacity='.7'; p.textContent='Nothing to combine. Bring two matching grimoires, or armour plus an essence robe piece.'; card.appendChild(p); }
+  const c=document.createElement('button'); c.className='primary'; c.textContent='Close'; c.addEventListener('click',()=>close(el)); card.appendChild(c); el.innerHTML=''; el.appendChild(card); }
+window.anvilUI=anvilUI;
+const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit; if(world.get(x,y,z)===P2B.anvil){ if(!reachOK(x,y,z)){ toast('Too far away'); return true; } anvilUI(); return true; } } } return _tI(sx,sy); };
 })();
 
 </script>
