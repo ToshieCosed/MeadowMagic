@@ -5891,7 +5891,8 @@ async function importPack(file){
   let desc=''; const mf=[...z.files.keys()].find(n=>/(^|\/)pack\.mcmeta$/i.test(n)); if(mf){ try{ const j=JSON.parse(new TextDecoder().decode(await z.read(mf))); desc=typeof j.pack?.description==='string'?j.pack.description:''; }catch(e){} }
   const skipped=Object.values(blk).filter(p=>!usedPaths.has(p)).length;
   { const low=new Map(); for(const n of z.files.keys()){ const m=n.toLowerCase().match(/assets\/minecraft\/textures\/entity\/(.+\.png)$/); if(m) low.set(m[1],n); }
-    for(const [k,cands] of (window.ENT_FILES||[])) for(const c of cands){ const nm=low.get(c); if(!nm) continue; const d=await z.read(nm); if(d){ files['e/'+k]=d; skins++; break; } } }
+    for(const [k,cands] of (window.ENT_FILES||[])){ let got=false; for(const c of cands){ const nm=low.get(c); if(!nm) continue; const d=await z.read(nm); if(d){ files['e/'+k]=d; skins++; got=true; break; } }
+      if(!got&&/^(cow|pig|chicken|sheep|wolf)$/.test(k)){ const ks=[...low.keys()].filter(q=>(q.indexOf(k+'/')===0||q.indexOf('/')<0)&&q.indexOf(k)>=0&&!/baby|mooshroom|saddle|fur|collar|angry|tame|cold|warm|_e\.|emissive|overlay|shear|_eyes/.test(q)).sort((a,b)=>(/temperate/.test(b)-/temperate/.test(a))||a.length-b.length); if(ks.length){ const d=await z.read(low.get(ks[0])); if(d){ files['e/'+k]=d; skins++; } } } } }
   const snd=await packSoundsFrom(z);
   return {name:file.name.replace(/\.zip$/i,''),desc:desc.replace(/§./g,''),files,sounds:snd.sounds,stats:{used,items,skipped,total:nB,sounds:snd.count,skins}}; }
 function clearPack(){ if(typeof applyPackSounds==='function') applyPackSounds(null); PACK.on=false; PACK.name=''; PACK.has.fill(0); PACK.x.fill(0); PACK.tint.fill(0); PACK.img={}; PACK.stats=null; PACK_SLOTS.fill(0);

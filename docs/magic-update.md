@@ -71,3 +71,6 @@ Nothing queued; ideas welcome.
 
 ## v0.36.2 — skin orientation fix
 Cow, pig, chicken and wolf bodies were rotated the wrong way, so the belly texture (udder, pig underside) showed on top and the back texture underneath. Bodies now use vanilla orientation. Sheep unchanged.
+
+## v0.36.3 — tolerant skin lookup
+If a pack has no cow/pig/chicken/sheep/wolf texture at the usual path, the importer now picks any matching PNG in that mob's entity folder (preferring "temperate"), so renamed or newer-layout packs still skin them. Re-import the pack to apply.
