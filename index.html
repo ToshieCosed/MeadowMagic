@@ -4277,6 +4277,7 @@ function useHeld(sx,sy){ // items that act on a tap instead of mining or buildin
   if(it.starter||s.id===B.TORCH&&!buildMode){ const r=pick(sx,sy); if(r&&r.prev&&reachOK(...r.hit)){ const [x,y,z]=r.prev; if(lightPortalAt(x,y,z)){ useTool(); return true; } if(it.starter&&world.get(x,y,z)===B.AIR){ world.set(x,y,z,B.FIRE); sfx('ignite',x+.5,y+.5,z+.5,.9); useTool(); return true; } } if(it.starter){ toast('Strike it against a block'); return true; } }
   if(it.rod){ castRod(sx,sy); return true; } if(it.xpbook){ useXPBook(); return true; } if(it.journal){ openJournal(); return true; } if(it.camera){ openCamera(); return true; }
   if(it.grimoire&&s.x&&s.x.g&&false){ const g=s.x&&s.x.g; toast(g?`${ENCH[g.k].name} ${ENCH[g.k].max>1?ROMAN[g.lv]:''}: use a grimoire desk to apply it`:'A blank grimoire'); return true; }
+  if(it.potion){ drinkPotion(s); return true; }
   if(it.food){ eat(); return true; }
   if(it.bag){ openBackpack(); return true; }
   if(it.throwing){ throwBoomerang(sx,sy); return true; }
@@ -8216,7 +8217,7 @@ window.CAULD=[{need:{[I.ARCANE_ESS]:10},act:1,time:3,out:[]}];
 for(const e in ESSGLASS) CAULD.push({need:{[e]:1,[B.SAND]:2},out:[[P2B[ESSGLASS[e]],4]],time:3});
 const matchRec=t=>{ const h=t.tech.items; for(const r of CAULD){ let ok=true; for(const id in r.need) if((h[id]||0)<r.need[id]){ ok=false; break; } if(ok) return r; } return null; };
 const cnt=t=>Object.values(t.tech.items).reduce((a,b)=>a+b,0);
-function spit(x,y,z,id,n){ spawnDrop(x+.5,y+1.05,z+.5,id,n); const q=drops[drops.length-1]; if(q){ q.nb=1; q.vy=7+rnd()*2; q.vx=(rnd()-.5)*2.5; q.vz=(rnd()-.5)*2.5; } }
+function spit(x,y,z,id,n,sx){ spawnDrop(x+.5,y+1.05,z+.5,id,n); const q=drops[drops.length-1]; if(q){ q.nb=1; if(sx) q.sx=sx; q.vy=7+rnd()*2; q.vx=(rnd()-.5)*2.5; q.vz=(rnd()-.5)*2.5; } }
 const take1=()=>{ if(creative()) return; const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); };
 function p2Tap(x,y,z,b){ const t=getT(x,y,z,b), T=t.tech, s=held(), it=s&&ITEMS[s.id];
   if(b===P2B.fire){ if(it&&it.dye){ T.col=toRGB(it.dcol); take1(); toast('The smoke turns '+it.dye); burst(x+.5,y+.8,z+.5,T.col,8,1.5); return true; } return false; }
@@ -8246,8 +8247,8 @@ setInterval(()=>{ try{ if(!world||!world.tiles||!game()) return; const dt=Math.m
       const cl=T.col||WATERC; for(let k=0;k<2+(items.length?2:0);k++) parts.push({x:t.x+.2+rnd()*.6,y:t.y+.72,z:t.z+.2+rnd()*.6,vx:0,vy:1+rnd(),vz:0,t:.5,c:cl.map(v=>Math.min(255,v+60)),s:.05,ember:true});
       if(T.act&&rnd()<.5) parts.push({x:t.x+.5+(rnd()-.5)*.5,y:t.y+.9,z:t.z+.5+(rnd()-.5)*.5,vx:0,vy:.8,vz:0,t:1.2,c:[110,170,255],s:.04,smoke:true});
       const r=matchRec(t); if(!r){ T.bt=0; continue; } T.bt+=dt;
-      if(T.bt>=r.time){ T.bt=0; for(const id in r.need){ T.items[id]-=r.need[id]; if(T.items[id]<=0) delete T.items[id]; }
-        if(r.act){ T.act=1; toast('The cauldron hums with arcane power'); } else for(const [id,n] of r.out) spit(t.x,t.y,t.z,id,n);
+      if(T.bt>=r.time){ T.bt=0; let outs=r.out; if(r.run) outs=r.run(T); else for(const id in r.need){ T.items[id]-=r.need[id]; if(T.items[id]<=0) delete T.items[id]; }
+        if(r.act){ T.act=1; toast('The cauldron hums with arcane power'); } else for(const o of outs) spit(t.x,t.y,t.z,o[0],o[1],o[2]);
         if(!Object.keys(T.items).length&&!T.act) T.col=null; sfx('splashS',t.x,t.y,t.z,.6,16); burst(t.x+.5,t.y+1,t.z+.5,cl,12,2.5); } } }
   // faint sparkles around witches glass near the player
   for(let k=0;k<40;k++){ const x=Math.floor(player.x+(rnd()-.5)*20), y=Math.floor(player.y+(rnd()-.4)*10), z=Math.floor(player.z+(rnd()-.5)*20); const b=world.get(x,y,z), bd=b>0&&BLOCKS[b]; if(bd&&bd.wg){ parts.push({x:x+rnd(),y:y+rnd(),z:z+rnd(),vx:0,vy:.25,vz:0,t:1.4,c:bd.tint.map(v=>Math.min(255,v*255+50)),s:.03,smoke:true}); } }
@@ -8277,7 +8278,7 @@ const ER={}; for(const mk of ['leather','rleather']){ const mi=ARMATS.findIndex(
   for(const k in EK){ const [eid,en,ec]=EK[k]; const id=NI('ER_'+mk+'_'+p.k+'_'+k,`${en} ${mk==='leather'?'leather':'tough leather'} ${p.name}`,{stack:1,armor:p.slot,def:bi.def,col:tint(Array.isArray(bi.col)?bi.col:[138,90,52],ec),amat:'leather',ess:k});
     ER[id]=k; CAULD.push({need:{[base]:1,[eid]:1},out:[[id,1]],time:3}); } }); }
 // ---- resistance: robes and essence-lined armour ----
-const resist=ty=>{ let r=0; for(let i=0;i<4;i++){ const s=inv.armor[i]; if(!s) continue; const it=ITEMS[s.id], w=PIECES[i].w; if(it.ess===ty||(s.x&&s.x.es===ty)) r+=w*RES; } return Math.min(.9,r); };
+const resist=ty=>{ let r=0; for(let i=0;i<4;i++){ const s=inv.armor[i]; if(!s) continue; const it=ITEMS[s.id], w=PIECES[i].w; if(it.ess===ty||(s.x&&s.x.es===ty)) r+=w*RES; } if(window.buff&&buff(ty)) r=r>0?r*2:.3; return Math.min(.9,r); };
 window.essResist=resist;
 const dmgType=w=>{ w=String(w||''); return /burn|fire|lava|flame/i.test(w)?'burn':/frozen|ice|frost/i.test(w)?'frost':/magick|arcane/i.test(w)?'arcane':/illusion|shadow/i.test(w)?'shadow':/slain|bitten|squished|shot/i.test(w)?'life':null; };
 const _h=hurt; hurt=function(n,why){ const ty=dmgType(why); if(ty&&surv()) n=n*(1-resist(ty)); return _h(n,why); };
@@ -8300,6 +8301,49 @@ function render(el){ const card=document.createElement('div'); card.style.cssTex
   const c=document.createElement('button'); c.className='primary'; c.textContent='Close'; c.addEventListener('click',()=>close(el)); card.appendChild(c); el.innerHTML=''; el.appendChild(card); }
 window.anvilUI=anvilUI;
 const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit; if(world.get(x,y,z)===P2B.anvil){ if(!reachOK(x,y,z)){ toast('Too far away'); return true; } anvilUI(); return true; } } } return _tI(sx,sy); };
+})();
+
+
+/* ---------- v0.25.0 phase 4: bottles, bottled essence, potions, buff column ---------- */
+(function(){
+const EK=window.ESSK, rnd=Math.random;
+NI('GLASS_BOTTLE','Glass bottle',{stack:16});
+const bottle=(P,c,fill)=>{ for(let y=2;y<=4;y++){ P(7,y,'#c8e4ee'); P(8,y,'#c8e4ee'); } P(7,2,'#8a6a44'); P(8,2,'#8a6a44'); for(let y=5;y<=13;y++){ const w=y<7?3:y<12?5:4; for(let x=8-w;x<8+w;x++) P(x,y,fill&&y>6?c:'#d6eef6'); } for(let x=4;x<12;x++) P(x,13,'#9cc0cc'); if(fill) for(const [x,y] of [[6,8],[9,10],[7,11]]) P(x,y,'#ffffff'); };
+ispr(I.GLASS_BOTTLE,P=>bottle(P,null,false));
+const PK=['frost','shadow','burn','arcane'], PN={frost:'Frost',shadow:'Shadow',burn:'Fire',arcane:'Arcane'}, PI={frost:'❄',shadow:'🌑',burn:'🔥',arcane:'✨'};
+const BE={}, POT={};
+for(const k in EK){ const [eid,en,ec]=EK[k], col='#'+ec.map(v=>Math.min(255,v+40).toString(16).padStart(2,'0')).join('');
+  BE[k]=NI('BE_'+k,`Bottled ${en.toLowerCase()} essence`,{stack:16,be:k}); ispr(BE[k],P=>bottle(P,col,true));
+  CAULD.push({need:{[I.GLASS_BOTTLE]:1,[eid]:1},out:[[BE[k],1]],time:3});
+  if(PK.includes(k)){ POT[k]=NI('POT_'+k,`${PN[k]} potion`,{stack:1,potion:k}); ispr(POT[k],P=>{ bottle(P,col,true); P(7,1,col); P(8,0,'#fff'); });
+    CAULD.push({need:{[BE[k]]:1,[I.SUGAR]:1},time:3,run:T=>{ const sg=T.items[I.SUGAR]; delete T.items[I.SUGAR]; if(--T.items[BE[k]]<=0) delete T.items[BE[k]]; const dur=Math.min(540,60+60*Math.floor((sg-1)/5)); return [[POT[k],1,{dur}]]; }}); } }
+RECIPES.push({out:I.GLASS_BOTTLE,n:3,pat:['G.G','.G.'],keys:{G:[B.GLASS]},cat:'items'});
+// ---- buff state ----
+const P=player, buffs=()=>player.buffs||(player.buffs={});
+window.buff=k=>{ const b=player.buffs&&player.buffs[k]; return !!(b&&b.t>0); };
+window.drinkPotion=function(s){ const k=ITEMS[s.id].potion, dur=(s.x&&s.x.dur)||60; buffs()[k]={t:dur,max:dur}; s.n--; if(!s.n) inv.slots[inv.sel]=null; if(addItem(I.GLASS_BOTTLE,1)) spawnDrop(player.x,player.y+1,player.z,I.GLASS_BOTTLE,1); invChanged(); renderHotbar(); toast(`${PN[k]} potion · ${Math.round(dur/60)} min`); burst(player.x,player.y+1.4,player.z,[...EK[k][2]],10,2); };
+// ---- column UI ----
+const col=document.createElement('div'); col.id='buffs'; col.style.cssText='position:fixed;z-index:5;left:max(8px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 56px);display:flex;flex-direction:column;gap:6px;pointer-events:none'; document.body.appendChild(col);
+const BC={frost:'#6ab4e8',shadow:'#8a5ac8',burn:'#e8641e',arcane:'#4a7af0'};
+function ui(){ col.innerHTML=''; for(const k of PK){ const b=player.buffs&&player.buffs[k]; if(!b||b.t<=0) continue; const f=Math.max(0,b.t/b.max)*360, m=Math.floor(b.t/60), s=Math.floor(b.t%60);
+  const d=document.createElement('div'); d.style.cssText=`width:40px;height:40px;border-radius:50%;background:conic-gradient(${BC[k]} ${f}deg,rgba(20,26,38,.75) 0);display:flex;align-items:center;justify-content:center;position:relative`;
+  d.innerHTML=`<div style="width:32px;height:32px;border-radius:50%;background:#141a26;display:flex;align-items:center;justify-content:center;font-size:16px">${PI[k]}</div><span style="position:absolute;left:44px;top:11px;color:#e8ecf2;font:12px system-ui;text-shadow:0 1px 2px #000;white-space:nowrap">${m}:${String(s).padStart(2,'0')}</span>`; col.appendChild(d); } }
+// ---- tick ----
+let last=performance.now(), ores=[], oreT=0; const gl=document.getElementById('gl');
+setInterval(()=>{ try{ const now=performance.now(), dt=Math.min(1,(now-last)/1000); last=now; if(!game()){ col.innerHTML=''; gl.style.filter=''; return; }
+  const bs=player.buffs; if(!bs) return; for(const k in bs) if(bs[k].t>0&&mode!=='menu') bs[k].t-=dt;
+  const p=player;
+  if(buff('frost')){ const x=Math.floor(p.x), z=Math.floor(p.z), y=Math.floor(p.y-.2); for(let dx=-1;dx<=1;dx++) for(let dz=-1;dz<=1;dz++){ for(const yy of [y,y+1]) if(isW(world.get(x+dx,yy,z+dz))&&(yy===y||isW(world.get(x+dx,y,z+dz)))) world.set(x+dx,yy===y+1?y:yy,z+dz,B.ICE); } }
+  if(buff('burn')){ p.fireT=0; if(BLOCKS[Math.max(0,world.get(Math.floor(p.x),Math.floor(p.y+.5),Math.floor(p.z)))]?.lava){ p.vy=Math.max(p.vy,-1.2); if(input.jump||input.jumpEdge) p.vy=3.2; p.fallTop=p.y; } }
+  gl.style.filter=buff('arcane')?'brightness(1.6) contrast(1.06) saturate(1.1)':'';
+  if(buff('arcane')){ if(rnd()<.8) parts.push({x:p.x+(rnd()-.5)*.8,y:p.y+rnd()*1.6,z:p.z+(rnd()-.5)*.8,vx:0,vy:.4,vz:0,t:1,c:[130,180,255],s:.04,smoke:true});
+    if((oreT-=dt)<=0){ oreT=.8; ores=[]; const X=Math.floor(p.x),Y=Math.floor(p.y),Z=Math.floor(p.z); for(let dx=-10;dx<=10&&ores.length<80;dx++) for(let dy=-8;dy<=8;dy++) for(let dz=-10;dz<=10;dz++){ const b=world.get(X+dx,Y+dy,Z+dz); if(b>0&&BLOCKS[b].ore) ores.push([X+dx,Y+dy,Z+dz,BLOCKS[b].ore]); } } } else ores.length=0;
+  if(buff('frost')===false&&false) return; ui();
+ }catch(e){} },200);
+const _d=window.drawP2; window.drawP2=function(){ if(_d) _d(); if(ores.length&&buff('arcane')){ const t=performance.now()/1000; setVL(VL_EMISSIVE); for(const [x,y,z,c] of ores){ const k=.75+.25*Math.sin(t*3+x+z); emitBox(dynVB,[x-.015,y-.015,z-.015],[x+1.015,y+1.015,z+1.015],c.map(v=>Math.min(255,v*k+40)),IDT); } } };
+// ---- shadow potion: mobs lose you; fire potion: no burn damage ----
+const _sH=stepHostile; stepHostile=function(m,d,dt,dist){ if(buff('shadow')&&!(m.hurtT>0)){ m.aggro=0; return null; } return _sH(m,d,dt,dist); };
+const _h=hurt; hurt=function(n,why){ if(buff('burn')&&/burn|fire|lava|flame/i.test(String(why||''))) return; return _h(n,why); };
 })();
 
 </script>

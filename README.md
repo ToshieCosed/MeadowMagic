@@ -40,7 +40,7 @@ Saves live in the browser's local storage, per device.
   - Night monsters: zombies, skeletons, spiders, coloured slimes, Duskwalkers and five kinds of mage (illusion, fire, magick, ice, summoner) that drop elemental essences.
   - Game modes: Survival, Peaceful (no monsters) and Creative.
   - Witchcraft: craftable fireplaces (permanent fire; throw dye in to colour the smoke) and a witch's cauldron heated over lava or a fireplace. Throw mage essences and sand in to brew witches glass: shadow lets only the player through, burning only mobs, life only passive mobs and the player, frost only loose items, arcane none. All of it glows.
-  - Robes and anvil: brew leather or tough leather armour with an essence for elemental resistance, then line any armour with it at the anvil (which also merges matching grimoires). Design notes: [docs/magic-update.md](docs/magic-update.md).
+  - Robes and anvil: brew leather or tough leather armour with an essence for elemental resistance, then line any armour with it at the anvil (which also merges matching grimoires). Potions (frost, shadow, fire, arcane) come from bottled essence plus sugar, with a timer column on screen. Design notes: [docs/magic-update.md](docs/magic-update.md).
 - **XP and enchanting:** rainbow XP orbs, books of experience, and Grimoires (enchanting) at a grimoire desk.
 - **Fishing:** a reeling minigame, a loot table and a fishing journal.
 - **Bows:** a warp bow with torch, fire, ice, teleport and swap arrows.
