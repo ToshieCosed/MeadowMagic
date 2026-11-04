@@ -473,6 +473,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
     </div>
     <div class="modes" role="radiogroup" aria-label="Game mode" id="modes">
       <button class="size" role="radio" aria-checked="true" data-gm="survival"><i>Survival</i><em>Gather, craft, 10 hearts</em></button>
+      <button class="size" role="radio" aria-checked="false" data-gm="peaceful"><i>Peaceful</i><em>Survival, no monsters</em></button>
       <button class="size" role="radio" aria-checked="false" data-gm="creative"><i>Creative</i><em>Every block, instant mining</em></button>
     </div>
     <div class="sizes" role="radiogroup" aria-label="World size" id="sizes">
@@ -2455,7 +2456,7 @@ function stepPlayer(dt){
   if(deepW&&sprinting) p.swimProne=true;
   if(p.swimProne&&(!p.inWater||mag<.15||!input.sprint&&!p.headUnder)&&!boxHits(p.x,p.y,p.z,p.crouch?PH_C:PH)) p.swimProne=false;
   const base=p.crouch?1.7:sprinting?7.4:mag>.82?5.0:3.3;
-  const spd=p.inWater?(p.swimProne?5.6:2.3):base;
+  const spd=(p.inWater?(p.swimProne?5.6:2.3):base)*(p.slowT>0?.5:1);
   const tvx=wantX*spd*(mag>0?1:0), tvz=wantZ*spd*(mag>0?1:0);
   const acc=p.inWater?6:p.onGround?14:5;
   const k=1-Math.exp(-acc*dt);
@@ -3089,7 +3090,7 @@ function hurt(n,why){
   const v=document.getElementById('hurtfx'); v.classList.remove('on'); void v.offsetWidth; v.classList.add('on');
   if(p.hp<=0){ toast((why||'You died')+'. Respawning'); p.air=1; if(p.mount) dismount(); hook=null; respawn(); p.hp=p.maxHp; p.stamina=1; p.exhausted=false; p.fallTop=p.y; }
 }
-function stepHealth(dt){ const p=player; p.hurtT+=dt;
+function stepHealth(dt){ const p=player; p.hurtT+=dt; if(p.slowT>0) p.slowT-=dt;
   if(p.hp<p.maxHp&&p.hurtT>6){ p.regenT=(p.regenT||0)+dt; if(p.regenT>3){p.regenT=0;p.hp++;hudDirty=true;} } }
 let hudDirty=true;
 function drawHearts(){
@@ -3899,8 +3900,8 @@ let mobSpawnT=5;
 // ---------- night monsters: zombies and skeletons spawn in the dark, burn in daylight ----------
 let hostileT=2;
 function stepHostileSpawning(dt){
-  hostileT-=dt; if(hostileT>0) return; hostileT=2.5; if(inDusk()) for(const m of mobs) if(MOB[m.type].hostile&&world.gen.village(m.x,m.z)) m.dead=true;
-  for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if((MOB[m.type].hostile||m.type==='lost')&&Math.hypot(m.x-player.x,m.z-player.z)>90) mobs.splice(i,1); }
+  hostileT-=dt; if(hostileT>0) return; hostileT=1.7; if(inDusk()) for(const m of mobs) if(MOB[m.type].hostile&&world.gen.village(m.x,m.z)) m.dead=true;
+  for(let i=mobs.length-1;i>=0;i--){ const m=mobs[i]; if((MOB[m.type].hostile||m.type==='lost')&&(Math.hypot(m.x-player.x,m.z-player.z)>90||m.y<player.y-50)) mobs.splice(i,1); }
   if(inPocket()) return;
   if(inUnder()){ const n=mobs.filter(m=>MOB[m.type].hostile).length; if(n>=14) return;
     for(let k=0;k<8;k++){ const a=Math.random()*6.28, d=14+Math.random()*22; let x=Math.floor(player.x+Math.cos(a)*d), z=Math.floor(player.z+Math.sin(a)*d);
@@ -3909,19 +3910,19 @@ function stepHostileSpawning(dt){
       if(Math.random()<(nearTower?.75:.5)){ spawnMob('demon',f[0]+.5,f[1],f[2]+.5,false); const m=mobs[mobs.length-1]; m.weapon=['staff','knife','sword'][Math.random()*3|0]; }
       else { spawnMob('slime',f[0]+.5,f[1],f[2]+.5,false); const m=mobs[mobs.length-1]; m.size=[1,2,3][Math.random()*3|0]; m.col=SLIMES.findIndex(q=>q.k==='orange'); m.magma=1; m.hp=m.size*m.size*3; }
       return; } return; }
-  const n=mobs.filter(m=>MOB[m.type].hostile).length, night=!dayInfo().day||inDusk(); if(n>=(night?12:4)) return;
+  const n=mobs.filter(m=>MOB[m.type].hostile).length, night=!dayInfo().day||inDusk(); if(n>=(night?18:6)) return;
   for(let k=0;k<6;k++){ const a=Math.random()*6.28, d=18+Math.random()*22, x=Math.floor(player.x+Math.cos(a)*d), z=Math.floor(player.z+Math.sin(a)*d);
     if(x<1||z<1||x>=world.size-1||z>=world.size-1||!world.chunk(x>>4,z>>4)) continue;
     // try the surface, and sometimes a cave floor below it
     let y=world.surface(x,z); if(Math.random()<.4){ for(let yy=y-3;yy>2;yy--) if(world.solid(x,yy,z)&&!world.solid(x,yy+1,z)&&!world.solid(x,yy+2,z)){ y=yy; break; } }
-    const top=world.get(x,y,z); if(!(top>0&&BLOCKS[top].solid&&BLOCKS[top].opaque)||world.solid(x,y+1,z)||world.solid(x,y+2,z)||isW(world.get(x,y+1,z))) continue;
+    if(y<player.y-50) continue; const top=world.get(x,y,z); if(!(top>0&&BLOCKS[top].solid&&BLOCKS[top].opaque)||world.solid(x,y+1,z)||world.solid(x,y+2,z)||isW(world.get(x,y+1,z))) continue;
     if(inDusk()){ if(world.gen.village(x,z)) continue; if(Math.random()<.5){ spawnMob('walker',x+.5,y+1,z+.5,false); return; } continue; }
     const L=sampleLight(x+.5,y+1.5,z+.5), dark=Math.max(L[4],L[5],L[6])<60&&(night||L[0]<70);
     if(!dark) continue;
-    if(Math.random()<.07&&night&&!world.solid(x,y+3,z)&&!world.solid(x,y+4,z)){ spawnMob('walker',x+.5,y+1,z+.5,false); return; }
+    if(Math.random()<.1&&night&&!world.solid(x,y+3,z)&&!world.solid(x,y+4,z)){ spawnMob('walker',x+.5,y+1,z+.5,false); return; }
     const ch=world.chunk(x>>4,z>>4), swamp=ch&&ch.bio&&BIO[ch.bio[(z&15)*CS+(x&15)]].k==='swamp', r=Math.random();
     if(r<(swamp?.6:.2)) { spawnMob('slime',x+.5,y+1,z+.5,false); const m=mobs[mobs.length-1]; m.size=[1,2,3][Math.random()*3|0]; m.col=Math.random()*SLIMES.length|0; m.hp=m.size*m.size*2; }
-    else { const q=Math.random(); spawnMob(q<.42?'zombie':q<.78?'skeleton':'spider',x+.5,y+1,z+.5,false); if(Math.random()<.25) spawnMob('bat',x+.5,y+2.5,z+.5,false); } return; }
+    else { const q=Math.random(); spawnMob(pickHostile(q),x+.5,y+1,z+.5,false); if(Math.random()<.25) spawnMob('bat',x+.5,y+2.5,z+.5,false); } return; }
 }
 function stepHostile(m,d,dt,dist){ // returns [gx,gz,sp] or null when idle
   const p=player, dy=Math.abs(p.y-m.y);
@@ -3948,6 +3949,7 @@ function stepHostile(m,d,dt,dist){ // returns [gx,gz,sp] or null when idle
     const dmg=m.weapon==='sword'?6:4, cd=m.weapon==='knife'?.6:1.1;
     if(dist<1.4&&dy<1.8&&m.atkT<=0){ m.atkT=cd; m.swing=.3; hurt(dmg,'Slain by a fire demon'); if(Math.random()<.4) player.fireT=Math.max(player.fireT||0,3); const l=dist||1; p.vx+=(p.x-m.x)/l*5; p.vz+=(p.z-m.z)/l*5; }
     return dist>1.1?[p.x-m.x,p.z-m.z,d.speed*(m.weapon==='knife'?1.25:1)]:[0,0,0]; }
+  if(m.type.startsWith('mage')) return window.stepMage(m,d,dt,dist,dy);
   if(m.type==='zombie'){
     if(dist<1.25&&dy<1.6&&m.atkT<=0){ m.atkT=1; m.swing=.3; hurt(3,'Slain by a zombie'); const l=dist||1; p.vx+=(p.x-m.x)/l*7; p.vz+=(p.z-m.z)/l*7; p.vy=Math.max(p.vy,4.5); }
     return dist>1?[p.x-m.x,p.z-m.z,d.speed]:[0,0,0];
@@ -3969,7 +3971,7 @@ function stepWolf(m,d,dt,dist){ const p=player; m.atkT=Math.max(0,(m.atkT||0)-dt
   return dist>3.2?[p.x-m.x,p.z-m.z,d.speed*(dist>8?1.6:1)]:[0,0,0]; }
 function stepMobSpawning(dt){
   mobSpawnT-=dt; if(mobSpawnT>0) return; mobSpawnT=15;
-  const near=mobs.filter(m=>!MOB[m.type].hostile&&!MOB[m.type].swim&&m.type!=='parrot'&&Math.hypot(m.x-player.x,m.z-player.z)<64).length; if(near>=14) return;
+  const near=mobs.filter(m=>!MOB[m.type].hostile&&!MOB[m.type].swim&&m.type!=='parrot'&&Math.hypot(m.x-player.x,m.z-player.z)<64).length; if(near>=22) return;
   const a=Math.random()*6.28, d=22+Math.random()*24, cx=player.x+Math.cos(a)*d, cz=player.z+Math.sin(a)*d;
   const types=['cow','cow','pig','pig','chicken','chicken','horse','sheep','sheep','sheep','wolf'], type=types[Math.random()*types.length|0];
   const n=type==='horse'?rint(1,2):rint(2,4);
@@ -4396,6 +4398,7 @@ function emitMob(vb,m){
     legs([-.18,.18],[-.36,.36],.5,.075,sk); if(!m.sheared) legs([-.18,.18],[-.36,.36],.5,.11,w);
     box([-.28-f,.5-f*.5,-.52-f],[.28+f,1.0+f,.5+f],m.sheared?sk:w); box([-.17,.78,.48],[.17,1.12,.82],sk); if(!m.sheared) box([-.19,.98,.48],[.19,1.16,.7],w);
     box([-.12,.94,.82],[-.06,1.0,.84],MC.black); box([.06,.94,.82],[.12,1.0,.84],MC.black); }
+  else if(m.type.startsWith('mage')){ window.drawMage(m,box,T); }
   else if(m.type==='zombie'||m.type==='skeleton'){ const z=m.type==='zombie', skin=z?[96,142,74]:[214,212,202], shirt=z?[44,122,138]:skin, pants=z?[58,58,138]:skin, lw=z?.12:.06, aw=z?.09:.05;
     const ws=m.moving?Math.sin(m.phase)*.7:0, arm=z?-1.5+(m.swing>0?Math.sin(m.swing*20)*.4:0)+ws*.15:(m.draw>0||m.aggro>0?-1.5:ws*.8);
     box([-.13-lw,0,-lw],[-.13+lw,.76,lw],pants,T(.76,0,ws)); box([.13-lw,0,-lw],[.13+lw,.76,lw],pants,T(.76,0,-ws));
@@ -5992,7 +5995,7 @@ const VOICE={
   lost:(o,t,k)=>tn(o,t,.45,{type:'sawtooth',f:k==='hurt'?300:rr(170,210),f2:rr(150,230),v:.2,bp:rr(700,1100),bq:3}),
   demon:(o,t,k)=>{ tn(o,t,.7,{type:'sawtooth',f:k==='hurt'?120:70,f2:50,v:.35,lp:600,trem:30}); for(let i=0;i<3;i++) nz(o,t+rr(0,.5),.02,{type:'highpass',f:3000,v:.4}); },
 };
-const MOB_VOICE=t=>VOICE[t]?t:/zombie/.test(t)?'zombie':/skel/.test(t)?'skeleton':/demon/.test(t)?'demon':/slime/.test(t)?'slime':/walker|dusk/.test(t)?'walker':null;
+const MOB_VOICE=t=>VOICE[t]?t:/zombie|mage/.test(t)?'zombie':/skel/.test(t)?'skeleton':/demon/.test(t)?'demon':/slime/.test(t)?'slime':/walker|dusk/.test(t)?'walker':null;
 function sfxMob(m,kind){ const v=MOB_VOICE(m.type); const o=sfxOut(m.x,m.y+.8,m.z,kind==='idle'?.55:.75,kind==='idle'?18:22); if(!o) return;
   if(kind==='death'){ nz(o,AC.currentTime,.25,{type:'lowpass',f:600,v:.6}); }
   if(kind!=='idle'){ tn(o,AC.currentTime,.07,{f:110,f2:60,v:.6}); nz(o,AC.currentTime,.05,{type:'lowpass',f:1800,v:.5}); }
@@ -8001,7 +8004,7 @@ function renderWorlds(){
   if(!idx.length){ ul.innerHTML='<p class="empty">No saved worlds yet. Forge one above.</p>'; return; }
   for(const w of idx){
     const li=document.createElement('li');
-    li.innerHTML=`<div class="meta"><b></b><span>${w.gameMode==='creative'?'Creative':'Survival'} · ${w.size.toLocaleString()}² · seed ${String(w.seed).slice(0,14)}</span></div><div class="acts"><button class="ghost play">Play</button><button class="ghost danger del">Delete</button></div>`;
+    li.innerHTML=`<div class="meta"><b></b><span>${w.gameMode==='creative'?'Creative':w.gameMode==='peaceful'?'Peaceful':'Survival'} · ${w.size.toLocaleString()}² · seed ${String(w.seed).slice(0,14)}</span></div><div class="acts"><button class="ghost play">Play</button><button class="ghost danger del">Delete</button></div>`;
     li.querySelector('b').textContent=w.name;
     li.querySelector('.play').addEventListener('click',()=>{ const [m,sv]=resumeDim(w,store.get('strata:w:'+w.id)); enterPlay(m,sv); });
     li.querySelector('.del').addEventListener('click',()=>{
@@ -8123,6 +8126,56 @@ let _tgBusy=0; setInterval(()=>{ try{ if(_tgBusy||!world||!world.tiles||!window.
     for(const [x,y,z] of rems.slice(0,24)) (world.rlq||(world.rlq=[])).push([x-15,x+15,z-15,z+15,y-15,y+15]);
     if(adds.length>64||rems.length>24) for(const q of adds.slice(64).concat(rems.slice(24).map(([x,y,z])=>[x,z,y,y]))) (world.rlInc||(world.rlInc=[])).push(q); }catch(e){} _tgBusy=0; },0);
  }catch(e){ _tgBusy=0; } },1500);
+})();
+
+
+/* ---------- v0.22.0 phase 1: peaceful mode, more monsters, five mages, essences ---------- */
+(function(){
+const ES=[['SHADOW_ESS','Shadow essence','#5a2f90','#c09cff'],['BURN_ESS','Burning essence','#d8420f','#ffd048'],['FROST_ESS','Frost essence','#5aa8e0','#f0fcff'],['ARCANE_ESS','Arcane essence','#2f5ae0','#a8d8ff'],['LIFE_ESS','Life essence','#2fa83a','#d0f8a8']];
+for(const [k,n,c1,c2] of ES){ NI(k,n,{ess:1}); ispr(I[k],P=>{ for(let y=7;y<=13;y++){ const w=y-6; for(let x=8-w;x<8+w;x++) P(x,y,(x*3+y)%4?c1:c2); } for(const [x,y] of [[8,3],[7,4],[9,4],[8,5],[8,4]]) P(x,y,c2); }); }
+const MK={ illusion:{n:'Illusion mage',e:'SHADOW_ESS',rb:[70,40,110],gl:[190,130,255],r:[5,9],hp:2},
+  fire:{n:'Fire mage',e:'BURN_ESS',rb:[140,40,20],gl:[255,150,40],r:[9,13],hp:16},
+  magick:{n:'Magick mage',e:'ARCANE_ESS',rb:[30,60,140],gl:[120,190,255],r:[8,12],hp:16},
+  ice:{n:'Ice mage',e:'FROST_ESS',rb:[60,120,160],gl:[200,240,255],r:[7,11],hp:16},
+  summoner:{n:'Summoner mage',e:'LIFE_ESS',rb:[30,110,50],gl:[150,240,130],r:[10,15],hp:16} };
+for(const k in MK){ const q=MK[k]; MOB['mage_'+k]={hp:q.hp,speed:2.0,w:.6,h:1.9,food:[],hostile:1,fireproof:1,mage:k,drops:m=>m.clone?[]:[[I[q.e],rint(1,2)]],name:q.n}; }
+window.pickHostile=q=>q<.3?'zombie':q<.52?'skeleton':q<.7?'spider':'mage_'+['illusion','fire','magick','ice','summoner'][Math.random()*5|0];
+window.peaceful=()=>game()&&world.meta.gameMode==='peaceful';
+// ---- model ----
+window.drawMage=function(m,box,T){ const q=MK[MOB[m.type].mage], cl=m.clone, rb=cl?[110,70,160]:q.rb, rd=rb.map(v=>v*.7), sk=[230,200,170], ws=m.moving?Math.sin(m.phase)*.1:0, arm=(m.draw>0||m.aggro>0)?-1.4:ws;
+  if(cl) setVL(VL_EMISSIVE);
+  box([-.27,0,-.17],[.27,.9,.17],rd); box([-.24,.9,-.14],[.24,1.42,.14],rb); box([-.25,.88,-.15],[.25,.95,.15],[200,170,70]);
+  box([-.36,.9,-.07],[-.24,1.38,.07],rb,T(1.38,0,arm)); box([.24,.9,-.07],[.36,1.38,.07],rb,T(1.38,0,arm*.8));
+  box([-.2,1.42,-.2],[.2,1.82,.2],sk); box([-.32,1.8,-.32],[.32,1.86,.32],rd); box([-.22,1.86,-.22],[.22,2.0,.22],rd); box([-.14,2.0,-.14],[.14,2.12,.14],rd); box([-.06,2.12,-.06],[.06,2.24,.06],rd);
+  setVL(VL_EMISSIVE); box([-.12,1.6,.2],[-.06,1.66,.215],q.gl); box([.06,1.6,.2],[.12,1.66,.215],q.gl);
+  const H=T(1.38,0,arm*.8); box([.3,.3,-.02],[.34,1.95,.02],[90,60,40],H); box([.27,1.95,-.05],[.37,2.08,.05],q.gl,H);
+  setVL(sampleLight(m.x,m.y+1.2,m.z)); };
+// ---- bolts ----
+const bolts=[]; const live=o=>o&&!o.dead&&mobs.includes(o);
+function fire(m,kind,col,sp){ const p=player, o=[m.x,m.y+1.6,m.z], t=[p.x,p.y+1,p.z], v=[t[0]-o[0],t[1]-o[1],t[2]-o[2]], l=Math.hypot(...v)||1;
+  bolts.push({x:o[0],y:o[1],z:o[2],vx:v[0]/l*sp,vy:v[1]/l*sp,vz:v[2]/l*sp,k:kind,c:col,t:0,own:m}); m.face=Math.atan2(v[0],v[2]); m.draw=.4; }
+function clone(own,x,y,z){ let f=floorNear(Math.floor(x),Math.floor(y),Math.floor(z))||[Math.floor(own.x),Math.floor(own.y),Math.floor(own.z)]; spawnMob('mage_illusion',f[0]+.5,f[1],f[2]+.5,false); const c=mobs[mobs.length-1]; c.clone=true; c.aggro=30; c.life=25; own.cl=c; burst(c.x,c.y+1,c.z,[170,110,230],10,2); }
+function updBolts(dt){ const p=player;
+  for(let i=bolts.length-1;i>=0;i--){ const b=bolts[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt; b.t+=dt; let end=b.t>3;
+    for(let k=0;k<2;k++) parts.push({x:b.x+(Math.random()-.5)*.15,y:b.y+(Math.random()-.5)*.15,z:b.z+(Math.random()-.5)*.15,vx:0,vy:0,vz:0,t:b.k==='magick'?.6:.35,c:b.c,s:b.k==='magick'?.16:.11,ember:true});
+    if(world.solid(Math.floor(b.x),Math.floor(b.y),Math.floor(b.z))) end=true;
+    else if(Math.abs(p.x-b.x)<.45&&Math.abs(p.z-b.z)<.45&&b.y>p.y-.2&&b.y<p.y+ph()+.2){ end=true;
+      if(b.k==='fire'){ hurt(4,'Burned by a fire mage'); p.fireT=Math.max(p.fireT||0,2); } else if(b.k==='magick') hurt(4,'Struck by arcane magick'); else if(b.k==='ice'){ hurt(3,'Frozen by an ice mage'); p.slowT=4; } }
+    if(end){ if(b.k==='illusion'){ b.own.bolt=false; if(live(b.own)) clone(b.own,b.x-b.vx*dt*2,b.y,b.z-b.vz*dt*2); } burst(b.x,b.y,b.z,b.c,6,2); bolts.splice(i,1); } } }
+window.stepMage=function(m,d,dt,dist,dy){ const p=player, k=MOB[m.type].mage, q=MK[k]; m.shootT=(m.shootT??2)-dt; m.atkT=Math.max(0,m.atkT-dt);
+  if(m.clone){ m.life-=dt; if(m.life<=0){ m.dead=true; burst(m.x,m.y+1,m.z,[170,110,230],10,2); return null; }
+    if(dist<1.25&&dy<1.6&&m.atkT<=0){ m.atkT=1; m.swing=.3; hurt(3,'Slain by an illusion'); const l=dist||1; p.vx+=(p.x-m.x)/l*6; p.vz+=(p.z-m.z)/l*6; } return dist>1?[p.x-m.x,p.z-m.z,d.speed*1.5]:[0,0,0]; }
+  if(m.shootT<=0&&dist<22){
+    if(k==='illusion'){ if(!m.bolt&&!live(m.cl)){ m.shootT=3; m.bolt=true; fire(m,'illusion',q.gl,13); } }
+    else if(k==='summoner'){ if(!live(m.summ)){ m.shootT=6; const t=['zombie','skeleton','spider'][Math.random()*3|0]; spawnMob(t,m.x+(Math.random()-.5)*2,m.y,m.z+(Math.random()-.5)*2,true); const c=mobs[mobs.length-1]; c.grow=1e9; c.hp=Math.ceil(MOB[t].hp/2); c.aggro=30; c.lesser=true; m.summ=c; m.draw=.5; burst(c.x,c.y+.5,c.z,q.gl,10,2); } }
+    else { m.shootT=2.2+Math.random(); fire(m,k,q.gl,k==='magick'?15:12); } }
+  if(dist>q.r[1]) return [p.x-m.x,p.z-m.z,d.speed]; if(dist<q.r[0]) return [m.x-p.x,m.z-p.z,d.speed*.9];
+  const a=Math.atan2(p.x-m.x,p.z-m.z)+Math.PI/2; return [Math.sin(a)*(m.strafe||1),Math.cos(a)*(m.strafe||1),d.speed*.5]; };
+const _hM=hitMob; hitMob=function(m,dmg,fx,fz){ if(m.type==='mage_illusion') dmg=1; return _hM(m,dmg,fx,fz); };   // illusion mages and clones: exactly two hits
+const _sHS=stepHostileSpawning; stepHostileSpawning=function(dt){
+  if(!game()){ bolts.length=0; return _sHS(dt); }
+  if(peaceful()){ for(let i=mobs.length-1;i>=0;i--) if(MOB[mobs[i].type].hostile) mobs.splice(i,1); bolts.length=0; return; }
+  updBolts(dt); return _sHS(dt); };
 })();
 
 </script>
