@@ -965,6 +965,8 @@ for(const k in WGK){ const [n,c,t,m]=WGK[k]; const id=NB('WG_'+k.toUpperCase());
 { const id=NB('ANVIL'); def(id,'Anvil','#3a3a42','#2c2c34',0,{opaque:false,lightOpaque:0,shape:1,p2:'anvil',boxes:[[.15,0,.15,.85,.18,.85],[.3,.18,.3,.7,.55,.7],[.08,.55,.0,.92,1,1]]}); pat(id,PT.METAL); P2B.anvil=id; }
 const MLB=[]; DYES.forEach((d,i)=>{ let c=typeof d.dye==='string'?hex(d.dye):d.dye; const hs='#'+c.map(v=>Math.min(255,v|0).toString(16).padStart(2,'0')).join(''); const id=NB('MLIGHT_'+d.k); def(id,'Mage light',hs,hs,0,{solid:false,opaque:false,lightOpaque:0,noItem:1,shape:1,emit:c.map(v=>Math.max(2,Math.round(v/255*14))),boxes:[[.38,.38,.38,.62,.62,.62]],mlight:i}); MLB.push(id); });
 { const id=NB('SHADOW_BLOCK'); def(id,'Shadow block','#2e2048','#2e2048',0,{opaque:false,tint:[.35,.22,.6],lightOpaque:0,noItem:1,shadowB:1}); pat(id,PT.GLASS); P2B.shadowb=id; }
+{ const id=NB('FROST_BLOCK'); def(id,'Frost block','#bfe3ff','#a8d4f8',0,{opaque:false,tint:[.74,.88,1],glassy:200,lightOpaque:0,noItem:1,frostB:1}); pat(id,PT.ICE); P2B.frostb=id;
+  const sid=NB('ICE_SLIDE'); def(sid,'Ice slide','#d4efff','#bfe3ff',0,{opaque:false,lightOpaque:0,boxes:[[0,0,0,1,.14,1]],shape:1,noItem:1,slideB:1,drop:0}); pat(sid,PT.ICE); P2B.slideb=sid; }
 BLOCKS[TECHB.wterm].name='Advanced wireless terminal';
 
 
@@ -8456,6 +8458,68 @@ setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player;
 const _d=window.drawP2; window.drawP2=function(){ if(_d) _d(); if(!decoy) return; const t=performance.now()/1000, f=.5+.3*Math.sin(t*6), c=[150*f+60,100*f+40,220], x=decoy.x, y=decoy.y, z=decoy.z, w=Math.sin(t*5)*.15; setVL(VL_EMISSIVE);
   emitBox(dynVB,[x-.25,y+.75,z-.13],[x+.25,y+1.4,z+.13],c,IDT); emitBox(dynVB,[x-.22,y+1.4,z-.22],[x+.22,y+1.84,z+.22],c,IDT); emitBox(dynVB,[x-.25,y,z-.13+w],[x-.02,y+.76,z+.12+w],c,IDT); emitBox(dynVB,[x+.02,y,z-.13-w],[x+.25,y+.76,z+.12-w],c,IDT);
   emitBox(dynVB,[x-.38,y+.8,z-.07],[x-.25,y+1.38,z+.07],c,IDT); emitBox(dynVB,[x+.25,y+.8,z-.07],[x+.38,y+1.38,z+.07],c,IDT); };
+})();
+
+
+/* ---------- v0.28.0 phase 5b-2: frozen staff, frost blocks and ice slides ---------- */
+(function(){
+const rnd=Math.random, ST=window.STAFFDEF, FRB=P2B.frostb, SLB=P2B.slideb; spec([FRB,SLB],.05);
+const id=NI('STAFF_FROST','Frozen staff',{stack:1,staff:'frost'}); window.STAFFS.frost=id;
+ispr(id,P=>{ for(let i=0;i<9;i++) P(3+i,13-i,i%2?'#5a6a80':'#46566c'); for(const [x,y] of [[10,2],[10,3],[10,4],[10,5],[10,6],[8,4],[9,4],[11,4],[12,4],[8,2],[12,6],[12,2],[8,6],[9,3],[11,5],[11,3],[9,5]]) P(x,y,'#8fd0ff'); P(10,4,'#ffffff'); P(10,3,'#d8f2ff'); P(10,5,'#d8f2ff'); });
+CAULD.push({need:{[I.STICK]:1,[I.FROST_ESS]:50},needAct:1,out:[[id,1]],time:4});
+const pb=[], col=[130,200,250]; let holdDone=0;
+const isFS=b=>b===FRB||b===SLB, isW=b=>b>0&&BLOCKS[b]&&BLOCKS[b].wl;
+const free=(x,y,z)=>{ const b=world.get(x,y,z); return b===B.AIR||(b>0&&BLOCKS[b].replace&&!BLOCKS[b].wl); };
+// ---- bolts ----
+function bolt(ap,kind){ const p=player, o=[p.x,p.y+1.4,p.z], v=[ap[0]-o[0],ap[1]-o[1],ap[2]-o[2]], l=Math.hypot(...v)||1; pb.push({kind,x:o[0]+v[0]/l*.6,y:o[1]+v[1]/l*.6,z:o[2]+v[2]/l*.6,vx:v[0]/l*22,vy:v[1]/l*22,vz:v[2]/l*22,t:0}); sfx('bowShoot',p.x,p.y,p.z,.6,16); }
+function freeze(cx,cy,cz){ let n=0; for(let dx=-4;dx<=4;dx++)for(let dz=-4;dz<=4;dz++){ if(dx*dx+dz*dz>17) continue; for(let dy=0;dy>-3;dy--){ const x=cx+dx,y=cy+dy,z=cz+dz; if(isW(world.get(x,y,z))){ world.set(x,y,z,B.ICE); n++; if(rnd()<.25) burst(x+.5,y+.9,z+.5,[210,240,255],3,1.5); } } } if(n){ sfx('glass',cx,cy,cz,.7,18); toast('Froze '+n+' water blocks'); } return n; }
+// ---- frost blocks and ice slides ----
+function placeFrost(sx,sy){ if(Date.now()-holdDone<700) return true; const r=pick(sx,sy); if(!r||!r.prev||!reachOK(...r.hit)) return true; const [x,y,z]=r.prev, p=player; if(!free(x,y,z)) return true;
+  if(Math.abs(p.x-(x+.5))<.8&&Math.abs(p.z-(z+.5))<.8&&y+1>p.y&&y<p.y+ph()){ toast('You are in the way'); return true; } world.set(x,y,z,FRB); burst(x+.5,y+.5,z+.5,col,6,1.5); sfx('glass',x,y,z,.4,12); return true; }
+function layPath(ap){ if(Date.now()-holdDone<700) return true; const p=player, dx=ap[0]-p.x, dz=ap[2]-p.z, hyp=Math.hypot(dx,dz)||1, L=Math.min(hyp,24), n=Math.ceil(L*2), seen=new Set(); let py=Math.floor(p.y), c=0;
+  for(let i=1;i<=n&&c<60;i++){ const cx=Math.floor(p.x+dx/hyp*L*i/n), cz=Math.floor(p.z+dz/hyp*L*i/n), k=cx+','+cz; if(seen.has(k)) continue; seen.add(k);
+    let g=null; for(let y=py+2;y>=py-3;y--){ if(world.solid(cx,y,cz)&&!isFS(world.get(cx,y,cz))&&!world.solid(cx,y+1,cz)){ g=y; break; } if(world.get(cx,y,cz)===SLB){ g=y-1; break; } }
+    if(g===null) break; const y=g+1; py=y; if(world.get(cx,y,cz)===SLB) continue; if(!free(cx,y,cz)) continue; world.set(cx,y,cz,SLB); c++; if(c%3===0) burst(cx+.5,y+.2,cz+.5,col,2,1); }
+  if(c){ sfx('glass',p.x,p.y,p.z,.6,16); toast('Ice slide laid ('+c+')'); } else toast('No ground to lay a slide on'); return true; }
+function connected(x,y,z){ const out=[], seen=new Set([x+','+y+','+z]), q=[[x,y,z]]; while(q.length&&out.length<4000){ const c=q.pop(); out.push(c); for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){ if(!dx&&!dy&&!dz) continue; const n=[c[0]+dx,c[1]+dy,c[2]+dz], k=n.join(','); if(seen.has(k)||!isFS(world.get(...n))) continue; if(world.get(...n)===FRB&&(dx||dz)&&(dy||(dx&&dz))&&world.get(...c)===FRB) continue; seen.add(k); q.push(n); } } return out; }
+function poof(x,y,z){ const L=connected(x,y,z); L.forEach(([a,b,c],i)=>{ world.set(a,b,c,B.AIR); if(i<80) burst(a+.5,b+.5,c+.5,col,4,2); }); sfx('pop',x,y,z,.8,18); toast(`${L.length} frost pieces unsummoned`); }
+const fm=()=>{ const s=game()&&mode==='play'&&held(); if(!s||ITEMS[s.id].staff!=='frost') return false; const m=window.staffMode0(s); return m==='frost'||m==='slide'; };
+window.FROZ={fm,poof,connected,pb};
+let hd=null; document.addEventListener('pointerdown',e=>{ if(!fm()||(e.target.closest&&e.target.closest('button,#hotbar,#actions'))) return; hd={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ const r=pick(hd.x,hd.y); if(r&&isFS(world.get(...r.hit))&&reachOK(...r.hit)){ holdDone=Date.now(); poof(...r.hit); } hd=null; },1100)}; });
+document.addEventListener('pointermove',e=>{ if(hd&&Math.hypot(e.clientX-hd.x,e.clientY-hd.y)>14){ clearTimeout(hd.t); hd=null; } }); for(const ev of ['pointerup','pointercancel']) document.addEventListener(ev,()=>{ if(hd){ clearTimeout(hd.t); hd=null; } });
+const _mT=mineTime; mineTime=function(b,tool){ if(isFS(b)&&fm()) return Infinity; return _mT(b,tool); };
+ST.frost={n:'Frozen staff',modes:['freeze','ice','frost','slide'],mn:{freeze:'Freeze',ice:'Ice bolt',frost:'Frost',slide:'Slide'},c:col,ess:I.FROST_ESS,cd:.3,
+  use(sx,sy,s,m){ if(m==='freeze'||m==='ice'){ bolt(aimPoint(sx,sy),m); return true; } if(m==='frost'){ window.staffCd(.15); return placeFrost(sx,sy); } window.staffCd(.6); return layPath(aimPoint(sx,sy)); } };
+// ---- player: grip, speed, downhill sliding ----
+const holdingFrost=()=>{ const s=held(); return !!(s&&ITEMS[s.id].staff==='frost'); };
+const _sP=stepPlayer; stepPlayer=function(dt){ const p=player, pvx=p.vx, pvz=p.vz; _sP(dt); try{
+  if(!p.onGround||p.inWater||p.mount||p.climbing) return; const cx=Math.floor(p.x), cz=Math.floor(p.z);
+  let on=world.get(cx,Math.floor(p.y+.001),cz)===SLB?2:world.get(cx,Math.floor(p.y-.05),cz)===FRB?1:0; if(!on) return; const st=holdingFrost();
+  const slip=st?.12:(on===2?.55:.45), boost=on===2?(st?5.5:2):(st?3.5:3);
+  p.vx=p.vx+(pvx-p.vx)*slip; p.vz=p.vz+(pvz-p.vz)*slip; const f=1+dt*boost, sp=Math.hypot(p.vx,p.vz);
+  if(sp>.6){ p.vx*=f; p.vz*=f; }
+  if(on===2){ const cy=Math.floor(p.y+.001); for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){ if(world.get(cx+dx,cy-1,cz+dz)===SLB&&!world.solid(cx+dx,cy,cz+dz)){ p.vx+=dx*dt*(st?9:6); p.vz+=dz*dt*(st?9:6); } } }
+  const s2=Math.hypot(p.vx,p.vz), cap=st?12:8.5; if(s2>cap){ p.vx*=cap/s2; p.vz*=cap/s2; }
+  if(on&&sp>2&&rnd()<dt*10) parts.push({x:p.x+(rnd()-.5)*.6,y:p.y+.1,z:p.z+(rnd()-.5)*.6,vx:0,vy:.4,vz:0,t:.8,c:[200,230,255],s:.08,smoke:true});
+ }catch(e){} };
+// ---- mobs: slowed on frost, slip on slides ----
+const _mm=mobMove; mobMove=function(m,vx,vz,dt,a){ if(dt<=.1){ if(m.frostT>0){ vx*=.45; vz*=.45; }
+    const cell=world.get(Math.floor(m.x),Math.floor(m.y+.001),Math.floor(m.z)), cell2=world.get(Math.floor(m.x),Math.floor(m.y-.05),Math.floor(m.z));
+    if(cell===SLB||cell2===FRB){ m.frostT=Math.max(m.frostT||0,1.5); const k=cell===SLB?.88:.75; m.sx=(m.sx||0)*k+vx*(1-k); m.sz=(m.sz||0)*k+vz*(1-k); vx=m.sx; vz=m.sz; } else { m.sx=m.sz=0; } }
+  return _mm(m,vx,vz,dt,a); };
+// ---- frame loop ----
+let last=performance.now();
+(function loop(){ requestAnimationFrame(loop); const now=performance.now(), DT=Math.min(.6,(now-last)/1000); last=now; if(!game()||mode!=='play') return;
+  for(const m of mobs) if(m.frostT>0){ m.frostT-=DT; if(rnd()<DT*5) parts.push({x:m.x+(rnd()-.5)*.4,y:m.y+MOB[m.type].h*.5,z:m.z+(rnd()-.5)*.4,vx:0,vy:.3,vz:0,t:.7,c:[200,230,255],s:.06,smoke:true}); }
+  const NS=Math.ceil(DT/.04); for(let rep=0;rep<NS;rep++){ const dt=DT/NS; for(let i=pb.length-1;i>=0;i--){ const b=pb[i]; b.t+=dt; b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt; if(rnd()<.8) parts.push({x:b.x,y:b.y,z:b.z,vx:0,vy:0,vz:0,t:.4,c:b.kind==='ice'?[170,225,255]:[90,170,240],s:.1,ember:true});
+    const cx=Math.floor(b.x), cy=Math.floor(b.y), cz=Math.floor(b.z), cb=world.get(cx,cy,cz); let end=b.t>2.5;
+    if(!end&&b.kind==='freeze'&&isW(cb)){ freeze(cx,cy,cz); end=true; }
+    else if(!end&&world.solid(cx,cy,cz)&&cb!==SLB){ end=true; }
+    if(!end&&b.kind==='ice') for(const m of mobs){ if(m.dead) continue; const {hw,h}=mobBox(m); if(Math.abs(m.x-b.x)<hw+.25&&Math.abs(m.z-b.z)<hw+.25&&b.y>m.y-.1&&b.y<m.y+h+.1){ hitMob(m,6,player.x,player.z); m.frostT=5; burst(m.x,m.y+h*.6,m.z,[190,230,255],12,2.5); end=true; break; } }
+    if(end){ burst(b.x,b.y,b.z,[200,235,255],8,2); pb.splice(i,1); } } } })();
+setInterval(()=>{ try{ if(!game()||mode==='menu') return; const p=player;
+  for(const m of mobs){ if(m.dead||Math.hypot(m.x-p.x,m.z-p.z)>48) continue; const {hw,h}=mobBox(m); let touch=false; for(const [ox,oz] of [[hw+.15,0],[-hw-.15,0],[0,hw+.15],[0,-hw-.15]]) for(const yy of [m.y+.3,m.y+h*.6]) if(world.get(Math.floor(m.x+ox),Math.floor(yy),Math.floor(m.z+oz))===FRB) touch=true; if(touch) m.frostT=Math.max(m.frostT||0,3); }
+  for(let k=0;k<50;k++){ const x=Math.floor(p.x+(rnd()-.5)*22), y=Math.floor(p.y+(rnd()-.4)*10), z=Math.floor(p.z+(rnd()-.5)*22), b=world.get(x,y,z); if(b===FRB) parts.push({x:x+rnd(),y:y+rnd(),z:z+rnd(),vx:(rnd()-.5)*.2,vy:.3,vz:(rnd()-.5)*.2,t:1.4,c:[210,235,255],s:.07,smoke:true}); else if(b===SLB) parts.push({x:x+rnd(),y:y+.15,z:z+rnd(),vx:(rnd()-.5)*.3,vy:.15,vz:(rnd()-.5)*.3,t:1.6,c:[225,242,255],s:.09,smoke:true}); } }catch(e){} },400);
 })();
 
 </script>

@@ -17,5 +17,7 @@ Design brief and build notes. Source lives in `src/strata.html`; `python tools/b
 - Function declarations can be wrapped by reassignment; `const` arrows (like `enchText`) cannot.
 - **v0.27.0 illusioner staff:** stick + 50 shadow essence. Modes: Blink (short teleport, 1.2s cooldown), Decoy (12s illusion that lures hostiles within 32 blocks), Blind (shadow bolt, mobs blinded 40s), Blocks (placeable shadow blocks: translucent, smoky, mobs touching take damage and can't pass; mined instantly; tap with a held block to replace every connected shadow block; hold ~1s on one with the staff to unsummon them all). Test: `tools/tests/phase5b_illusioner.py`.
 
+- **v0.28.0 frozen staff:** stick + 50 frost essence. Modes: Freeze (bolt turns water to permanent ice, 4 blocks around and 3 deep, works on the ocean), Ice bolt (6 damage + slowness), Frost (placeable frost blocks: icy and translucent, enemies touching them are slowed, you move faster on them, hold ~1s to unsummon a connected group), Slide (lays a thin slippery ice bed from you toward the aim point that follows the terrain, up to 24 blocks; you get grip and extra speed while holding the staff, slide downhill, mobs slip; hold to unsummon). Frost blocks and slides are ordinary block ids so they save with the world. Test: `tools/tests/phase5c_frozen.py`.
+
 ## Planned
-Frozen staff: water-freezing bolt, ice bolt, frost blocks and ice slides (phase 5b-2).
+Nothing queued; ideas welcome.
