@@ -29,6 +29,8 @@ JS='''async()=>{ const W=ms=>new Promise(r=>setTimeout(r,ms)); startWorld({id:'w
  world.set(X+1,G+1,Z+8,S); seg(X+1,G+1,Z+8,0,grn); WIRE.rebuild(); await W(1200);
  res.rf={lamp:lp.tech.e,cap:cb.tech.e,s1:s1.tech.e,s2:s2.tech.e};
  const n=WIRE.nets().find(n=>n.c===grn); res.netRF=n&&n.rf;
+ // 3b. wires laid on the ground beside a panel feed a capacitor bank at the far end
+ const sp=tech(X-6,G,Z+11,'solar1',4,{e:500}), cb2=tech(X-1,G,Z+11,'capbank',4,{e:0}); for(let x=X-5;x<=X-2;x++) seg(x,G-1,Z+11,2,blu); WIRE.rebuild(); await W(900); res.ground={cap:cb2.tech.e,sol:sp.tech.e};
  // 4. persistence + cleanup
  const save=JSON.stringify([...world.wires.entries()]); res.saved=save.length>10;
  world.set(X+1,G+1,Z+8,B.AIR); await W(1300); res.cleaned=!world.wires.has((X+1)+','+(G+1)+','+(Z+8));
@@ -41,6 +43,6 @@ async def main():
         r=await pg.evaluate(JS.replace('BUNDLE_ID','B.BUNDLE').replace('TECHB.','TECH.TECHB.').replace('TECHB[','TECH.TECHB['))
         await pg.screenshot(path=str(OUT/'wires.png'))
         print(json.dumps(r)); print('errors',errs[:5])
-        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['cleaned'] and not errs
+        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['ground']['cap']>0 and r['cleaned'] and not errs
         print('PASS' if ok else 'FAIL'); await b.close(); sys.exit(0 if ok else 1)
 asyncio.run(main())

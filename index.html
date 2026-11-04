@@ -9688,7 +9688,9 @@ function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
       segs.push(seg); geo.push(seg); segBy.set(key,seg); } }
   const byRoot=new Map(), get=r=>{ let n=byRoot.get(r); if(!n){ n={c:-1,segs:[],terms:[],lv:0,live:false,rf:0,b1:0,b1t:null,b2:0,sup:0}; byRoot.set(r,n); nets.push(n); } return n; };
   nets=[]; termIdx=new Map();
-  for(const s of segs){ const n=get(find(s.key)); n.c=s.c; n.segs.push(s); s.net=n; for(const q of s.nbs) link(s.key,q[0]); const t=tAt(s.x,s.y,s.z); if(t) n.terms.push({t,face:s.f,node:s.key}); if(!n.pk||s.key<n.pk) n.pk=s.key; }
+  for(const s of segs){ const n=get(find(s.key)); n.c=s.c; n.segs.push(s); s.net=n; for(const q of s.nbs) link(s.key,q[0]); const fv=D6[s.f], cand=[[s.x,s.y,s.z,s.f],[s.x+fv[0],s.y+fv[1],s.z+fv[2],OPP[s.f]],[s.x+2*fv[0],s.y+2*fv[1],s.z+2*fv[2],OPP[s.f]]];
+      for(let d=0;d<6;d++){ if((d>>1)===(s.f>>1)) continue; const v=D6[d]; cand.push([s.x+fv[0]+v[0],s.y+fv[1]+v[1],s.z+fv[2]+v[2],OPP[d]],[s.x+v[0],s.y+v[1],s.z+v[2],OPP[d]]); }
+      for(const q of cand){ const t=tAt(q[0],q[1],q[2]); if(t) n.terms.push({t,face:q[3],node:s.key}); } if(!n.pk||s.key<n.pk) n.pk=s.key; }
   for(const C of clusters) for(const c of C.cols){ const root=find('B'+C.id+':'+c); if(!par.has('B'+C.id+':'+c)) continue; const n=get(root); n.c=c;
     for(const p of C.cells) for(let d=0;d<6;d++){ const v=D6[d], t=tAt(p[0]+v[0],p[1]+v[1],p[2]+v[2]); if(t&&!isBundle(world.get(t.x,t.y,t.z))) n.terms.push({t,face:OPP[d],node:'B'+C.id+':'+c}); } }
   for(const n of nets) for(const e of n.terms){ const k=ck(e.t.x,e.t.y,e.t.z); let a=termIdx.get(k); if(!a) termIdx.set(k,a=[]); a.push({face:e.face,net:n}); } }

@@ -103,3 +103,6 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - The bands crawl along the wire away from the power source; the speed follows signal strength (or RF flow). Updates every tick, so rapid lever flicking changes it immediately.
 - Each colour on a shared face animates independently (red one way, white the other). All six faces of a block hold their own wires.
 - Test: `tools/tests/phase16_wire_look.py`.
+
+### v0.38.2 — wires plug into machines beside them
+- A wire now connects to any tech block touching it: the one it sits on, the one in the air cell it occupies, and any at the sides of that cell or of its host block. A wire laid along the ground ending against a solar panel's side (or a capacitor bank) plugs in. Test in phase15 (ground run solar → capbank).
