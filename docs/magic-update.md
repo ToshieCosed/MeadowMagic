@@ -68,3 +68,6 @@ Nothing queued; ideas welcome.
 ## v0.36.1 — more mob skins
 - Added pack skins for horse (first `horse_*.png` found), bat, squid, glow squid (`squid/glow_squid.png`, drawn fully lit), parrot (first `parrot_*.png` found), the Duskwalker (uses the enderman skin, scaled up) and the Lost (uses the villager skin).
 - Demons and mages have no direct vanilla equivalent and keep their built-in look. Re-import the pack once to pick up the new textures.
+
+## v0.36.2 — skin orientation fix
+Cow, pig, chicken and wolf bodies were rotated the wrong way, so the belly texture (udder, pig underside) showed on top and the back texture underneath. Bodies now use vanilla orientation. Sheep unchanged.
