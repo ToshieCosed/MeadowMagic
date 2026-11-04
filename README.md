@@ -37,7 +37,8 @@ Saves live in the browser's local storage, per device.
 - **Water and lava:** both flow, they make obsidian and cobblestone where they meet, and buckets pick up and place either.
 - **Creatures:**
   - Animals: cows, pigs, chickens, horses, sheep, tamable wolves and bats.
-  - Night monsters: zombies, skeletons, spiders and coloured slimes.
+  - Night monsters: zombies, skeletons, spiders, coloured slimes, Duskwalkers and five kinds of mage (illusion, fire, magick, ice, summoner) that drop elemental essences.
+  - Game modes: Survival, Peaceful (no monsters) and Creative.
 - **XP and enchanting:** rainbow XP orbs, books of experience, and Grimoires (enchanting) at a grimoire desk.
 - **Fishing:** a reeling minigame, a loot table and a fishing journal.
 - **Bows:** a warp bow with torch, fire, ice, teleport and swap arrows.
