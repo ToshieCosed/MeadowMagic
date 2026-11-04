@@ -77,3 +77,13 @@ If a pack has no cow/pig/chicken/sheep/wolf texture at the usual path, the impor
 
 ## v0.36.4 — horse model
 Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5, mane, ears, tail, vanilla proportions) so skins map correctly.
+
+## v0.37.0 — beds, sleeping bags, weaving wheel and banners
+- **Beds**: 16 colours, two blocks long, craft 3 wool over 3 planks. Tap one at night to sleep through to morning and set your respawn point (dying or falling out of the world puts you beside it). Both halves break together. You can't sleep in the day, in the Underworld, or with monsters within 9 blocks.
+- **Sleeping bags**: 16 colours, one block, 3 wool over 3 string or fibre. Same night skip, but they never change your respawn point.
+- **Weaving wheel** (2 string over 2 planks): opens the banner workshop.
+- **Banners**: 32x64 cloth with a swallowtail. Place on a wall or on a pole on the ground; tap a placed banner to edit it, crouch-tap to take it back. Cost 2 wool + 1 stick (free in creative).
+- **Editor**: three layers (the layers you are not editing show grey and faint), an eye button for the whole banner, up to 12 pieces per layer. Pieces: 30 full-banner patterns, 30 shapes/symbols, 55 icons, 90 emoji (two-colour print or natural colours). Per piece: primary and secondary colour (swatches or any colour), flip both ways, turn, size 1x-3x, move 2 pixels at a time or drag on the preview, bring forward / send back, copy, delete. Cloth colour is free choice.
+- **Premade**: 41 designs (skull & crossbones, X, !, town, home, shop, anvil, sword, tavern, zombie, pickaxe, tree, water, frost, fire, shadow, arcane, life, boots, hammer, axe, chest armour, helmet, leggings, ghost, food, chicken, pig, sheep, smeltery, cauldron, grass, technology, sunrise, sunset, flippers, wolf, stairs, prohibited, builder, shears, chest) plus 16 plain colours. Tap one to load it, then craft; tick "Craft on tap" to craft straight from the list.
+- Block parts can now carry their own colour (7th value in a box), which is how beds get wooden frames with coloured mattresses.
+- Test: `tools/tests/phase14_beds_banners.py outdir` (contact sheets of every piece and premade banner, bed/bag/sleep/respawn assertions, banner placement, editor screenshot).
