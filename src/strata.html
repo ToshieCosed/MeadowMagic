@@ -942,6 +942,33 @@ for(const d of DYES){ const e=d.k==='white'?[15,15,15]:d.k==='black'?[6,5,9]:viv
   const on=TB('lampon_'+d.k,d.name+' lamp','#3b3b42','#3b3b42',{solid:false,lamp:d.k,lampCol:hex(d.dye),emit:e,lit:1,drop:off,noItem:1}); LAMPS[d.k]={off,on}; }
 BLOCKS[B.TORCH].emit=[14,13,9];
 
+// ---- v0.34: wall torches, walls, more flowers, flower pots ----
+const WT={}; BLOCKS[B.TORCH].torch=1;
+for(const [k,dx,dz] of [['N',0,-1],['E',1,0],['S',0,1],['W',-1,0]]){ const id=NB('WTORCH_'+k); def(id,'Torch','#ffcf5a','#7a5230',0,{solid:false,opaque:false,emit:BLOCKS[B.TORCH].emit.slice(),noItem:1,drop:B.TORCH,torch:1,wt:[dx,dz]}); WT[dx+','+dz]=id; }
+// walls: one connecting block per stone, brick, wood and metal material
+const WALL_MATS=[]; const hx6=a=>'#'+a.map(v=>v.toString(16).padStart(2,'0')).join('');
+function mkWall(m){ const bd0=BLOCKS[m.base], id=NB('WALL_'+m.k.toUpperCase()); m.wall=id; def(id,m.name+' wall',hx6(bd0.top),hx6(bd0.side),0,{opaque:false,lightOpaque:0,fence:1,wallM:m}); pat(id,m.pat); WALL_MATS.push(m); }
+for(const m of SHAPE_MATS) mkWall(m);
+for(const s of STONES) if(!SHAPE_MATS.some(m=>m.base===s.id)) mkWall({k:s.k,name:s.name.replace(/ bricks$/,' brick').replace(/ tiles$/,' tile'),base:s.id,pat:BLOCKS[s.id].ps|0});
+for(const [k,n,b] of [['obsidian','Obsidian',B.OBSIDIAN],['duskblock','Dusk',B.DUSK_BLOCK]]) if(b&&BLOCKS[b]) mkWall({k,name:n,base:b,pat:BLOCKS[b].ps|0});
+// more flowers
+const TALL_LO=new Set(), TALL_HI={};
+const NEWF=[['FLOWER_AZ','Azure bluet','#e6edf5','azure_bluet',.5],['TULIP_R','Red tulip','#d9322a','red_tulip',.6],['TULIP_W','White tulip','#f4f1e8','white_tulip',.6],['LILYV','Lily of the valley','#f2f6ee','lily_of_the_valley',.45],['TORCHF','Torchflower','#e8742a','torchflower',.72]];
+for(const [k,n,c,mc,ph] of NEWF){ const id=NB(k); def(id,n,c,0,0,{solid:false,opaque:false,plant:true,replace:true,stem:hex('#4e9a36'),ph,mcName:mc}); }
+const tallPlant=(k,name,col,head)=>{ const lo=NB(k.toUpperCase()+'_LO'), hi=NB(k.toUpperCase()+'_HI'); spr(k+'_lo',(P,R)=>head(P,R,0)); spr(k+'_hi',(P,R)=>head(P,R,1));
+  def(lo,name,col,0,0,{solid:false,opaque:false,spr:SPR[k+'_lo'],dbl:1,support:1,mcName:k}); def(hi,name,col,0,0,{solid:false,opaque:false,spr:SPR[k+'_hi'],dbl:2,noItem:1,support:1,mcName:k});
+  TALL_HI[lo]=hi; TALL_LO.add(lo); return lo; };
+{ const G=hex('#3e8a2c'), G2=hex('#2f6f22'), G3=hex('#4fa63a');
+  const stem=(P,hi)=>{ for(let y=hi?7:0;y<16;y++){ P(7,y,G); P(8,y,G2); } };
+  const leaves=(P,hi)=>{ if(hi) return; for(const [x,y] of [[4,10],[5,10],[6,11],[5,11],[9,5],[10,5],[11,6],[10,6]]) P(x,y,G3); };
+  tallPlant('sunflower','Sunflower','#f7c81a',(P,R,hi)=>{ stem(P,hi); leaves(P,hi); if(!hi) return; const cx=7.5, cy=4.5; for(let y=0;y<10;y++) for(let x=1;x<15;x++){ const d=Math.hypot(x-cx,y-cy);
+    if(d<2.7) P(x,y,R(x,y)>.5?hex('#5a3a1a'):hex('#43290f')); else if(d<5.3&&(Math.sin(Math.atan2(y-cy,x-cx)*6)>-.35||d<3.7)) P(x,y,R(x,y,2)>.5?hex('#f7c81a'):hex('#eeaa00')); } });
+  const cluster=(k,name,col,c1,c2,leafy)=>tallPlant(k,name,col,(P,R,hi)=>{ stem(P,hi); leaves(P,hi); const cy=hi?4.5:1; for(let y=hi?0:0;y<(hi?10:5);y++) for(let x=2;x<14;x++){ const dx=(x-7.5)/(leafy?5.5:4.2), dy=(y-cy)/(hi?5.2:3.5); if(dx*dx+dy*dy<1){ const r=R(x,y,3); if(r>.3) P(x,y,r>.7?hex(c1):hex(c2)); else if(leafy&&r>.12) P(x,y,G3); } } });
+  cluster('lilac','Lilac','#b58bd6','#c9a2e6','#9a6cc0',0); cluster('rose_bush','Rose bush','#c8202a','#d6262f','#a81820',1); cluster('peony','Peony','#f0a8c8','#f6bcd6','#e07fab',1); }
+const POT=NB('FLOWER_POT'), POTB=[[.3125,0,.3125,.6875,.375,.6875]], POT_OF={};
+def(POT,'Flower pot','#a0523a','#8f4630',0,{opaque:false,lightOpaque:0,shape:1,pot:{plant:0},boxes:POTB}); pat(POT,PT.TERRA);
+for(const bd of [...BLOCKS]){ if(!bd||bd.noItem||bd.id===B.TALLGRASS||!(bd.plant||bd.sapling||bd.mush)) continue; const id=NB('POTTED_'+bd.id); def(id,'Flower pot','#a0523a','#8f4630',0,{opaque:false,lightOpaque:0,shape:1,pot:{plant:bd.id},boxes:POTB,noItem:1,drop:POT}); pat(id,PT.TERRA); POT_OF[bd.id]=id; }
+
 /* ---------- stage 20 blocks: capacitor tiers, solar panels, coal generator, item pipes, hoppers, droppers, placed backpacks ---------- */
 TB('capbank2','Advanced capacitor bank','#5a4a30','#4a3c26',{lightOpaque:1}); TB('capbank3','Vibrant capacitor bank','#3c5a3a','#2e4a2c',{lightOpaque:1});
 const SOLAR_COL=['#7a7f86','#c48c4c','#dfe5ea','#f2c94a','#cdc5ba','#8e99a6','#a3b6cc','#e6eef4'];
@@ -1159,8 +1186,8 @@ biome('snowy_peaks','Snowy Mountains',{grass:'#80b497',foliage:'#60a17b',top:B.S
 { const T3=(k,extra)=>{ const b=BIO[BI[k]]; if(b) b.trees3=[...(b.trees||[]),...extra]; };
   T3('plains',[['acacia',.0012]]); T3('flower_plains',[['cherry',.004]]); T3('forest',[['giantOak',.0007]]); T3('flower_forest',[['cherry',.014]]); T3('birch_forest',[['giantBirch',.003]]);
   T3('dark_forest',[['paleOak',.004]]); T3('swamp',[['mangrove',.01]]); T3('jungle',[['megaJungle',.006]]); T3('badlands',[['acacia',.0015]]); T3('mountains',[['cherry',.003]]); }
-const FLOWERS_COMMON=[B.FLOWER_R,B.FLOWER_Y,B.FLOWER_B,B.FLOWER_W,B.FLOWER_O,B.FLOWER_K];
-const FLOWERS_ALL=[...FLOWERS_COMMON,B.FLOWER_P,B.FLOWER_L];
+const FLOWERS_COMMON=[B.FLOWER_R,B.FLOWER_Y,B.FLOWER_B,B.FLOWER_W,B.FLOWER_O,B.FLOWER_K,B.FLOWER_AZ,B.TULIP_R,B.TULIP_W,B.SUNFLOWER_LO];
+const FLOWERS_ALL=[...FLOWERS_COMMON,B.FLOWER_P,B.FLOWER_L,B.LILYV,B.TORCHF,B.LILAC_LO,B.ROSE_BUSH_LO,B.PEONY_LO];
 const VINE_OF={'0,-1':B.VINE_N,'1,0':B.VINE_E,'0,1':B.VINE_S,'-1,0':B.VINE_W};
 const BANDS=[B.TERRACOTTA,B.TERRA_O,B.TERRA_O,B.TERRA_Y,B.TERRACOTTA,B.TERRA_BR,B.TERRA_O,B.TERRA_R,B.TERRA_W,B.TERRACOTTA,B.TERRA_LG,B.TERRA_O,B.TERRA_Y,B.TERRA_R,B.TERRACOTTA,B.TERRA_W];
 
@@ -1320,9 +1347,9 @@ class Generator2{
       if(!under&&h+1<H){ const P=bd.plants, r=hash2(wx,wz,seed+99), mead=Math.max(0,this.nF(wx*.02,wz*.02)), tp=b[idx(lx,h,lz)];
         if(P&&(tp===B.GRASS||tp===B.PODZOL||tp===B.MYCELIUM||tp===B.SAND||tp===B.RED_SAND||tp===B.SNOW_GRASS)){
           let acc=0; const fh=hash2(wx,wz,seed+98);
-          const pick=(p,v)=>{ if(!p) return false; acc+=p*(.6+mead); if(r<acc){ set(lx,h+1,lz,v); return true; } return false; };
+          const pick=(p,v)=>{ if(!p) return false; acc+=p*(.6+mead); if(r<acc){ set(lx,h+1,lz,v); if(TALL_HI[v]&&h+2<H) set(lx,h+2,lz,TALL_HI[v]); return true; } return false; };
           if(tp===B.SAND||tp===B.RED_SAND){ pick(P.dead,B.DEAD_BUSH); }
-          else pick(P.flower,(P.allFlowers?FLOWERS_ALL:FLOWERS_COMMON)[(fh*(P.allFlowers?8:6))|0])||pick(P.orchid,B.FLOWER_L)||pick(P.mush,fh<.5?B.MUSH_R:B.MUSH_BR)||pick(P.fern,B.FERN)||pick(P.dead,B.DEAD_BUSH)||(tp!==B.MYCELIUM&&tp!==B.SNOW_GRASS&&pick(P.grass,B.TALLGRASS));
+          else pick(P.flower,(P.allFlowers?FLOWERS_ALL:FLOWERS_COMMON)[(fh*(P.allFlowers?FLOWERS_ALL:FLOWERS_COMMON).length)|0])||pick(P.orchid,B.FLOWER_L)||pick(P.mush,fh<.5?B.MUSH_R:B.MUSH_BR)||pick(P.fern,B.FERN)||pick(P.dead,B.DEAD_BUSH)||(tp!==B.MYCELIUM&&tp!==B.SNOW_GRASS&&pick(P.grass,B.TALLGRASS));
         }
         // loose rocks lying on the surface (tap to pick up)
         if(b[idx(lx,h+1,lz)]===B.AIR){ const pr=hash2(wx,wz,seed+77);
@@ -1834,6 +1861,7 @@ function meshChunk(world,ch){
     const bd=BLOCKS[b], wx=x0+x, wz=z0+z; PAT=0; CB=b;
     const bio=ch.bio?BIO[ch.bio[z*CS+x]]:null, tc=(bd.btint&&bio)?(bd.btint==='grass'?bio.grass:bd.btint==='lily'?null:bio.foliage):null;
     const jit=.93+hash2(wx+y*7,wz-y*3,seed)*.12;
+    if(bd.wt){ setVLcell(x,y,z); torchWall(vbL,vbO,wx,y,wz,b,bd); continue; }
     if(PACK.on&&PACK.x[b]||bd.spr){ setVLcell(x,y,z); emitSprite(vbL,wx,y,wz,b,bd,tc||(bio&&bio.grass)); continue; }
     if(bd.cocoa){ setVLcell(x,y,z); const c=bd.cocoa, s2=[4,6,8][c.age]/16, h2=[5,7,9][c.age]/16, v=F4V[c.f], off=.5-s2/2-.0625, cx=wx+.5+v[0]*off, cz=wz+.5+v[1]*off; PAT=PT.CLAY;
       emitBox(vbO,[cx-s2/2,y+.75-h2,cz-s2/2],[cx+s2/2,y+.75,cz+s2/2],[[106,138,42],[160,110,50],[138,74,32]][c.age],IDT); continue; }
@@ -1876,6 +1904,7 @@ function meshChunk(world,ch){
       for(const q of [P(.06,.06,.94,.12,t),P(.06,.88,.94,.94,t),P(.06,.06,.12,.94,t),P(.88,.06,.94,.94,t)]) emitBox(vbO,q[0],q[1],bd.top,IDT); PAT=0; { const q=P(.44,.74,.56,.8,.08); emitBox(vbO,q[0],q[1],[60,52,40],IDT); } continue; }
     if(bd.elevator){ setVLcell(x,y,z); PAT=PT.WOOL; emitBox(vbO,[wx,y,wz],[wx+1,y+1,wz+1],bd.side,IDT); PAT=0; setVL(VL_EMISSIVE); emitBox(vbO,[wx+.35,y+1,wz+.35],[wx+.65,y+1.01,wz+.65],[170,90,230],IDT); continue; }
     if(bd.tech){ setVLcell(x,y,z); techMesh(vbO,vbG,b,bd,wx,y,wz); continue; }
+    if(bd.pot){ setVLcell(x,y,z); PAT=bd.ps|0; emitBox(vbO,[wx+.3125,y,wz+.3125],[wx+.6875,y+.375,wz+.6875],bd.side,IDT); PAT=0; emitBox(vbO,[wx+.375,y+.34,wz+.375],[wx+.625,y+.385,wz+.625],[96,64,42],IDT); if(bd.pot.plant) potPlant(vbL,wx,y,wz,bd.pot.plant,jit); continue; }
     if(bd.shape&&!bd.door){ setVLcell(x,y,z); PAT=bd.ps|0; const c=bd.side;
       for(const q of bd.rboxes||bd.boxes) emitBox(vbO,[wx+q[0],y+q[1],wz+q[2]],[wx+q[3],y+q[4],wz+q[5]],q===bd.boxes[0]&&bd.slab?bd.top:c,IDT); continue; }
     if(bd.door){ setVLcell(x,y,z); PAT=bd.ps|0; const q=bd.boxes[0], c=bd.side; emitBox(vbO,[wx+q[0],y+q[1],wz+q[2]],[wx+q[3],y+q[4],wz+q[5]],c,IDT); PAT=0;
@@ -1899,6 +1928,11 @@ function meshChunk(world,ch){
       for(const [dx,dz] of DIRS){ const nb=at(x+dx,y,z+dz); if(!(nb>0&&(BLOCKS[nb].fence||BLOCKS[nb].opaque))) continue;
         const a=[dx<0?wx:dx>0?wx+.56:wx+.46, dz<0?wz:dz>0?wz+.56:wz+.46], e=[dx<0?wx+.44:dx>0?wx+1:wx+.54, dz<0?wz+.44:dz>0?wz+1:wz+.54];
         emitBox(vbO,[a[0],y,a[1]],[e[0],y+1,e[1]],sh3(c,.92),IDT); }
+      continue; }
+    if(bd.wallM){ setVLcell(x,y,z); PAT=bd.ps|0; const c=bd.side, tall=at(x,y+1,z)>0&&BLOCKS[at(x,y+1,z)].wallM; emitBox(vbO,[wx+.25,y,wz+.25],[wx+.75,y+1,wz+.75],c,IDT);
+      for(const [dx,dz] of DIRS){ const nb=at(x+dx,y,z+dz); if(!(nb>0&&(BLOCKS[nb].fence||BLOCKS[nb].opaque))) continue;
+        const a=[dx<0?wx:dx>0?wx+.75:wx+.3125, dz<0?wz:dz>0?wz+.75:wz+.3125], e=[dx<0?wx+.25:dx>0?wx+1:wx+.6875, dz<0?wz+.25:dz>0?wz+1:wz+.6875];
+        emitBox(vbO,[a[0],y,a[1]],[e[0],y+(tall?1:.8125),e[1]],sh3(c,.94),IDT); }
       continue; }
     if(bd.fence){ setVLcell(x,y,z); const c=bd.top; PAT=PT.PLANK; emitBox(vbO,[wx+.38,y,wz+.38],[wx+.62,y+1,wz+.62],c,IDT);
       for(const [dx,dz] of DIRS){ const nb=at(x+dx,y,z+dz); if(!(nb>0&&(BLOCKS[nb].fence||BLOCKS[nb].opaque))) continue;
@@ -2006,6 +2040,23 @@ function emitPlant(vb,x,y,z,bd,jit,col){
 function emitSprite(vb,x,y,z,b,bd,tg){ const pk=PACK.on&&PACK.has[b]; PAT=pk?0:(bd.spr|0);
   const c=(bd.btint||pk&&PACK.tint[b])?(bd.stem?[150,196,80]:tg||[121,192,90]):[255,255,255], e=.003, lo=190, hi=255; vb.need(8);
   for(const [ax,az,bx,bz] of [[x+e,z+e,x+1-e,z+1-e],[x+1-e,z+e,x+e,z+1-e]]){ vb.v(ax,y+e,az,c[0],c[1],c[2],lo); vb.v(bx,y+e,bz,c[0],c[1],c[2],lo); vb.v(bx,y+1-e,bz,c[0],c[1],c[2],hi); vb.v(ax,y+1-e,az,c[0],c[1],c[2],hi); } }
+function torchWall(vl,vo,x,y,z,b,bd){ // a torch leaning out from a wall: tilted sprite planes with a pack, tilted boxes without
+  const [dx,dz]=bd.wt, ox=-dx, oz=-dz, tx=dz, tz=-dx, pk=PACK.on&&PACK.has[b], bx=x+.5+dx*.34, bz=z+.5+dz*.34, y0=y+.2;
+  if(pk){ PAT=0; vl.need(8);
+    for(const [ax,az] of [[tx*.5,tz*.5],[dx*.5,dz*.5]]){ const T=.41;
+      vl.v(bx+ax,y0,bz+az,255,255,255,190); vl.v(bx-ax,y0,bz-az,255,255,255,190); vl.v(bx-ax+ox*T,y0+1,bz-az+oz*T,255,255,255,255); vl.v(bx+ax+ox*T,y0+1,bz+az+oz*T,255,255,255,255); } return; }
+  PAT=0; const seg=(s0,s1,h,col,sh)=>{ const C=s=>[bx+ox*s*.26,y0+s*.625,bz+oz*s*.26], A=C(s0), B2=C(s1);
+    const L=(c,yy)=>[[c[0]-h,yy,c[2]-h],[c[0]+h,yy,c[2]-h],[c[0]+h,yy,c[2]+h],[c[0]-h,yy,c[2]+h]], l0=L(A,A[1]), l1=L(B2,B2[1]);
+    for(let i=0;i<4;i++){ const j=(i+1)%4, q=[l0[i],l0[j],l1[j],l1[i]]; quadRaw(vo,q,col,sh*(i&1?.8:1)); quadRaw(vo,[q[3],q[2],q[1],q[0]],col,sh*(i&1?.8:1)); }
+    quadRaw(vo,l1,col,sh); quadRaw(vo,[l1[3],l1[2],l1[1],l1[0]],col,sh); };
+  seg(0,.72,.0625,[120,82,46],1); setVL(VL_EMISSIVE); seg(.7,1,.085,[255,190,70],1); seg(.9,1.01,.05,[255,240,170],1); }
+function potPlant(vl,x,y,z,pb,jit){ const pbd=BLOCKS[pb]; if(!pbd) return; const pk=PACK.on&&PACK.has[pb], a=.2, b2=.8, y0=y+.34, h=.56, sv=CB; vl.need(8);
+  const cross=(c,lo,hi)=>{ for(const [ax,az,bx,bz] of [[x+a,z+a,x+b2,z+b2],[x+b2,z+a,x+a,z+b2]]){ vl.v(ax,y0,az,c[0],c[1],c[2],lo); vl.v(bx,y0,bz,c[0],c[1],c[2],lo); vl.v(bx,y0+h,bz,c[0],c[1],c[2],hi); vl.v(ax,y0+h,az,c[0],c[1],c[2],hi); } };
+  if(pk){ CB=pb; PAT=0; cross([255,255,255],190,255); CB=sv; }
+  else if(pbd.spr){ PAT=pbd.spr; cross([255,255,255],190,255); }
+  else { PAT=0; const top=pbd.top, stem=pbd.stem||top, split=.5, hh=h; for(const [ax,az,bx,bz] of [[x+a,z+a,x+b2,z+b2],[x+b2,z+a,x+a,z+b2]]){ vl.need(8);
+      const seg=(ya,yb,c,l0,l1)=>{ vl.v(ax,ya,az,c[0],c[1],c[2],l0); vl.v(bx,ya,bz,c[0],c[1],c[2],l0); vl.v(bx,yb,bz,c[0],c[1],c[2],l1); vl.v(ax,yb,az,c[0],c[1],c[2],l1); };
+      seg(y0,y0+hh*split,stem,150,210); seg(y0+hh*split,y0+hh,top,230,255); } } }
 function quadRaw(vb,q,col,shade){ vb.need(4); const l=Math.min(255,(shade??1)*255)|0; for(const p of q) vb.v(p[0],p[1],p[2],col[0],col[1],col[2],l); }
 // light at a world position for moving things (player, drops, arrows)
 const _sl=new Uint8Array(8);
@@ -2824,7 +2875,7 @@ const INSTR={piano:{name:'Piano',w:'triangle',a:.004,d:1.2,s:0,r:.3,o:0,h:.5},lu
 for(const k in INSTR) INSTR[k].item=NI('INST_'+k.toUpperCase(),INSTR[k].name,{stack:1,instrument:k});
 NI('DISC_BLANK','Blank music disc'); NI('DISC','Music disc',{stack:1,disc:1});
 NI('DEMON_BONE','Demon bone'); NI('DEMON_EYE','Demon eye');
-NI('FORGEWRITE','ForgeWrite',{stack:1,forgewrite:1}); NI('FORGEWRITE_SIGNED','Written ForgeWrite',{stack:1,forgewrite:2}); NI('SIGN','Sign',{stack:16,decorItem:1,decor:1});
+NI('FORGEWRITE','ForgeWrite',{stack:1,forgewrite:1}); NI('FORGEWRITE_SIGNED','Written ForgeWrite',{stack:1,forgewrite:2}); NI('SIGN','Sign',{stack:16,decorItem:1,decor:1}); NI('HSIGN','Hanging sign',{stack:16,decorItem:1,decor:1});
 NI('BUCKET','Bucket',{stack:16,decorItem:0,bucket:'empty'}); NI('BUCKET_WATER','Water bucket',{stack:1,bucket:'w'}); NI('BUCKET_LAVA','Lava bucket',{stack:1,bucket:'l'});
 NI('GLIDER','Hang glider',{stack:1,glider:1}); NI('DUSK_ORB','Dusk orb',{stack:16}); NI('DUSK_PEARL','Dusk pearl');
 for(const sl of SLIMES){ sl.jelly=NI('JELLY_'+sl.k.toUpperCase(),sl.d.name+' slime jelly',{jelly:sl.d.dye}); }
@@ -3483,6 +3534,10 @@ r_(P2B.fire,1,['CCC','CFC','CCC'],{keys:{C:[B.COBBLE],F:[I.COAL]},cat:'blocks'})
 r_(P2B.cauldron,1,['I.I','I.I','III'],{keys:{I:[I.IRON]},cat:'blocks'});
 r_(P2B.anvil,1,['III','.I.','III'],{keys:{I:[I.IRON]},cat:'blocks'});
 r_(P2B.camp,1,['.S.','SCS','LLL'],{keys:{S:[I.STICK],C:[I.COAL,I.CHARCOAL],L:[B.LOG]},cat:'blocks'});
+for(const m of WALL_MATS) r_(m.wall,6,['XXX','XXX'],{keys:{X:[m.base]},cat:'blocks'});
+r_(POT,1,['B.B','.B.'],{keys:{B:[B.BRICK,B.TERRACOTTA]},cat:'decor'});
+r_(I.HSIGN,2,['R.R','PPP','PPP'],{keys:{R:[B.ROPE,I.STRING]},cat:'decor'});
+for(const [f,k] of [[B.FLOWER_AZ,'light_gray'],[B.TULIP_R,'red'],[B.TULIP_W,'light_gray'],[B.LILYV,'white'],[B.TORCHF,'orange'],[B.SUNFLOWER_LO,'yellow'],[B.LILAC_LO,'magenta'],[B.ROSE_BUSH_LO,'red'],[B.PEONY_LO,'pink']]) r_(DYE_BY[k].item,2,['a','M'],{keys:{a:[f]},cat:'items'});
 r_(I.LEATHER,1,['H'],{station:'tan',cat:'items'});
 r_(I.RLEATHER,2,['EXE'],{keys:{X:[I.TIN]},station:'tan',cat:'items'});
 r_(I.SADDLE,1,['EEE','EFE'],{station:'tan',cat:'travel'});
@@ -3627,6 +3682,7 @@ for(const w of WOODS){ spec([w.log,w.stripped,w.woodB,w.swood],3.2,'axe'); spec(
 for(const s of STONES) spec(s.id,s.k==='CALCITE'?1.2:s.k.includes('DEEPSLATE')?4.5:3,'pick',1);
 spec([B.FARMLAND,B.FARMLAND_WET],.9,'shovel'); spec([B.MELON,B.PUMPKIN],1.4,'axe'); spec(CAKE,.5); spec([...BERRY,...COCOA,B.SUGAR_CANE,B.TALL_LO,B.TALL_HI,B.FERN_LO,B.FERN_HI],.05);
 for(const k in CROPS){ spec(CROPS[k].ids,.05); if(CROPS[k].att) spec(CROPS[k].att,.05); }
+for(const m of WALL_MATS){ SPEC[m.wall]=SPEC[m.base]||{h:2}; }
 for(const m of SHAPE_MATS){ const sp=SPEC[m.base]||{h:2}; for(const id of [...Object.values(m.slab),...Object.values(m.stairs)]) SPEC[id]=sp; }
 for(const m of DOOR_MATS) for(let i=0;i<16;i++) spec(m.door+i,m.wood?2.4:4,m.wood?'axe':'pick',m.wood?0:1);
 for(const m of GATE_MATS) for(let i=0;i<4;i++) spec(m.gate+i,m.wood?2.2:4,m.wood?'axe':'pick',m.wood?0:1);
@@ -3658,7 +3714,7 @@ SMELTS[0].a.push(...WOODS.filter(w=>!w.nether).flatMap(w=>[w.log,w.stripped,w.wo
 SMELTS.push({a:[B.STONE],out:B.SMOOTH_STONE,time:6,tier:1},{a:[I.POTATO],out:I.BAKED_POTATO,time:5,tier:1},{a:[B.KELP],out:I.DRIED_KELP,time:4,tier:1},{a:[B.COBBLED_DEEPSLATE],out:B.DEEPSLATE,time:6,tier:1},{a:[B.CACTUS],out:DYE_BY.green.item,time:5,tier:1});
 const SMELT_IN=new Set(SMELTS.flatMap(r=>[...r.a,...(r.b||[])]));
 for(const sl of SLIMES) FUEL[sl.jelly]=120; FUEL[I.BUCKET_LAVA]=1000;
-for(const w of WOODS){ FUEL[FENCE_OF[w.k]]=6; FUEL[FURN[w.k].table]=12; FUEL[FURN[w.k].chair]=8; } for(const m of SHAPE_MATS) if(m.wood){ FUEL[m.slab.d]=7; FUEL[m.stairs.n0]=12; }
+for(const w of WOODS){ FUEL[FENCE_OF[w.k]]=6; FUEL[FURN[w.k].table]=12; FUEL[FURN[w.k].chair]=8; } for(const m of WALL_MATS) if(m.wood) FUEL[m.wall]=8; FUEL[I.HSIGN]=6; for(const m of SHAPE_MATS) if(m.wood){ FUEL[m.slab.d]=7; FUEL[m.stairs.n0]=12; }
 Object.assign(FUEL,{[I.COAL]:80,[B.FENCE]:6,[B.LADDER_N]:4,[B.CHEST_WOOD]:20,[B.TANNING]:20,[I.BOAT]:30,[I.SADDLE]:4,[I.LEATHER]:3,[I.SEEDS]:1,[B.TORCH]:2});
 for(const id in ITEMS){ const it=ITEMS[id]; if(it.mat==='wood') FUEL[id]=10; if(it.amat==='wood') FUEL[id]=12; }
 for(const w of WOODS){ if(w.nether) continue; FUEL[w.log]=FUEL[w.log]||30; FUEL[w.planks]=FUEL[w.planks]||15; for(const id of [w.stripped,w.woodB,w.swood]) FUEL[id]=30; FUEL[w.sapling]=5; } FUEL[I.DRIED_KELP]=4;
@@ -5298,7 +5354,7 @@ function faceFrame(hit,prev,w,h){ const d=[prev[0]-hit[0],prev[1]-hit[1],prev[2]
 function decorCorners(e,inset){ const k=inset||0, hu=e.w/2-k, hv=e.h/2-k, P=(a,b)=>[e.c[0]+e.u[0]*a+e.v[0]*b,e.c[1]+e.u[1]*a+e.v[1]*b,e.c[2]+e.u[2]*a+e.v[2]*b];
   return [P(-hu,-hv),P(hu,-hv),P(hu,hv),P(-hu,hv)]; }
 function pickDecor(sx,sy){ const [o,d]=camRay(sx,sy); let best=null, bt=Infinity;
-  for(const e of world.decor){ const dn=d[0]*e.n[0]+d[1]*e.n[1]+d[2]*e.n[2]; if(dn>=0) continue;
+  for(const e of world.decor){ const dn=d[0]*e.n[0]+d[1]*e.n[1]+d[2]*e.n[2]; if(dn>=0&&!e.two) continue;
     const t=((e.c[0]-o[0])*e.n[0]+(e.c[1]-o[1])*e.n[1]+(e.c[2]-o[2])*e.n[2])/dn; if(t<0||t>=bt) continue;
     const p=[o[0]+d[0]*t-e.c[0],o[1]+d[1]*t-e.c[1],o[2]+d[2]*t-e.c[2]], a=p[0]*e.u[0]+p[1]*e.u[1]+p[2]*e.u[2], b=p[0]*e.v[0]+p[1]*e.v[1]+p[2]*e.v[2];
     if(Math.abs(a)<=e.w/2&&Math.abs(b)<=e.h/2){ bt=t; best=e; } }
@@ -5306,7 +5362,7 @@ function pickDecor(sx,sy){ const [o,d]=camRay(sx,sy); let best=null, bt=Infinity
   return best; }
 function giveBack(id,x){ if(creative()&&id!==I.PAINTING) return; if(addItem(id,1)) spawnDrop(player.x,player.y+1,player.z,id,1); else if(x) inv.slots[inv.landed].x=x; }
 function removeDecor(e,give){ const i=world.decor.indexOf(e); if(i<0) return; world.decor.splice(i,1); world.changed=true;
-  if(give){ if(e.kind==='painting') giveBack(I.PAINTING,{art:e.art}); if(e.kind==='frame'){ giveBack(I.FRAME); if(e.item) giveBack(e.item.id,e.item.x); } if(e.kind==='poster') giveBack(I.POSTER); if(e.kind==='sign') giveBack(I.SIGN); }
+  if(give){ if(e.kind==='painting') giveBack(I.PAINTING,{art:e.art}); if(e.kind==='frame'){ giveBack(I.FRAME); if(e.item) giveBack(e.item.id,e.item.x); } if(e.kind==='poster') giveBack(I.POSTER); if(e.kind==='sign') giveBack(e.hang?I.HSIGN:I.SIGN); }
   burst(e.c[0],e.c[1],e.c[2],[200,180,140],6,1.5); }
 function decorOnBlockBroken(x,y,z){ for(const e of world.decor.slice()) if(e.sup[0]===x&&e.sup[1]===y&&e.sup[2]===z) removeDecor(e,true); }
 function decorRoom(f){ return f.w===1&&f.h===1?!world.decor.some(e=>e.cell+''===f.cell+''&&e.n+''===f.n+''):true; }
@@ -5404,6 +5460,9 @@ function emitDecor(vb){
     const n=e.n, frameB=(t,col)=>{ const hu=e.w/2, hv=e.h/2; const B=(a0,b0,a1,b1)=>{ const P=(a,b,dn)=>[e.c[0]+e.u[0]*a+e.v[0]*b+n[0]*dn,e.c[1]+e.u[1]*a+e.v[1]*b+n[1]*dn,e.c[2]+e.u[2]*a+e.v[2]*b+n[2]*dn];
         const p0=P(a0,b0,-.03), p1=P(a1,b1,.03); emitBox(vb,[Math.min(p0[0],p1[0]),Math.min(p0[1],p1[1]),Math.min(p0[2],p1[2])],[Math.max(p0[0],p1[0]),Math.max(p0[1],p1[1]),Math.max(p0[2],p1[2])],col,IDT); };
       B(-hu,-hv,hu,-hv+t); B(-hu,hv-t,hu,hv); B(-hu,-hv,-hu+t,hv); B(hu-t,-hv,hu,hv); };
+    if(e.hang){ const cy=e.c[1]+.3, topY=e.hang===1?e.cell[1]+1:cy+.07;
+      for(const sd of [-.36,.36]){ const px=e.c[0]+e.u[0]*sd, pz=e.c[2]+e.u[2]*sd; emitBox(vb,[px-.018,cy,pz-.018],[px+.018,topY,pz+.018],[64,64,72],IDT); }
+      if(e.hang===2){ const d=e.arm, a0=[e.c[0]-d[0]*.5,e.c[2]-d[2]*.5], a1=[e.c[0]+d[0]*.5,e.c[2]+d[2]*.5]; emitBox(vb,[Math.min(a0[0],a1[0])-.03,cy+.05,Math.min(a0[1],a1[1])-.03],[Math.max(a0[0],a1[0])+.03,cy+.12,Math.max(a0[1],a1[1])+.03],[110,76,44],IDT); } }
     if(e.kind==='sign'&&e.post){ const cx=e.cell[0]+.5, cz=e.cell[2]+.5, y0=e.cell[1]; emitBox(vb,[cx-.05,y0,cz-.05],[cx+.05,y0+.66,cz+.05],[120,82,48],IDT); }
     if(e.kind==='sign'){ const b0=decorCorners(e,0); const mn=[0,1,2].map(i=>Math.min(...b0.map(p=>p[i]))-e.n[i]*.04), mx=[0,1,2].map(i=>Math.max(...b0.map(p=>p[i]))-e.n[i]*.005); emitBox(vb,mn,mx,[110,76,44],IDT); }
     if(e.kind==='painting') frameB(.07,[120,82,48]);
@@ -5476,7 +5535,8 @@ function drawTextured(){
     const ins=e.kind==='icon'?0:e.kind==='frame'&&!e.mode?(e.item.id===I.MAP?.08:.16):e.kind==='painting'?.07:0, q=decorCorners(e,ins), off=e.kind==='poster'?0:.012, n=e.n;
     const uv=[[0,1],[1,1],[1,0],[0,0]], d=new Float32Array(20); for(let i=0;i<4;i++){ d[i*5]=q[i][0]+n[0]*off; d[i*5+1]=q[i][1]+n[1]*off; d[i*5+2]=q[i][2]+n[2]*off; d[i*5+3]=uv[i][0]; d[i*5+4]=uv[i][1]; }
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,t); gl.activeTexture(gl.TEXTURE0);
-    gl.bindBuffer(gl.ARRAY_BUFFER,texVBO); gl.bufferSubData(gl.ARRAY_BUFFER,0,d); gl.drawArrays(gl.TRIANGLE_FAN,0,4); }
+    gl.bindBuffer(gl.ARRAY_BUFFER,texVBO); gl.bufferSubData(gl.ARRAY_BUFFER,0,d); gl.drawArrays(gl.TRIANGLE_FAN,0,4);
+    if(e.two){ const uv2=[[1,1],[0,1],[0,0],[1,0]], d2=new Float32Array(20); for(let i=0;i<4;i++){ d2[i*5]=q[i][0]-n[0]*.052; d2[i*5+1]=q[i][1]-n[1]*.052; d2[i*5+2]=q[i][2]-n[2]*.052; d2[i*5+3]=uv2[i][0]; d2[i*5+4]=uv2[i][1]; } gl.bufferSubData(gl.ARRAY_BUFFER,0,d2); gl.drawArrays(gl.TRIANGLE_FAN,0,4); } }
   if(used){ gl.disable(gl.POLYGON_OFFSET_FILL); gl.useProgram(prog); gl.bindVertexArray(null); }
 }
 
@@ -5749,8 +5809,10 @@ for(const k of ['wheat','carrots','potatoes','beetroots']) CROPS[k].ids.forEach(
 for(const k of ['melon','pumpkin']){ const c=CROPS[k+'_stem']; c.ids.forEach(id=>MCB[BKEY[id]]=[k+'_stem',0,0,'tx']); MCB[BKEY[c.att]]=['attached_'+k+'_stem',0,0,'tx']; }
 BERRY.forEach((id,s)=>MCB[BKEY[id]]=['sweet_berry_bush_stage'+s,0,0,'x']); CAKE.forEach(id=>MCB[BKEY[id]]=['cake_side','cake_top','cake_bottom']);
 const woodMc=k=>{ const w=WOODS.find(q=>q.k===k); return w&&w.mc; };
+for(const bd of BLOCKS){ if(!bd) continue; if(bd.mcName&&!MCB[BKEY[bd.id]]) MCB[BKEY[bd.id]]=[bd.dbl?bd.mcName+(bd.dbl===2?'_top':'_bottom'):bd.mcName,0,0,'x']; if(bd.wt) MCB[BKEY[bd.id]]=MCB.TORCH||['torch',0,0,'x']; if(bd.pot) MCB[BKEY[bd.id]]='flower_pot'; }
 function mcSpecFor(id){ const bd=BLOCKS[id]; if(!bd) return null; let e=MCB[BKEY[id]];
   if(!e){ if(bd.slab) return mcSpecFor(bd.slab.m.base); if(bd.stairs) return mcSpecFor(bd.stairs.m.base);
+    if(bd.wallM) return mcSpecFor(bd.wallM.base);
     if(bd.door){ const m=bd.door.m, n=m.wood?woodMc(m.k):m.k==='iron'?'iron':null; if(!n) return null; e=n+'_door_'+(bd.door.top?'top':'bottom'); }
     else if(bd.trap){ const m=bd.trap.m, n=m.wood?woodMc(m.k):m.k==='iron'?'iron':null; if(!n) return null; e=n+'_trapdoor'; }
     else if(bd.gate&&bd.gate.m.wood) e=woodMc(bd.gate.m.k)+'_planks';
@@ -7845,6 +7907,7 @@ function iconFor(id){
   if((bd.shape||bd.chair)&&bd.boxes){ isoBoxes(bd.rboxes||bd.boxes,bd.top,bd.side); return c; }
   if(bd.gate){ const col=rgb(bd.top,1); g.fillStyle=col; g.fillRect(6,10,8,44); g.fillRect(46,10,8,44); g.fillRect(14,20,32,6); g.fillRect(14,40,32,6); if(bd.gate.m.metal) for(const x of [20,28,36]) g.fillRect(x,20,3,26); else g.fillRect(27,20,6,26); return c; }
   if(bd.bars){ g.fillStyle=rgb(bd.top,1); for(const x of [10,22,34,46]) g.fillRect(x,4,5,52); g.fillRect(6,12,48,4); g.fillRect(6,44,48,4); return c; }
+  if(bd.wallM){ g.fillStyle=rgb(bd.top,.9); g.fillRect(4,26,52,22); g.fillStyle=rgb(bd.top,1); g.fillRect(21,8,18,44); g.fillStyle=rgb(bd.top,.78); g.fillRect(21,8,3,44); return c; }
   if(bd.fence&&!bd.gate){ g.fillStyle=rgb(bd.top,1); g.fillRect(10,8,9,46); g.fillRect(41,8,9,46); g.fillStyle=rgb(bd.top,.86); g.fillRect(10,18,40,6); g.fillRect(10,36,40,6); return c; }
   if(bd.plant){ g.strokeStyle=rgb(bd.stem||bd.top,1); g.lineWidth=4; g.beginPath(); g.moveTo(30,54); g.lineTo(30,26); g.stroke(); g.fillStyle=rgb(bd.top,1); g.beginPath(); g.arc(30,22,11,0,7); g.fill(); return c; }
   const poly=(pts,f)=>{g.fillStyle=f;g.beginPath();g.moveTo(pts[0],pts[1]);for(let i=2;i<pts.length;i+=2)g.lineTo(pts[i],pts[i+1]);g.closePath();g.fill();};
@@ -8725,7 +8788,7 @@ function kick(){ prime(); if(!warmOn){ warmOn=true; setTimeout(tick,1500); } }
 { const _s=window.startWorld; window.startWorld=function(){ const r=_s.apply(this,arguments); setTimeout(kick,4000); return r; }; }
 
 // ---- 4. the Item Gallery ----
-const CAPF=11, FACES=14;
+const CAPF=12, FACES=14;
 function galleryFloors(){
   const mg=/essence|staff|potion|brew|elixir|grimoire|wand|robe|spell|arcane|enchant|mana|illusion|rune|witch|\bmages?\b|dusk|telelink|warp|lumen|demon|lore book|pocket expander|glow ink|book of experience/i;
   const G={blocks:[],weapons:[],magic:[],tools:[],armor:[],decor:[],tech:[],items:[]};
@@ -8733,6 +8796,7 @@ function galleryFloors(){
   const T=[['blocks','Blocks'],['weapons','Weapons'],['magic','Magic items'],['tools','Tools & travel'],['armor','Armor'],['decor','Decor & furniture'],['tech','Machines & tech'],['items','Items & materials']];
   const cap=CAPF*FACES, floors=[];
   for(const [k,t] of T){ const ids=G[k]; if(!ids.length) continue; const n=Math.ceil(ids.length/cap), per=Math.ceil(ids.length/n); for(let i=0;i<n;i++) floors.push({title:t,part:i+1,parts:n,ids:ids.slice(i*per,(i+1)*per)}); }
+  while(floors.length>12){ let bi=0,bs=1e9; for(let i=0;i<floors.length-1;i++){ const sz=floors[i].ids.length+floors[i+1].ids.length; if(sz<bs){ bs=sz; bi=i; } } const a=floors[bi], b=floors[bi+1]; floors.splice(bi,2,{title:a.title===b.title?a.title:a.title+' + '+b.title,part:a.part,parts:a.parts===b.parts&&a.title===b.title?a.parts:1,ids:a.ids.concat(b.ids)}); }
   return floors; }
 function wrapName(s){ const w=s.split(' '), L=['']; for(const x of w){ const cur=L[L.length-1]; if(!cur) L[L.length-1]=x; else if((cur+' '+x).length<=12) L[L.length-1]=cur+' '+x; else L.push(x); } while(L.length>3){ const a=L.pop(); L[L.length-1]+=' '+a; } return L.join('\n'); }
 function buildGallery(w){
@@ -8751,7 +8815,7 @@ function buildGallery(w){
   floors.forEach((F,k)=>{ const yS=S0+k*PITCH;
     fill(X0+1,yS+1,Z0+1,X0+28,yS+PITCH-1,Z0+28,0);                 // hollow
     fill(X0+1,yS,Z0+1,X0+28,yS,Z0+28,k?FLOOR:FLOOR);                // floor slab
-    for(const wz of [4,8,12,16,20,24]) fill(X0+4,yS+1,Z0+wz,X0+25,yS+PITCH-1,Z0+wz,SHELF);   // shelf walls
+    for(const wz of [4,8,12,16,20,24]) fill(X0+4,yS+1,Z0+wz,X0+27,yS+PITCH-1,Z0+wz,SHELF);   // shelf walls
     if(k) fill(X0+1,yS,Z0+2,X0+1,yS,Z0+3,0);                         // ladder hole
     // ladder (continues to the next floor)
     const top=k===NF-1?yS+PITCH-1:yS+PITCH+1; for(let y=k?yS:yS+1;y<=top;y++){ put(X0+1,y,Z0+2,B.LADDER_W); put(X0+1,y,Z0+3,B.LADDER_W); }
@@ -8841,6 +8905,44 @@ window.buildCampDemo=function(w){ const C=w.gen.C, G=SHOW_G+1, X=C-110+36, Z0=C-
   w.meta.campdemo=1; w.changed=true;
   for(const k of touched){ const ch=w.chunks.get(k); if(ch){ freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); w.chunks.delete(k); } } };
 { const _s=window.startWorld; window.startWorld=function(meta,save,preview){ const r=_s.apply(this,arguments); try{ if(meta&&meta.gen==='show'&&!preview&&!(world.meta&&world.meta.campdemo)) buildCampDemo(world); }catch(e){ console.error('campdemo',e); } return r; }; }
+})();
+
+/* ===== v0.34.0: wall torches, tall flowers, flower pots, hanging signs ===== */
+(function(){
+const TALL_HI_SET=new Set(Object.values(TALL_HI)), POTS=new Set([POT,...Object.values(POT_OF)]);
+// placing: torches on a wall lean out from it; two-block flowers need headroom
+{ const _ps=placeSpecial; placeSpecial=function(r,id){ const [x,y,z]=r.prev, [hx,hy,hz]=r.hit;
+    if(id===B.TORCH){ const nx=hx-x, nz=hz-z; if(hy===y&&(nx||nz)) return WT[nx+','+nz]; }
+    if(TALL_LO.has(id)){ const up=world.get(x,y+1,z); if(up!==0&&!(BLOCKS[up].replace)){ toast('Needs two blocks of space'); return 0; } }
+    return _ps.call(this,r,id); }; }
+{ const _ap=afterPlace; afterPlace=function(x,y,z,id){ _ap.apply(this,arguments); if(TALL_LO.has(id)) world.set(x,y+1,z,TALL_HI[id]); }; }
+// breaking the top half breaks the whole plant (and drops it once)
+{ const _bb=breakBlock; breakBlock=function(x,y,z,tool){ const b=world.get(x,y,z); if(TALL_HI_SET.has(b)&&TALL_LO.has(world.get(x,y-1,z))) return _bb.call(this,x,y-1,z,tool); return _bb.apply(this,arguments); }; }
+// a torch on a wall falls off when that wall goes
+{ const _sb=supportBroken; supportBroken=function(x,y,z){ _sb.apply(this,arguments); for(const [dx,dz] of DIRS){ const c=world.get(x+dx,y,z+dz), cb=c>0&&BLOCKS[c]; if(cb&&cb.wt&&cb.wt[0]===-dx&&cb.wt[1]===-dz) breakBlock(x+dx,y,z+dz,null); } }; }
+// pots drop the pot and its plant
+{ const _df=dropsFor; dropsFor=function(b,tool){ const bd=b>0&&BLOCKS[b]; if(bd&&bd.pot&&bd.pot.plant) return [[POT,1],[bd.pot.plant,1]]; return _df.apply(this,arguments); }; }
+const use1=()=>{ if(creative()) return; const s=held(); s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); renderHotbar(); };
+{ const _tI=tryInteract; tryInteract=function(sx,sy){ if(!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const [x,y,z]=r.hit, b=world.get(x,y,z);
+      if(POTS.has(b)&&reachOK(x,y,z)){ const s=held(), it=s&&ITEMS[s.id], bd=BLOCKS[b];
+        if(!bd.pot.plant&&it&&it.block&&POT_OF[it.block]){ world.set(x,y,z,POT_OF[it.block]); use1(); toast('Potted the '+it.name.toLowerCase()); return true; }
+        if(bd.pot.plant&&!(it&&it.block&&POT_OF[it.block])){ world.set(x,y,z,POT); if(!creative()){ if(addItem(bd.pot.plant,1)) spawnDrop(x+.5,y+.8,z+.5,bd.pot.plant,1); } toast('Took the plant out'); return true; } } } }
+    return _tI(sx,sy); }; }
+// ---- hanging signs: hang under a block or stick out from a wall on an arm; two-sided, no post needed ----
+function hsignAt(prev,hit){ const d=[prev[0]-hit[0],prev[1]-hit[1],prev[2]-hit[2]], cx=prev[0]+.5, cy=prev[1], cz=prev[2]+.5; let e;
+  if(d[1]===-1){ const a=Math.atan2(player.x-cx,player.z-cz), q=Math.round(a/(Math.PI/2))*(Math.PI/2), n=[Math.round(Math.sin(q)),0,Math.round(Math.cos(q))];
+    e={kind:'sign',two:1,hang:1,c:[cx,cy+.42,cz],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:hit.slice(),cell:prev.slice(),fixU:1}; }
+  else { const t=[d[2],0,-d[0]], side=Math.sign((player.x-cx)*t[0]+(player.z-cz)*t[2])||1, n=[t[0]*side,0,t[2]*side];
+    e={kind:'sign',two:1,hang:2,arm:d,c:[cx,cy+.5,cz],n,u:[n[2],0,-n[0]],v:[0,1,0],w:.9,h:.6,sup:hit.slice(),cell:prev.slice(),fixU:1}; }
+  e.text=''; e.frame='wood'; e.bg='planks'; return e; }
+function placeHSign(sx,sy){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap the underside of a block, or the side of a wall'); return; } if(!reachOK(...r.hit)){ toast('Too far away'); return; }
+  if(r.prev[1]-r.hit[1]===1){ toast('Hanging signs go under a block or out from a wall'); return; }
+  const e=hsignAt(r.prev,r.hit); world.decor.push(e); world.changed=true; const s=held(); if(s&&!creative()){ s.n--; if(!s.n) inv.slots[inv.sel]=null; invChanged(); } openSign(e); }
+{ const _ud=useDecor; useDecor=function(sx,sy){ const s=held(); if(s&&s.id===I.HSIGN){ placeHSign(sx,sy); return true; } return _ud(sx,sy); }; }
+window.__v34={placeHSign,hsignAt};
+{ const _ic=itemIconCanvas; itemIconCanvas=function(id){ if(id!==I.HSIGN) return _ic(id); const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d');
+  g.fillStyle='#6e4a28'; g.fillRect(4,6,52,5); g.strokeStyle='#4a4a54'; g.lineWidth=2; g.beginPath(); g.moveTo(14,10); g.lineTo(14,24); g.moveTo(46,10); g.lineTo(46,24); g.stroke();
+  g.fillStyle='#c59a5f'; g.fillRect(6,24,48,26); g.strokeStyle='#8a5a34'; g.lineWidth=3; g.strokeRect(6,24,48,26); g.fillStyle='#3a2a1a'; g.fillRect(14,32,32,3); g.fillRect(18,40,24,3); return c; }; }
 })();
 
 </script>

@@ -40,3 +40,11 @@ Nothing queued; ideas welcome.
 - **Dyeable**: tap with any of the 16 dyes, or throw a dye onto it; flames, embers, smoke and light all take the colour. Tap with a water bucket to return it to orange. Breaking it drops a plain campfire.
 - **Real-time flickering light**: the 8 nearest campfires are passed to the shader each frame as point lights (radius ~9, colour from the dye, noisy flicker) on top of the normal baked coloured block light (which also stops the glow leaking through walls). Works on terrain, mobs and the player.
 - Showcase: five demo campfires (plain, blue, purple, lime, red) with signs by the gallery entrance; added to older Showcase worlds on load.
+
+## v0.34.0 — Walls, wall torches, flowers, pots, hanging signs
+- **Wall torches**: placing a torch on the side of a block mounts it tilted out from that wall (4 orientations, texture-pack aware, pops off if the wall is removed, drops a normal torch).
+- **Walls**: 51 connecting wall blocks (every stone, brick, wood, metal, obsidian, dusk); craft 6 from 2 rows of 3 of the base block. Posts rise to meet walls above and connect to neighbours.
+- **Flowers**: azure bluet, red/white tulips, lily of the valley, torchflower, plus double-height sunflower, lilac, rose bush and peony (break once, drop once). Dye recipes included; world gen scatters them.
+- **Flower pots**: craft from 3 bricks/terracotta; right-click with any flower/sapling/mushroom to pot it, tap with an empty hand to take it out.
+- **Hanging signs**: separate item; tap the underside of a block (chained ceiling sign) or the side of a wall (bracket arm). Two-sided, editable text, no post needed.
+- Item Gallery capped at 12 floors; existing saved galleries keep their old layout, new worlds include the new items.
