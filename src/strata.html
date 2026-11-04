@@ -9698,31 +9698,33 @@ function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
 
 // ---------------- the simulation: strongest signal wins, RF is shared out by demand ----------------
 function fair(dem,T){ const g=dem.map(()=>0); let rem=T, idx=dem.map((_,i)=>i); while(rem>1e-9&&idx.length){ const share=rem/idx.length, next=[]; for(const i of idx){ const need=dem[i]-g[i], give=Math.min(need,share); g[i]+=give; rem-=give; if(need-give>1e-9) next.push(i); } if(next.length===idx.length) break; idx=next; } return g; }
-function stepNet(n){ const seen=new Set(); let b1=0,b1t=null,b2=0; const P=[],C=[],Bt=[];
-  for(const e of n.terms){ const t=e.t; if(world.tiles.get(ck(t.x,t.y,t.z))!==t) continue;
-    const lv=X.sigLevel(t,e.face); if(lv>b1){ b2=b1; b1=lv; b1t=t; } else if(lv>b2) b2=lv;
-    if(seen.has(t)) continue; seen.add(t); const D=X.TDX(t); if(!D.cap) continue; const en=t.tech.e||0, rate=D.rate||0;
-    if(D.io==='out'){ if(en>1e-6) P.push([t,Math.min(rate,en)]); } else if(D.io==='in'){ const dm=Math.min(rate,D.cap-en); if(dm>1e-6) C.push([t,dm]); }
-    else { const sp=Math.min(rate,en), dm=Math.min(rate,D.cap-en); Bt.push([t,sp,dm]); } }
-  n.b1=b1; n.b1t=b1t; n.b2=b2;
-  // 1. producers feed everything that has room (consumers and batteries share fairly)
-  const all=C.map(c=>[c[0],c[1],0]).concat(Bt.filter(b=>b[2]>1e-6).map(b=>[b[0],b[2],1])), S1=P.reduce((a,p)=>a+p[1],0), D1=all.reduce((a,c)=>a+c[1],0), T1=Math.min(S1,D1);
-  let rf=0; const charged=new Set();
-  if(T1>1e-9){ const g=fair(all.map(c=>c[1]),T1); all.forEach((c,i)=>{ if(g[i]<=0) return; c[0].tech.e+=g[i]; c[0]._i=(c[0]._i||0)+g[i]; c[3]=g[i]; if(c[2]) charged.add(c[0]); }); P.forEach(p=>{ const d=T1*p[1]/S1; p[0].tech.e-=d; p[0]._o=(p[0]._o||0)+d; }); rf+=T1; }
-  // 2. batteries top up consumers that producers could not cover
-  const bs=Bt.filter(b=>b[1]>1e-6&&!charged.has(b[0])), S2=bs.reduce((a,b)=>a+b[1],0);
-  const rem=C.map(c=>{ const a=all.find(x=>x[0]===c[0]); return [c[0],Math.max(0,c[1]-(a&&a[3]||0))]; }).filter(c=>c[1]>1e-6), R=rem.reduce((a,c)=>a+c[1],0), T2=Math.min(S2,R);
-  if(T2>1e-9){ const g=fair(rem.map(c=>c[1]),T2); rem.forEach((c,i)=>{ if(g[i]<=0) return; c[0].tech.e+=g[i]; c[0]._i=(c[0]._i||0)+g[i]; }); bs.forEach(b=>{ const d=T2*b[1]/S2; b[0].tech.e-=d; b[0]._o=(b[0]._o||0)+d; }); rf+=T2; }
-  n.rf=rf; n.sup=S1+Bt.reduce((a,b)=>a+b[1],0); n.sup0=n.terms.reduce((a,e)=>{ const D=X.TDX(e.t); return a+((D.cap&&(D.io==='out'||(D.io==='both'&&C.length)))?Math.min(D.rate||0,e.t._e0||0):0); },0); n.live=n.sup0>1e-6||rf>1e-6; n.lv=Math.max(b1,n.live?16:0);
+// RF: every producer's output is shared out across every draw it can reach (through any colour), capped by what each draw can take; whatever a full device doesn't use stays free for the others
+function pour(srcs,sinks,apply){ const flows=[]; for(let it=0;it<30;it++){ const act=sinks.filter(k=>k.r>1e-6); if(!act.length) break; const req=new Map(); let any=false;
+    for(const sc of srcs){ if(sc.r<=1e-6) continue; const adj=act.filter(k=>k.rec!==sc.rec&&sc.rec.nets.some(n=>k.rec.nets.includes(n))); if(!adj.length) continue; const sh=sc.r/adj.length; for(const k of adj){ let a=req.get(k); if(!a) req.set(k,a=[]); a.push([sc,sh]); } }
+    for(const [k,a] of req){ const tot=a.reduce((x,y)=>x+y[1],0), sc2=Math.min(1,k.r/tot); for(const [sc,sh] of a){ const g=sh*sc2; if(g<=1e-9) continue; sc.r-=g; k.r-=g; flows.push([sc,k,g]); any=true; } }
+    if(!any) break; }
+  for(const [sc,k,g] of flows){ sc.rec.t.tech.e-=g; sc.rec.t._o=(sc.rec.t._o||0)+g; k.rec.t.tech.e+=g; k.rec.t._i=(k.rec.t._i||0)+g; k.got=(k.got||0)+g; apply&&apply(sc,k,g); } return flows; }
+function transfer(){ const recs=new Map(); for(const n of nets){ n.rf=0; for(const e of n.terms){ const t=e.t; if(world.tiles.get(ck(t.x,t.y,t.z))!==t) continue; const D=X.TDX(t); if(!D.cap) continue; let r=recs.get(t); if(!r) recs.set(t,r={t,D,nets:[]}); if(r.nets.indexOf(n)<0) r.nets.push(n); } }
+  const P=[],K=[],B=[]; for(const r of recs.values()){ const t=r.t, D=r.D, e0=t._e0||0, rate=D.rate||0;
+    if(D.io==='out'){ if(e0>1e-6) P.push({rec:r,r:Math.min(rate,e0)}); } else if(D.io==='in'){ const dm=Math.min(rate,D.cap-t.tech.e); if(dm>1e-6) K.push({rec:r,r:dm,d:dm}); }
+    else { const dm=Math.min(rate,D.cap-t.tech.e); B.push({rec:r,sp:Math.min(rate,e0),dm}); } }
+  const acct=(sc,k,g)=>{ const sh=sc.rec.nets.filter(n=>k.rec.nets.includes(n)); for(const n of sh) n.rf+=g/sh.length; };
+  const bk=B.filter(b=>b.dm>1e-6).map(b=>({rec:b.rec,r:b.dm,d:b.dm,b})); pour(P,K.concat(bk),acct);
+  const charged=new Set(bk.filter(k=>k.got>1e-9).map(k=>k.rec)), rest=K.map(k=>({rec:k.rec,r:Math.max(0,k.d-(k.got||0))})).filter(k=>k.r>1e-6);
+  const bs=B.filter(b=>b.sp>1e-6&&!charged.has(b.rec)).map(b=>({rec:b.rec,r:b.sp})); if(bs.length&&rest.length) pour(bs,rest,acct); }
+function stepNet(n){ let b1=0,b1t=null,b2=0,hasIn=false; const seen=new Set();
+  for(const e of n.terms){ const t=e.t; if(world.tiles.get(ck(t.x,t.y,t.z))!==t) continue; const lv=X.sigLevel(t,e.face); if(lv>b1){ b2=b1; b1=lv; b1t=t; } else if(lv>b2) b2=lv; const D=X.TDX(t); if(D.cap&&D.io==='in') hasIn=true; }
+  n.b1=b1; n.b1t=b1t; n.b2=b2; n.sup0=0; for(const e of n.terms){ if(seen.has(e.t)) continue; seen.add(e.t); const D=X.TDX(e.t); if(D.cap&&(D.io==='out'||(D.io==='both'&&hasIn))) n.sup0+=Math.min(D.rate||0,e.t._e0||0); }
+  const rf=n.rf; n.sup=n.sup0; n.live=n.sup0>1e-6||rf>1e-6; n.lv=Math.max(b1,n.live?16:0);
   // where the power comes from decides which way the wire shows it flowing
-  const src=new Set(); for(const e of n.terms){ const t=e.t; if(X.sigLevel(t,e.face)>0){ src.add(e.node); continue; } const D=X.TDX(t); if(D.cap&&(t._e0||0)>1&&(D.io==='out'||(D.io==='both'&&C.length&&n.sup0>0))) src.add(e.node); }
+  const src=new Set(); for(const e of n.terms){ const t=e.t; if(X.sigLevel(t,e.face)>0){ src.add(e.node); continue; } const D=X.TDX(t); if(D.cap&&(t._e0||0)>1&&(D.io==='out'||(D.io==='both'&&hasIn&&n.sup0>0))) src.add(e.node); }
   n.speed=b1>0?b1:n.live?(rf>0?3+Math.min(13,rf/6):2):0; const sg=n.speed?[...src].sort().join('|'):''; if(sg!==n.sg){ n.sg=sg; flow(n,src); } }
 function flow(n,src){ for(const s of n.segs) s.fl.fill(0); if(!src.size) return; const dist=new Map(), q=[]; for(const k of src){ dist.set(k,0); q.push(k); }
   for(let i=0;i<q.length;i++){ const k=q[i]; for(const m of adj.get(k)||[]) if(!dist.has(m)){ dist.set(m,dist.get(k)+1); q.push(m); } }
   for(const s of n.segs){ const ds=dist.get(s.key); if(ds==null) continue; for(const [m,d] of s.nbs){ const dm=dist.get(m); if(d>=0&&dm!=null&&dm!==ds) s.fl[d]=dm>ds?1:-1; } for(let d=0;d<6;d++) if(s.arm[d]&&!s.fl[d]&&s.fl[d^1]) s.fl[d]=-s.fl[d^1]; } }
 function step(){ if(!world||world.preview||!(['play','inv','cru','store','tech'].includes(mode))) return;
   if(dirty||(cleanT-=1)<=0){ cleanT=20; rebuild(); }
-  for(const n of nets) for(const e of n.terms) e.t._e0=e.t.tech.e; tickc++; const L=nets.length; for(let i=0;i<L;i++) stepNet(nets[(i+tickc)%L]); }
+  for(const n of nets) for(const e of n.terms) e.t._e0=e.t.tech.e; transfer(); for(const n of nets) stepNet(n); }
 let tickc=0;
 setInterval(()=>{ try{ step(); }catch(e){ console.error('wires',e); } },50);
 // the tech blocks ask these when they look for input

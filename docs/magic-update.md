@@ -112,3 +112,6 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - Batteries only count as a source for a net that has something to feed.
 - Wires reach the block end: single-ended runs extend straight through, and runs end at the machine they touch. Wires on non-full blocks (slabs etc.) sit on the real surface.
 - Tests: phase15 (two-line capacitor case).
+
+### v0.38.4 — demand-based sharing across colours
+- RF is now shared globally: each producer's output is divided among every draw it can reach through any colour, capped by what each draw can take, and whatever a full/low-demand device leaves unused goes to the others (8 RF/t, yellow wants 1 → red and blue get 3.5 each). Works along shared channels or separate faces. Batteries still only cover draws producers couldn't. Test in phase15 (3d).
