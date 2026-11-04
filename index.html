@@ -9674,6 +9674,7 @@ function segBoxes(x,y,z,f,c,arm){ const a=f>>1, pl=[0,1,2].filter(i=>i!==a), lan
   box([lane-hw,lane-hw],[lane+hw,lane+hw]);
   for(let d=0;d<6;d++){ if((d>>1)===a||!arm[d]) continue; const pi=pl.indexOf(d>>1), po=1-pi, lo=[0,0], hi=[0,0]; lo[po]=lane-hw; hi[po]=lane+hw; if(d&1){ lo[pi]=0; hi[pi]=lane-hw; } else { lo[pi]=lane+hw; hi[pi]=1; } box(lo,hi); }
   return out; }
+function surf(x,y,z,f){ const bd=BLOCKS[world.get(x,y,z)], a=f>>1; if(bd&&bd.boxes&&bd.boxes.length) return (f&1)?Math.min(...bd.boxes.map(b=>b[a])):Math.max(...bd.boxes.map(b=>b[a+3])); return (f&1)?0:1; }
 function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
   // wires need something to hang on
   for(const [k,a] of [...wires]){ const [x,y,z]=k.split(',').map(Number), b=world.get(x,y,z); if(b===0||(b>0&&isW(b))){ for(const v of a) spawnDrop(x+.5,y+.5,z+.5,WID[v&15],1); wires.delete(k); } }
@@ -9685,12 +9686,13 @@ function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
       seg.nbs=[]; seg.arm=arm; seg.fl=[0,0,0,0,0,0];
       for(const n of neigh(x,y,z,f,c)){ arm[n[4]]=1; const nk=ck(n[0],n[1],n[2])+','+(n[3]*16+c); uni(key,nk); seg.nbs.push([nk,n[4]]); }
       for(const b of bundlesAt(x,y,z,f)){ if(b[3]>=0&&(b[3]>>1)!==(f>>1)) arm[b[3]]=1; const C=clusterOf(b[0],b[1],b[2]); C.cols.add(c); uni(key,'B'+C.id+':'+c); seg.nbs.push(['B'+C.id+':'+c,b[3]]); }
-      segs.push(seg); geo.push(seg); segBy.set(key,seg); } }
+      seg.sf=surf(x,y,z,f); segs.push(seg); geo.push(seg); segBy.set(key,seg); } }
   const byRoot=new Map(), get=r=>{ let n=byRoot.get(r); if(!n){ n={c:-1,segs:[],terms:[],lv:0,live:false,rf:0,b1:0,b1t:null,b2:0,sup:0}; byRoot.set(r,n); nets.push(n); } return n; };
   nets=[]; termIdx=new Map();
   for(const s of segs){ const n=get(find(s.key)); n.c=s.c; n.segs.push(s); s.net=n; for(const q of s.nbs) link(s.key,q[0]); const fv=D6[s.f], cand=[[s.x,s.y,s.z,s.f],[s.x+fv[0],s.y+fv[1],s.z+fv[2],OPP[s.f]],[s.x+2*fv[0],s.y+2*fv[1],s.z+2*fv[2],OPP[s.f]]];
       for(let d=0;d<6;d++){ if((d>>1)===(s.f>>1)) continue; const v=D6[d]; cand.push([s.x+fv[0]+v[0],s.y+fv[1]+v[1],s.z+fv[2]+v[2],OPP[d]],[s.x+v[0],s.y+v[1],s.z+v[2],OPP[d]]); }
-      for(const q of cand){ const t=tAt(q[0],q[1],q[2]); if(t) n.terms.push({t,face:q[3],node:s.key}); } if(!n.pk||s.key<n.pk) n.pk=s.key; }
+      cand.forEach((q,ci)=>{ const t=tAt(q[0],q[1],q[2]); if(t){ n.terms.push({t,face:q[3],node:s.key}); if(ci>=3) s.arm[OPP[q[3]]]=1; } }); { const A=s.arm; for(let d=0;d<6;d+=2) if(((d>>1)!==(s.f>>1))&&A[d]!==A[d+1]&&A[d]+A[d+1]===1&&false){} } if(!n.pk||s.key<n.pk) n.pk=s.key; }
+  for(const sg of segs){ const A=sg.arm; for(let d=0;d<6;d+=2){ if((d>>1)===(sg.f>>1)) continue; if(A[d]!==A[d+1]&&!(A[d^1]&&false)){ A[d]=1; A[d+1]=1; } } }
   for(const C of clusters) for(const c of C.cols){ const root=find('B'+C.id+':'+c); if(!par.has('B'+C.id+':'+c)) continue; const n=get(root); n.c=c;
     for(const p of C.cells) for(let d=0;d<6;d++){ const v=D6[d], t=tAt(p[0]+v[0],p[1]+v[1],p[2]+v[2]); if(t&&!isBundle(world.get(t.x,t.y,t.z))) n.terms.push({t,face:OPP[d],node:'B'+C.id+':'+c}); } }
   for(const n of nets) for(const e of n.terms){ const k=ck(e.t.x,e.t.y,e.t.z); let a=termIdx.get(k); if(!a) termIdx.set(k,a=[]); a.push({face:e.face,net:n}); } }
@@ -9712,16 +9714,17 @@ function stepNet(n){ const seen=new Set(); let b1=0,b1t=null,b2=0; const P=[],C=
   const bs=Bt.filter(b=>b[1]>1e-6&&!charged.has(b[0])), S2=bs.reduce((a,b)=>a+b[1],0);
   const rem=C.map(c=>{ const a=all.find(x=>x[0]===c[0]); return [c[0],Math.max(0,c[1]-(a&&a[3]||0))]; }).filter(c=>c[1]>1e-6), R=rem.reduce((a,c)=>a+c[1],0), T2=Math.min(S2,R);
   if(T2>1e-9){ const g=fair(rem.map(c=>c[1]),T2); rem.forEach((c,i)=>{ if(g[i]<=0) return; c[0].tech.e+=g[i]; c[0]._i=(c[0]._i||0)+g[i]; }); bs.forEach(b=>{ const d=T2*b[1]/S2; b[0].tech.e-=d; b[0]._o=(b[0]._o||0)+d; }); rf+=T2; }
-  n.rf=rf; n.sup=S1+Bt.reduce((a,b)=>a+b[1],0); n.live=n.sup>1e-6||rf>1e-6; n.lv=Math.max(b1,n.live?16:0);
+  n.rf=rf; n.sup=S1+Bt.reduce((a,b)=>a+b[1],0); n.sup0=n.terms.reduce((a,e)=>{ const D=X.TDX(e.t); return a+((D.cap&&(D.io==='out'||(D.io==='both'&&C.length)))?Math.min(D.rate||0,e.t._e0||0):0); },0); n.live=n.sup0>1e-6||rf>1e-6; n.lv=Math.max(b1,n.live?16:0);
   // where the power comes from decides which way the wire shows it flowing
-  const src=new Set(); for(const e of n.terms){ const t=e.t; if(X.sigLevel(t,e.face)>0){ src.add(e.node); continue; } const D=X.TDX(t); if(D.cap&&(t.tech.e||0)>1&&(D.io==='out'||(D.io==='both'&&rf>0))) src.add(e.node); }
+  const src=new Set(); for(const e of n.terms){ const t=e.t; if(X.sigLevel(t,e.face)>0){ src.add(e.node); continue; } const D=X.TDX(t); if(D.cap&&(t._e0||0)>1&&(D.io==='out'||(D.io==='both'&&C.length&&n.sup0>0))) src.add(e.node); }
   n.speed=b1>0?b1:n.live?(rf>0?3+Math.min(13,rf/6):2):0; const sg=n.speed?[...src].sort().join('|'):''; if(sg!==n.sg){ n.sg=sg; flow(n,src); } }
 function flow(n,src){ for(const s of n.segs) s.fl.fill(0); if(!src.size) return; const dist=new Map(), q=[]; for(const k of src){ dist.set(k,0); q.push(k); }
   for(let i=0;i<q.length;i++){ const k=q[i]; for(const m of adj.get(k)||[]) if(!dist.has(m)){ dist.set(m,dist.get(k)+1); q.push(m); } }
-  for(const s of n.segs){ const ds=dist.get(s.key); if(ds==null) continue; for(const [m,d] of s.nbs){ const dm=dist.get(m); if(d>=0&&dm!=null&&dm!==ds) s.fl[d]=dm>ds?1:-1; } } }
+  for(const s of n.segs){ const ds=dist.get(s.key); if(ds==null) continue; for(const [m,d] of s.nbs){ const dm=dist.get(m); if(d>=0&&dm!=null&&dm!==ds) s.fl[d]=dm>ds?1:-1; } for(let d=0;d<6;d++) if(s.arm[d]&&!s.fl[d]&&s.fl[d^1]) s.fl[d]=-s.fl[d^1]; } }
 function step(){ if(!world||world.preview||!(['play','inv','cru','store','tech'].includes(mode))) return;
   if(dirty||(cleanT-=1)<=0){ cleanT=20; rebuild(); }
-  for(const n of nets) stepNet(n); }
+  for(const n of nets) for(const e of n.terms) e.t._e0=e.t.tech.e; tickc++; const L=nets.length; for(let i=0;i<L;i++) stepNet(nets[(i+tickc)%L]); }
+let tickc=0;
 setInterval(()=>{ try{ step(); }catch(e){ console.error('wires',e); } },50);
 // the tech blocks ask these when they look for input
 const lvEx=(n,t)=>Math.max(n.b1t===t?n.b2:n.b1,n.live?16:0);
@@ -9761,7 +9764,7 @@ const PH=new Map(); let lastT=0;
 { const _ed=emitDecor; emitDecor=function(vb){ _ed.apply(this,arguments); if(!geo.length) return; const now=performance.now(), dt=Math.min(.1,Math.max(0,(now-lastT)/1000)); lastT=now;
     for(const n of nets) if(n.speed) PH.set(n.pk,((PH.get(n.pk)||0)+(.5+n.speed*.35)*dt)%1000);
     const px=player.x, pz=player.z, P=.125, TAU=Math.PI*2, hw=.036; PAT=0; setVL(VL_EMISSIVE);
-    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], n0=(s.f&1)?-.034:1.004, n1=(s.f&1)?-.004:1.034, cs=dd<14?1/32:dd<28?1/16:.5;
+    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], n0=s.sf+((s.f&1)?-.034:.004), n1=s.sf+((s.f&1)?-.004:.034), cs=dd<14?1/32:dd<28?1/16:.5;
       const col=(sh,tw)=>{ const g=on?.95+.32*sh:.62+.2*sh; return [Math.min(255,base[0]*g+(on?24:0)),Math.min(255,base[1]*g+(on?24:0)),Math.min(255,base[2]*g+(on?24:0))]; };
       const put=(lo,hi,c)=>{ const mn=[0,0,0], mx=[0,0,0]; mn[a]=org[a]+n0; mx[a]=org[a]+n1; mn[pl[0]]=org[pl[0]]+lo[0]; mx[pl[0]]=org[pl[0]]+hi[0]; mn[pl[1]]=org[pl[1]]+lo[1]; mx[pl[1]]=org[pl[1]]+hi[1]; emitBox(vb,mn,mx,c,IDT); };
       put([lane-hw,lane-hw],[lane+hw,lane+hw],col(.4,0));

@@ -106,3 +106,9 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 
 ### v0.38.2 — wires plug into machines beside them
 - A wire now connects to any tech block touching it: the one it sits on, the one in the air cell it occupies, and any at the sides of that cell or of its host block. A wire laid along the ground ending against a solar panel's side (or a capacitor bank) plugs in. Test in phase15 (ground run solar → capbank).
+
+### v0.38.3 — each colour animates on its own
+- Every colour net decides if it is live from its own sources (a snapshot of the tick), so a producer shared by several colours no longer lights only one of them. Red and blue lines into one capacitor both flow at their own speed; the block adds up what it receives.
+- Batteries only count as a source for a net that has something to feed.
+- Wires reach the block end: single-ended runs extend straight through, and runs end at the machine they touch. Wires on non-full blocks (slabs etc.) sit on the real surface.
+- Tests: phase15 (two-line capacitor case).

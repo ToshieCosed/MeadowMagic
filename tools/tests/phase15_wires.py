@@ -31,6 +31,12 @@ JS='''async()=>{ const W=ms=>new Promise(r=>setTimeout(r,ms)); startWorld({id:'w
  const n=WIRE.nets().find(n=>n.c===grn); res.netRF=n&&n.rf;
  // 3b. wires laid on the ground beside a panel feed a capacitor bank at the far end
  const sp=tech(X-6,G,Z+11,'solar1',4,{e:500}), cb2=tech(X-1,G,Z+11,'capbank',4,{e:0}); for(let x=X-5;x<=X-2;x++) seg(x,G-1,Z+11,2,blu); WIRE.rebuild(); await W(900); res.ground={cap:cb2.tech.e,sol:sp.tech.e};
+ // 3c. a solar on red and a solar on blue meet at one capacitor: both lines animate on their own, sharing happens in the block
+ { const z=Z+14, sa=tech(X-6,G,z,'solar1',4,{e:500}), sb=tech(X+1,G,z,'solar1',4,{e:500}), cp=tech(X-2,G,z+1,'capbank',4,{e:0});
+   for(let x=X-5;x<=X-2;x++) seg(x,G-1,z,2,red); for(let x=X-3;x<=X;x++) seg(x,G-1,z,2,blu); WIRE.rebuild(); await W(700);
+   const net=c=>WIRE.nets().find(n=>n.c===c&&n.segs.some(s=>s.z===z)), nr=net(red), nb=net(blu), mv=n=>n.segs.filter(s=>s.fl.some(v=>v)).length;
+   res.two={redSpeed:nr.speed,blueSpeed:nb.speed,redMoving:mv(nr),blueMoving:mv(nb),cap:cp.tech.e};
+   sa.tech.e=0; sa.tech.type='solar1'; await W(300); sa.tech.e=0; await W(500); res.two.redAfter=net(red).speed; res.two.blueAfter=net(blu).speed; }
  // 4. persistence + cleanup
  const save=JSON.stringify([...world.wires.entries()]); res.saved=save.length>10;
  world.set(X+1,G+1,Z+8,B.AIR); await W(1300); res.cleaned=!world.wires.has((X+1)+','+(G+1)+','+(Z+8));
@@ -43,6 +49,6 @@ async def main():
         r=await pg.evaluate(JS.replace('BUNDLE_ID','B.BUNDLE').replace('TECHB.','TECH.TECHB.').replace('TECHB[','TECH.TECHB['))
         await pg.screenshot(path=str(OUT/'wires.png'))
         print(json.dumps(r)); print('errors',errs[:5])
-        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['ground']['cap']>0 and r['cleaned'] and not errs
+        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['ground']['cap']>0 and r['two']['redSpeed']>0 and r['two']['blueSpeed']>0 and r['two']['blueMoving']>0 and r['two']['redMoving']>0 and r['two']['cap']>0 and r['two']['blueAfter']>0 and r['cleaned'] and not errs
         print('PASS' if ok else 'FAIL'); await b.close(); sys.exit(0 if ok else 1)
 asyncio.run(main())
