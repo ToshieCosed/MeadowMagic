@@ -4573,7 +4573,7 @@ function fluidUpdate(x,y,z){
     for(const [dx,dz,dd] of ds){ if(md<99&&dd!==md) continue; const nb=world.get(x+dx,y,z+dz), nf=FL[nb]; if(canFlow(nb)||nf&&(nf.k!==f.k||nf.lv>f.lv+1)) putFluid(x+dx,y,z+dz,f.k,f.lv+1); } }
 }
 // Minecraft's rule: flowing fluid heads for the nearest drop within 4 blocks, and only spreads evenly when there is none
-function slopeDist(x,y,z,k,depth,from){ const nb=world.get(x,y,z), nf=FL[nb]; if(!(canFlow(nb)||nf&&nf.k===k)) return 99; const bl=world.get(x,y-1,z), bf=FL[bl]; if(canFlow(bl)||bf&&bf.k===k) return depth; if(depth>=3) return 99;
+function slopeDist(x,y,z,k,depth,from){ const nb=world.get(x,y,z), nf=FL[nb]; if(!(canFlow(nb)||nf&&nf.k===k)) return 99; const bl=world.get(x,y-1,z); if(canFlow(bl)) return depth; if(depth>=3) return 99;
   let best=99; for(let i=0;i<4;i++){ if(i===(from^1)) continue; const d=DIRS[i]; best=Math.min(best,slopeDist(x+d[0],y,z+d[1],k,depth+1,i)); } return best; }
 function stepFire(){ /* fire blocks are short-lived: removed on chunk revisit */ }
 function stepFluids(dt){ fluidT-=dt; if(fluidT>0||!fluidQ.size) return; fluidT=.25; lavaTurn=(lavaTurn+1)%4;
@@ -8647,26 +8647,27 @@ function buildMagicShowcase(w,dry){
   // S0: potion lab
   { const x0=nx(0); station(x0+3,zS+3); chest(x0+6,G,zS+3,[[I.GLASS_BOTTLE,16],[I.SUGAR,16],[I.ARCANE_ESS,20],[I.SHADOW_ESS,20],[I.BURN_ESS,20],[I.FROST_ESS,20],...ITS(/potion/i).map(a=>[a,1])]);
     sign(x0+3,zS-1,S,'POTION LAB\nBottle an essence,\nadd sugar in the\ncauldron = potion'); sign(x0+9,zS+3,S,'Four potions: frost,\nshadow (mobs lose you),\nfire, arcane (ores\nglow through rock)'); }
-  // S1: flowing water like Minecraft
-  { const x0=nx(1); fill(x0+1,G,zS+2,x0+13,G,zS+2,B.STONE_BRICK); put(x0+2,G,zS+4,B.WATER); SRCS.push([x0+2,G,zS+4]);
-    // terraces and a hole: water heads for the nearest drop within 4 blocks
-    fill(x0+1,G-1,zS+7,x0+13,G-1,zS+13,B.STONE_BRICK); fill(x0+8,G-1,zS+9,x0+8,G-1,zS+9,0); fill(x0+8,G-3,zS+9,x0+8,G-2,zS+9,0); put(x0+8,G-3,zS+9,B.STONE_BRICK); put(x0+5,G,zS+9,B.WATER); SRCS.push([x0+5,G,zS+9]);
-    for(let s=0;s<4;s++){ fill(x0+1+s*3,G,zS+14,x0+3+s*3,G+3-s,zS+16,B.STONE_BRICK); } put(x0+2,G+4,zS+15,B.WATER); SRCS.push([x0+2,G+4,zS+15]);
-    sign(x0+2,zS+1,S,'FLOWING WATER\nA source spreads 7\nblocks, falls and\nrenews at drops'); sign(x0+7,zS+6,S,'It seeks the nearest\ndrop within 4 blocks\n(the hole) before\nspreading evenly'); sign(x0+1,zS+13,S,'Staircase fall:\nevery step restarts\nthe stream; it pushes\nitems, mobs and you'); }
-  // S2: friction lanes
-  { const x0=nx(2), fl=[B.STONE,B.ICE,B.PACKED_ICE,P2B.frostb,B.STONE]; fl.forEach((f,i)=>{ const z=zS+2+i*3; fill(x0+1,G-1,z,x0+16,G-1,z,f); if(i===4) fill(x0+1,G,z,x0+16,G,z,P2B.slideb); fill(x0+1,G,z-1,x0+16,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+16,G,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK); FEEDS.push({x:x0+1.5,y:G+.3,z:z+.5,id:I.STICK,vx:6,every:7,max:2});
-      put(x0+3,G+1,z-1,B.TORCH); put(x0+7,G+1,z-1,B.TORCH); put(x0+11,G+1,z-1,B.TORCH); put(x0+15,G+1,z-1,B.TORCH); });
-    sign(x0+1,zS-1,S,'FRICTION LANES\nSame kick, five floors:\nstone, ice, packed ice,\nfrost block, ice slide'); sign(x0+8,zS+16,S,'Torches every 4 blocks.\nSlide is slickest; stone\nstops fast. Items drift,\nmobs slip too'); }
+  // S1: flowing water like Minecraft, three walled basins so nothing floods the plot
+  { const x0=nx(1), SB=B.STONE_BRICK; const rim=(xa,za,xb,zb,h)=>{ fill(xa,G,za,xb,G+h,za,SB); fill(xa,G,zb,xb,G+h,zb,SB); fill(xa,G,za,xa,G+h,zb,SB); fill(xb,G,za,xb,G+h,zb,SB); };
+    fill(x0+1,G-1,zS+2,x0+9,G-1,zS+8,SB); rim(x0+1,zS+2,x0+9,zS+8,0); put(x0+5,G,zS+5,B.WATER); SRCS.push([x0+5,G,zS+5]);
+    fill(x0+1,G-1,zS+10,x0+9,G-1,zS+16,SB); rim(x0+1,zS+10,x0+9,zS+16,0); fill(x0+6,G-3,zS+13,x0+6,G-1,zS+13,0); put(x0+6,G-3,zS+13,SB); put(x0+3,G,zS+13,B.WATER); SRCS.push([x0+3,G,zS+13]);
+    for(let k=0;k<3;k++) fill(x0+12,G,zS+2+k*5,x0+14,G+2-k,zS+6+k*5,SB); fill(x0+11,G,zS+2,x0+11,G+4,zS+17,SB); fill(x0+15,G,zS+2,x0+15,G+4,zS+17,SB); fill(x0+11,G,zS+17,x0+15,G+2,zS+17,SB); fill(x0+12,G,zS+2,x0+14,G+4,zS+2,SB); put(x0+13,G+3,zS+3,B.WATER); SRCS.push([x0+13,G+3,zS+3]);
+    sign(x0+5,zS+1,S,'FLOWING WATER\nOne source spreads 7\nblocks each way\n(basin keeps it tidy)'); sign(x0+3,zS+9,S,'It seeks the nearest\ndrop within 4 blocks\n(the hole) and ignores\nthe rest of the basin'); sign(x0+13,zS+1,S,'STAIRCASE\nEvery fall renews the\nstream. It pushes items,\nmobs and you'); }
+  // S2: friction lanes: the same 8-block stream feeds five different floors
+  { const x0=nx(2), fl=[B.STONE,B.ICE,B.PACKED_ICE,P2B.frostb,B.STONE]; fl.forEach((f,i)=>{ const z=zS+2+i*3; fill(x0+1,G-1,z,x0+8,G-1,z,B.STONE_BRICK); fill(x0+9,G-1,z,x0+16,G-1,z,f); if(i===4) fill(x0+9,G,z,x0+16,G,z,P2B.slideb); fill(x0+1,G,z-1,x0+16,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+16,G,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK); fill(x0+17,G,z-1,x0+17,G,z+1,B.STONE_BRICK);
+      put(x0+1,G,z,B.WATER); SRCS.push([x0+1,G,z]); FEEDS.push({x:x0+1.5,y:G+.5,z:z+.5,id:I.STICK,vx:0,every:7,max:2});
+      for(const dx of [4,8,12,16]) put(x0+dx,G+1,z-1,B.TORCH); });
+    sign(x0+1,zS-1,S,'FRICTION LANES\nSame stream, five floors:\nstone, ice, packed ice,\nfrost block, ice slide'); sign(x0+8,zS+16,S,'Water speeds the stick up,\nthen the floor decides how\nfar it slides. Torches\nare 4 blocks apart'); }
   // S3: plate relay (two plots wide)
   { const x0=nx(3), SEC=3, LEN=9; fill(x0+1,G-1,zS+3,x0+SEC*LEN+2,G-1,zS+3,B.STONE_BRICK);
     for(let s=0;s<SEC;s++){ const ox=x0+1+s*LEN; fill(ox,G,zS+2,ox+LEN-2,G,zS+2,B.STONE_BRICK); fill(ox,G,zS+4,ox+LEN-2,G,zS+4,B.STONE_BRICK); put(ox+LEN-1,G,zS+3,PLATE); put(ox,G,zS+3,B.WATER); SRCS.push([ox,G,zS+3]); }
     FEEDS.push({x:x0+2.5,y:G+.6,z:zS+3.5,id:I.STICK,vx:0,every:9,max:2});
     sign(x0+1,zS,S,'PLATE RELAY\nWater stops at the\npressure plate but the\nitem keeps its speed'); sign(x0+13,zS,S,'The next stream\nadds speed again.\nNo drops needed, any\nlength'); sign(x0+22,zS,S,'Each section: 1 source\n+ 7 flowing blocks\n+ 1 plate. Ice is\noptional'); }
-  // S4: hoppers
-  { const x0=nx(5); for(let k=0;k<2;k++){ const z=zS+3+k*5; fill(x0+1,G-1,z,x0+8,G-1,z,B.ICE); fill(x0+1,G,z-1,x0+8,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+8,G,z+1,B.STONE_BRICK); fill(x0+10,G,z-1,x0+11,G+1,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK);
-      FEEDS.push({x:x0+1.5,y:G+.3,z:z+.5,id:I.STICK,vx:7,every:6,max:3});
-      chest(x0+9,G-1,z,[]); tech(x0+9,G,z,'hopper',3,{slots:[null,null,null,null,null,null],low:k===1}); put(x0+9,G+1,z,0); }
-    sign(x0+1,zS+1,S,'NORMAL HOPPER\nOnly takes items\nresting on top. Sliding\nitems stop at its side'); sign(x0+1,zS+6,S,'LOW-PROFILE HOPPER\nNearly flat: grabs items\nthat slide into its sides'); sign(x0+8,zS+11,S,'Tap a hopper to open\nits menu and flip Low\nprofile. Chests below\nshow what was caught'); }
+  // S4: hoppers, fed by a water stream that runs onto ice
+  { const x0=nx(5); for(let k=0;k<2;k++){ const z=zS+3+k*5; fill(x0+1,G-1,z,x0+8,G-1,z,B.STONE_BRICK); fill(x0+9,G-1,z,x0+12,G-1,z,B.ICE); fill(x0+1,G,z-1,x0+12,G,z-1,B.STONE_BRICK); fill(x0+1,G,z+1,x0+12,G,z+1,B.STONE_BRICK); fill(x0+14,G,z-1,x0+15,G+1,z+1,B.STONE_BRICK); fill(x0,G,z-1,x0,G,z+1,B.STONE_BRICK);
+      put(x0+1,G,z,B.WATER); SRCS.push([x0+1,G,z]); FEEDS.push({x:x0+1.5,y:G+.5,z:z+.5,id:I.STICK,vx:0,every:6,max:3});
+      chest(x0+13,G-1,z,[]); tech(x0+13,G,z,'hopper',3,{slots:[null,null,null,null,null,null],low:k===1}); put(x0+13,G+1,z,0); }
+    sign(x0+1,zS+1,S,'NORMAL HOPPER\nA stream carries items\nonto ice, but it only\ntakes items on its top'); sign(x0+1,zS+6,S,'LOW-PROFILE HOPPER\nNearly flat: grabs items\nthat slide into its sides'); sign(x0+8,zS+11,S,'Tap a hopper to open\nits menu and flip Low\nprofile. Chests below\nshow what was caught'); }
   // S5: mobs in currents
   { const x0=nx(6); fill(x0+1,G-1,zS+3,x0+14,G-1,zS+3,B.STONE_BRICK); fill(x0+9,G-1,zS+3,x0+14,G-1,zS+3,B.ICE); fill(x0,G,zS+2,x0+15,G+1,zS+2,B.GLASS); fill(x0,G,zS+4,x0+15,G+1,zS+4,B.GLASS); fill(x0+15,G,zS+3,x0+15,G+1,zS+3,B.GLASS); fill(x0,G,zS+3,x0,G+1,zS+3,B.GLASS); fill(x0,G+2,zS+2,x0+15,G+2,zS+4,B.GLASS);
     put(x0+1,G,zS+3,B.WATER); SRCS.push([x0+1,G,zS+3]); CAGES.push({type:'cow',x0:x0+1,x1:x0+15,z0:zS+2.5,z1:zS+4,cx:x0+4,cz:zS+3.5,y:G,free:true});
