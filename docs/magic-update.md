@@ -48,3 +48,13 @@ Nothing queued; ideas welcome.
 - **Flower pots**: craft from 3 bricks/terracotta; right-click with any flower/sapling/mushroom to pot it, tap with an empty hand to take it out.
 - **Hanging signs**: separate item; tap the underside of a block (chained ceiling sign) or the side of a wall (bracket arm). Two-sided, editable text, no post needed.
 - Item Gallery capped at 12 floors; existing saved galleries keep their old layout, new worlds include the new items.
+
+## v0.35.0 — Greywatch, the abandoned castle
+- **One fixed castle per world**, within 800 blocks of spawn (normal worlds pick the flattest land in a ring around spawn; the Showcase world puts it 260 blocks east). No exploring required.
+- **Surface:** 57x57 curtain walls with a ruined gate and portcullis, wall walks, four 30-block corner towers with spiral stairs and exits at each level, a vaulted cathedral (stained glass, pews, altar), and a three-storey keep with feast hall, library and roof.
+- **Dungeons:** up to three levels (fewer in low terrain), 9 blocks per level, wide arched halls, narrow door passages, prison/crypt/guard/store rooms. Iron doors cannot be opened by hand: stand on the stone plate beside them.
+- **Loot:** chests in every tower, keep, cathedral and dungeon room. Surface chests carry early-game iron, leather, basic armor, food and building blocks; deeper chests add gold, diamond, iron armor, grimoires and XP books.
+- **Enemies:** zombies and skeletons above, spiders and mages deeper; the bottom level has the most.
+- **The last room:** a sealed sanctum behind a plate door at the east end of the bottom hall holds an item frame with the lore book *The Underworld gate*.
+- **Lore books** can now show miniature item icons inline and item-grid figures, used here for the obsidian portal frame (empty and lit).
+- Iron doors are now plate-only everywhere (vanilla behaviour).

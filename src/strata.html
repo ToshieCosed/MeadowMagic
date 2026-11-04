@@ -2211,6 +2211,7 @@ class World{
     const ch=new Chunk(cx,cz,this.H); this.gen.fill(ch);
     const e=this.edits.get(this.key(cx,cz)); if(e) for(const [i,v] of e) ch.blocks[i]=v;
     if(ch.genTiles&&this.tiles) for(const t of ch.genTiles){ const k=tileKey(t.x,t.y,t.z); if(!this.tiles.has(k)&&world&&this===world&&ch.blocks[(t.y*CS+(t.z&15))*CS+(t.x&15)]===B.CHEST_WOOD&&!(this.lootDone&&this.lootDone[k])){ this.tiles.set(k,{kind:'chest',x:t.x,y:t.y,z:t.z,s:lootChest(t)}); this.lootDone=this.lootDone||{}; this.lootDone[k]=1; } }
+    if((ch.genDecor||ch.genMobs)&&world&&this===world&&window.castlePost) window.castlePost(this,ch);
     { const bl=ch.blocks, L=CS*CS; let y=this.H-1; for(;y>0;y--){ let any=false; for(let i=y*L,e=i+L;i<e;i++) if(bl[i]){ any=true; break; } if(any) break; } ch.top=y+1; }
     this.chunks.set(this.key(cx,cz),ch); lightChunk(this,ch); return ch;
   }
@@ -4526,6 +4527,7 @@ function tryInteract(sx,sy){
   if(b>0&&BLOCKS[b].trap){ if(!reachOK(x,y,z)){ toast('Too far away'); return true; } world.set(x,y,z,b+(BLOCKS[b].trap.open?-1:1)); return true; }
   if(b>0&&BLOCKS[b].seat&&!buildMode){ mount({kind:'seat',x:x+.5,y:y+.8,z:z+.5,yaw:player.face,cell:[x,y,z]}); return true; }
   if(b>0&&(BLOCKS[b].door||BLOCKS[b].gate||BLOCKS[b].chair)){ if(!reachOK(x,y,z)){ toast('Too far away'); return true; }
+    if(BLOCKS[b].door&&BLOCKS[b].door.m.k==='iron'){ toast('The iron door will not budge. Something heavy on a nearby plate might move it'); return true; }
     if(BLOCKS[b].door) toggleDoor(x,y,z); else if(BLOCKS[b].gate) world.set(x,y,z,b+(BLOCKS[b].gate.open?-1:1)); else sitOn(x,y,z); return true; }
   if(!INTERACTIVE(b)) return false;
   if(!reachOK(x,y,z)){ toast('Too far away'); return true; }
@@ -8943,6 +8945,212 @@ window.__v34={placeHSign,hsignAt};
 { const _ic=itemIconCanvas; itemIconCanvas=function(id){ if(id!==I.HSIGN) return _ic(id); const c=document.createElement('canvas'); c.width=c.height=60; const g=c.getContext('2d');
   g.fillStyle='#6e4a28'; g.fillRect(4,6,52,5); g.strokeStyle='#4a4a54'; g.lineWidth=2; g.beginPath(); g.moveTo(14,10); g.lineTo(14,24); g.moveTo(46,10); g.lineTo(46,24); g.stroke();
   g.fillStyle='#c59a5f'; g.fillRect(6,24,48,26); g.strokeStyle='#8a5a34'; g.lineWidth=3; g.strokeRect(6,24,48,26); g.fillStyle='#3a2a1a'; g.fillRect(14,32,32,3); g.fillRect(18,40,24,3); return c; }; }
+})();
+
+/* ===== v0.35.0: the Abandoned Castle, lore-book figures, plate-only iron doors ===== */
+(function(){
+const CW=57, UN=65535;
+// ---- lore: new entries, with miniature item figures ----
+const L0=LORE.length;
+LORE.push(
+ {t:'Greywatch: a garrison remembered',b:'Greywatch held the road for two hundred winters, and then the lamps went out all in one night. The gates stood open when the next patrol came. Its stores were never looted: iron, hides, grain and cut stone lie where the quartermasters left them. Take what you need from the chests, but do not trust the floors below the keep.'},
+ {t:'Doors of iron',b:'The garrison sealed its deep rooms with iron doors that no hand can move. They answer only to the stone plates set either side: stand on one and the door lifts, step off and it falls again. Mind what waits on the far side; the lower the hall, the worse it is.'},
+ {t:'The Underworld gate',b:'There is a door to a burning country below this one. Build a frame of <span data-i="OBSIDIAN"></span> obsidian four blocks wide and five tall; the four corners may be left out. Obsidian forms where water meets still lava, and only a diamond pick will carve it. Then strike a <span data-i="FIRE_STARTER"></span> fire starter on the inside of the frame and the gate wakes. Mind the Dusk gate is another door entirely: its frame is of dusk block.',
+  fig:[{cap:'The frame, seen from the front (corners optional)',rows:['.OO.','O..O','O..O','O..O','.OO.'],key:{O:{id:'OBSIDIAN'}}},
+       {cap:'Lit: the gate opens',rows:['.OO.','OUUO','OUUO','OUUO','.OO.'],key:{O:{id:'OBSIDIAN'},U:{tint:'#ff7a2a'}}}]});
+const LORE_HIST=L0, LORE_PLATE=L0+1, LORE_GATE=L0+2;
+window.LORE_GATE=LORE_GATE;
+// readLore: inline icons and figure grids
+const itemEl=(name,px)=>{ const id=B[name]!==undefined?B[name]:I[name]; const c=document.createElement('canvas'); c.width=c.height=px*2; c.style.cssText='width:'+px+'px;height:'+px+'px;vertical-align:middle;image-rendering:pixelated'; try{ const s=itemIconCanvas(id); c.getContext('2d').drawImage(s,0,0,px*2,px*2); }catch(e){} return c; };
+readLore=function(s){ const L=LORE[(s.x&&s.x.lore)||0]; mode='ui'; document.querySelector('#journal h2').textContent=L.t;
+  const body=document.getElementById('jBody'); body.innerHTML='<p style="line-height:1.55;max-width:560px">'+L.b+'</p>';
+  body.querySelectorAll('[data-i]').forEach(e=>e.appendChild(itemEl(e.dataset.i,22)));
+  for(const f of L.fig||[]){ const w=document.createElement('div'); w.style.cssText='margin:12px 0'; const cap=document.createElement('div'); cap.textContent=f.cap; cap.style.cssText='font-size:12px;opacity:.75;margin-bottom:4px'; w.appendChild(cap);
+    const g=document.createElement('div'); g.style.cssText='display:inline-grid;gap:2px;padding:8px;background:rgba(0,0,0,.35);border-radius:8px;grid-template-columns:repeat('+f.rows[0].length+',34px)';
+    for(const row of f.rows) for(const ch of row){ const k=f.key[ch], cell=document.createElement('div'); cell.style.cssText='width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:3px';
+      if(k&&k.id) cell.appendChild(itemEl(k.id,32)); else if(k&&k.tint){ cell.style.background='radial-gradient(circle,'+k.tint+' 0%,'+k.tint+'88 70%,transparent 100%)'; } else cell.style.background='rgba(255,255,255,.05)'; g.appendChild(cell); }
+    w.appendChild(g); body.appendChild(w); }
+  document.getElementById('journal').hidden=false; };
+
+// ---- loot ----
+const armorId=(mat,pi)=>{ const mi=ARMATS.findIndex(m=>m.k===mat); return mi<0?I.LEATHER:2000+mi*4+pi; };
+function castleLoot(t){ const r=mulberry32(t.seed>>>0), out=new Array(27).fill(null), lv={castle:0,dungeon:1,dungeon2:2,sanct:3}[t.loot]|0;
+  const put=(id,n,x)=>{ for(let k=0;k<8;k++){ const i=r()*27|0; if(!out[i]){ out[i]=Object.assign({id,n},x?{x}:{}); return; } } };
+  const q=(a,b)=>a+(r()*(b-a+1)|0), arm=m=>armorId(m,r()*4|0), tool=()=>GEN['iron:'+['pick','axe','sword','shovel'][r()*4|0]]||I.IRON, rGr=()=>{ const ks=Object.keys(ENCH), k=ks[r()*ks.length|0]; return {g:{k,lv:1+(r()*ENCH[k].max|0)}}; };
+  const P=[ // [weight, min level, max level, fn]
+   [14,0,3,()=>put(I.IRON,q(2+lv,6+lv*2))],[8,0,3,()=>put(I.COAL,q(3,9))],[10,0,1,()=>put(I.LEATHER,q(2,6))],[8,0,1,()=>put(arm('leather'),1)],[3,0,3,()=>put(arm('iron'),1)],
+   [8,0,3,()=>put(I.BREAD,q(2,5))],[6,0,3,()=>put(I.CBEEF,q(2,4))],[5,0,2,()=>put(I.BAKED_POTATO,q(2,4))],[4,0,1,()=>put(I.CARROT,q(3,6))],
+   [7,0,1,()=>put(B.COBBLE,q(16,40))],[6,0,1,()=>put(B.PLANKS,q(12,32))],[5,0,1,()=>put(B.STONE_BRICK,q(8,20))],[3,0,1,()=>put(B.GLASS,q(4,10))],[3,0,1,()=>put(B.BRICK,q(6,12))],[4,0,1,()=>put(B.LOG,q(8,16))],
+   [6,0,3,()=>put(B.TORCH,q(8,16))],[5,0,3,()=>put(I.ARROW,q(8,20))],[2,0,3,()=>put(I.BOW,1)],[3,0,1,()=>put(I.STICK,q(4,10))],[3,0,1,()=>put(I.STRING,q(2,6))],
+   [3,0,3,()=>put(I.GOLD,q(1+lv,3+lv*2))],[2,0,3,()=>put(tool(),1)],[2,0,3,()=>put(I.FIRE_STARTER,1)],[2,0,2,()=>put(I.BOOK,q(1,2))],
+   [2,0,0,()=>put(I.LORE,1,{lore:LORE_HIST})],[2,1,2,()=>put(I.LORE,1,{lore:LORE_PLATE})],
+   [8,1,3,()=>put(arm('iron'),1)],[6,1,3,()=>put(tool(),1)],[3,1,3,()=>put(I.DIAMOND,q(1,1+lv))],[3,1,3,()=>put(I.GRIMOIRE,1,rGr())],[3,1,3,()=>put(I.XP_BOOK,1,{xp:40+(r()*60*lv|0)})],[1,2,3,()=>put(I.SADDLE,1)],[1,2,3,()=>put(I.TELELINK_LESSER,1)]];
+  const pool=P.filter(p=>lv>=p[1]&&lv<=p[2]), tot=pool.reduce((a,p)=>a+p[0],0), n=lv===3?5:q(5,8)+(lv>=2?1:0);
+  if(lv===3){ put(I.DIAMOND,q(2,4)); put(I.GRIMOIRE,1,rGr()); put(I.GOLD,q(4,8)); }
+  for(let k=0;k<n;k++){ let w=r()*tot; for(const p of pool){ if((w-=p[0])<0){ p[3](); break; } } }
+  return out; }
+{ const _lc=lootChest; lootChest=function(t){ return (t.loot==='castle'||t.loot==='dungeon'||t.loot==='dungeon2'||t.loot==='sanct')?castleLoot(t):_lc(t); }; }
+
+// ---- siting: one fixed castle per world, within 800 blocks of spawn ----
+function castleSite(g){ if(g._cs!==undefined) return g._cs; g._cs=null; const S=g.size; if(S<130) return null;
+  const hf=(x,z)=>g.v2?g.sample(x,z):g.height(x,z), seed=g.seed|0, cx=S/2, cz=S/2, a0=hash2(11,17,seed+9300)*6.283, rmax=Math.min(800,S/2-CW/2-12);
+  const pts=[[0,0],[-24,-24],[24,-24],[-24,24],[24,24],[0,-24],[0,24],[-24,0],[24,0]];
+  const SEAL=typeof SEA==='number'?SEA:19;
+  let best=null;
+  for(let r=(S<=300?0:70);r<=rmax;r+=(r<150?20:50)) for(let a=0;a<8;a++){
+    const ang=a0+a*Math.PI/4+r*.013, x=Math.round(cx+Math.cos(ang)*r-CW/2), z=Math.round(cz+Math.sin(ang)*r-CW/2); if(x<10||z<10||x+CW>S-10||z+CW>S-10) continue;
+    const mx=x+(CW>>1), mz=z+(CW>>1); if(g.v2&&!g.spawnOK(mx,mz)) continue;
+    const hs=pts.map(([dx,dz])=>hf(mx+dx,mz+dz)), lo=Math.min(...hs), hi=Math.max(...hs);
+    if(lo<=SEAL+2) continue; const G=hs.slice().sort((p,q)=>p-q)[4]+1, nD=Math.min(3,Math.floor((G-5)/9)); if(nD<1) continue;
+    const sc=(hi-lo)+r*.012; if(!best||sc<best.sc) best={sc,ox:x,oz:z,G,nD,dist:Math.round(Math.hypot(mx-cx,mz-cz))}; if(hi-lo<=3) { r=1e9; break; } }
+  if(best) return g._cs=best;
+  return null; }
+
+// ---- the model ----
+function buildCastle(g,site){
+  const {ox,oz,G,nD}=site, yb=G-9*nD-3, yt=G+34, W=CW+8, YH=yt-yb+1, seed=g.seed|0, m=new Uint16Array(W*W*YH).fill(UN), tiles=[], decor=[], mobs=[];
+  const ix=(x,y,z)=>((y-yb)*W+(z+4))*W+(x+4), inb=(x,y,z)=>x>=-4&&x<CW+4&&z>=-4&&z<CW+4&&y>=yb&&y<=yt;
+  const S=(x,y,z,id)=>{ if(inb(x,y,z)) m[ix(x,y,z)]=id; }, Gt=(x,y,z)=>inb(x,y,z)?m[ix(x,y,z)]:UN;
+  const box=(x1,y1,z1,x2,y2,z2,id)=>{ for(let y=y1;y<=y2;y++)for(let z=z1;z<=z2;z++)for(let x=x1;x<=x2;x++) S(x,y,z,id); };
+  const R=(x,y,z,k)=>hash2(x*31+y*7+k*101,z*17+k,seed+9100);
+  const brick=(x,y,z)=>{ const r=R(x,y,z,1); return r<.6?B.STONE_BRICK:r<.8?B.MOSSY_STONE_BRICK:r<.92?B.COBBLE:B.MOSSY_COBBLE; };
+  const chest=(x,y,z,loot)=>{ S(x,y,z,B.CHEST_WOOD); tiles.push({x:ox+x,y,z:oz+z,loot,seed:(hash2(x+ox,z+oz,seed+y*3+9200)*1e9)|0}); };
+  const mob=(t,x,y,z)=>mobs.push({t,x:ox+x+.5,y:y+.05,z:oz+z+.5});
+  const wtorch=(x,y,z,nx,nz)=>{ const id=WT[nx+','+nz]; if(id) S(x,y,z,id); };
+  const lantern=(x,y,z)=>S(x,y,z,B.LANTERN_yellow);
+  const web=(x,y,z,p)=>{ if(R(x,y,z,5)<p&&Gt(x,y,z)===0) S(x,y,z,B.COBWEB); };
+  const IRONDOOR=DOOR_MATS.find(d=>d.k==='iron').door, PLATE=PLATE_MATS[1].plate;
+  const door=(x,y,z,al)=>{ const fi=al==='x'?3:0; S(x,y,z,IRONDOOR+fi*4); S(x,y+1,z,IRONDOOR+fi*4+1); };
+  // generic stair: cells [[x,z],..], feet(i)=f0+i*dy; single floating step blocks, air above
+  const stairs=(cells,f0,dy,base)=>cells.forEach(([x,z],i)=>{ const f=f0+i*dy; box(x,f,z,x,f+3,z,0); if(base!==undefined&&base<f-1) box(x,base,z,x,f-1,z,B.STONE_BRICK); else S(x,f-1,z,B.STONE_BRICK); });
+  // 1. solid mass, courtyard ground and the skirt
+  for(let z=0;z<CW;z++)for(let x=0;x<CW;x++){ for(let y=yb;y<=G-2;y++) S(x,y,z,brick(x,y,z)); S(x,G-1,z,R(x,0,z,2)<.12?B.GRAVEL:R(x,0,z,3)<.2?B.COBBLE:B.GRASS); }
+  for(let z=-4;z<CW+4;z++)for(let x=-4;x<CW+4;x++){ if(x>=0&&x<CW&&z>=0&&z<CW) continue; S(x,G-1,z,B.GRASS); S(x,G-2,z,B.DIRT); S(x,G-3,z,B.DIRT); }
+  // courtyard paths
+  for(let z=3;z<=31;z++)for(let x=26;x<=30;x++) if(R(x,0,z,4)<.8) S(x,G-1,z,B.COBBLE);
+  // 2. dungeons
+  const hallCap=[8,8,7,5], yS=j=>G-9*(j+1), flo=(x,z)=>((x+z)&1)?B.STONE_BRICK:B.SMOOTH_STONE_BRICKS;
+  const hallE=(j,xa,xb)=>{ const y=yS(j); for(let z=25;z<=31;z++){ const c=hallCap[Math.abs(z-28)]; for(let x=xa;x<=xb;x++){ box(x,y,z,x,y+c-1,z,0); S(x,y-1,z,flo(x,z)); } } };
+  const hallN=(j)=>{ const y=yS(j); for(let x=25;x<=31;x++){ const c=hallCap[Math.abs(x-28)]; for(let z=4;z<=52;z++){ box(x,y,z,x,y+c-1,z,0); S(x,y-1,z,flo(x,z)); } } };
+  const room=(j,x1,z1,x2,z2)=>{ const y=yS(j); for(let z=z1;z<=z2;z++)for(let x=x1;x<=x2;x++){ box(x,y,z,x,y+7,z,0); S(x,y-1,z,flo(x,z)); } };
+  const RM=[[5,5,21,21],[35,5,51,21],[5,35,21,51],[35,35,51,51]];
+  // corridors: [axis, from, to, fixed, roomIndex]
+  const COR=[['x',22,24,13,0],['z',22,24,13,0],['x',32,34,13,1],['z',22,24,43,1],['x',22,24,43,2],['z',32,34,13,2],['x',32,34,43,3],['z',32,34,43,3]];
+  for(let j=0;j<nD;j++){ const y=yS(j), last=j===nD-1;
+    hallE(j,4,last?44:52); hallN(j); RM.forEach(([a,b,c,d])=>room(j,a,b,c,d));
+    for(const [ax,f,t,fx,ri] of COR){ const doored=j>=nD-2?(j===nD-1||ri!==0):ri===3; for(let k=f;k<=t;k++){ const x=ax==='x'?k:fx, z=ax==='x'?fx:k; box(x,y,z,x,y+1,z,0); S(x,y-1,z,flo(x,z)); }
+      if(doored||(j===0&&ri===3)){ const mid=(f+t)>>1, dx=ax==='x'?mid:fx, dz=ax==='x'?fx:mid; door(dx,y,dz,ax);
+        for(const q of [f,t]){ const px=ax==='x'?q:fx, pz=ax==='x'?fx:q; S(px,y,pz,PLATE); } } }
+    // lighting and cobwebs along the halls
+    for(let k=6;k<=50;k+=9){ if(R(k,j,1,6)<.55){ wtorch(k,y+2,25,0,1); } if(R(k,j,2,6)<.55) wtorch(k,y+2,31,0,-1); if(R(k,j,3,6)<.6) wtorch(25,y+2,k,1,0); if(R(k,j,4,6)<.5) wtorch(31,y+2,k,-1,0); }
+    for(let k=5;k<=51;k+=7){ for(const z of [25,31]) if(!(k>=25&&k<=31)) box(k,y,z,k,y+4,z,B.STONE_BRICK); }
+    // rooms
+    RM.forEach(([x1,z1,x2,z2],ri)=>{ const cxm=(x1+x2)>>1, czm=(z1+z2)>>1, th=['store','cells','crypt','guard'][(ri+j)%4], nm=1+j+(last?1:0);
+      for(const [wx,wz] of [[x1,z1],[x2,z1],[x1,z2],[x2,z2]]){ wtorch(wx,y+2,wz,wx===x1?1:-1,0); web(wx,y+7,wz,.7); }
+      if(th==='store'){ for(let k=x1+1;k<=x2-1;k+=3){ if(R(k,j,ri,7)<.55) chest(k,y,z1,j===0?'castle':'dungeon'); if(R(k,j,ri,8)<.4) chest(k,y,z2,j===0?'castle':'dungeon'); } for(let k=x1+3;k<=x2-3;k+=4) for(let z=cxm-3>0?czm-2:czm;z<=czm+2;z+=2) if(R(k,z,j,9)<.5) S(k,y,z,B.PLANKS); }
+      else if(th==='cells'){ for(let k=x1+4;k<=x2-4;k+=4) for(let z=z1;z<=z2;z++){ box(k,y,z,k,y+2,z,(z===czm?0:B.IRON_BARS)); } for(let k=x1+2;k<=x2-2;k+=4) if(R(k,j,ri,10)<.6) chest(k,y,z1+1+((k+j)%3)*5,j?'dungeon':'castle'); }
+      else if(th==='crypt'){ for(let k=x1+2;k<=x2-2;k+=3) for(let z=z1+2;z<=z2-2;z+=4){ S(k,y,z,B.COBBLE); S(k,y+1,z,B.CHISELED_STONE); } chest(cxm,y,z2,j>=1?'dungeon2':'dungeon'); }
+      else { for(let k=x1+3;k<=x2-3;k+=3){ S(k,y,czm,B.TABLE_oak); S(k,y,czm+1,B.CHAIR_oak_0); S(k,y,czm-1,B.CHAIR_oak_2); } chest(x1+1,y,cxm,j?'dungeon2':'dungeon'); chest(x2-1,y,czm,j?'dungeon2':'dungeon'); }
+      const types=j===0?['zombie','skeleton']:j===1?['zombie','skeleton','spider']:['skeleton','spider','zombie','mage_fire','mage_ice','mage_illusion'];
+      for(let k=0;k<nm;k++){ const rx=x1+2+((R(k,j,ri,11)*(x2-x1-3))|0), rz=z1+2+((R(k,ri,j,12)*(z2-z1-3))|0); if(Gt(rx,y,rz)===0) mob(types[(k+ri)%types.length],rx,y,rz); } });
+    // hall guards
+    const hm=j+1+(last?2:0); for(let k=0;k<hm;k++){ const t=j===0?'zombie':j===1?'skeleton':['skeleton','spider','mage_magick'][k%3]; mob(t,28,y,k%2?10+k*7:46-k*6); }
+    // dungeon stairs down from the level above (t=j): even -> z45..37, odd -> z19..11
+    web(28,y+7,28,.5); }
+  // the last level: a sealed sanctum at the east end of the long hall
+  { const j=nD-1, y=yS(j); box(45,y,28,47,y+1,28,0); S(45,y-1,28,flo(45,28)); S(46,y-1,28,flo(46,28)); S(47,y-1,28,flo(47,28));
+    door(46,y,28,'x'); S(45,y,28,PLATE); S(47,y,28,PLATE);
+    for(let z=24;z<=32;z++)for(let x=48;x<=53;x++){ box(x,y,z,x,y+7,z,0); S(x,y-1,z,(x>=50&&x<=51)?B.CARPET_red:flo(x,z)); }
+    for(let z=24;z<=32;z+=4){ lantern(48,y+3,z); lantern(53,y+3,z); } box(48,y+1,28,50,y+1,28,0);
+    chest(48,y,25,'sanct'); chest(48,y,31,'sanct'); S(53,y,28,B.CHISELED_STONE);
+    const fy=y+1; decor.push({e:{kind:'frame',mode:0,item:{id:I.LORE,n:1,d:0,x:{lore:LORE_GATE}},c:[ox+54+.5-.53,fy+.5,oz+28+.5],n:[-1,0,0],u:[0,0,1],v:[0,1,0],w:1,h:1,sup:[ox+54,fy,oz+28],cell:[ox+53,fy,oz+28],fixU:1}});
+    decor.push({e:{kind:'sign',c:[ox+54+.5-.53,fy+.5,oz+30+.5],n:[-1,0,0],u:[0,0,1],v:[0,1,0],w:1,h:.6,sup:[ox+54,fy,oz+30],cell:[ox+53,fy,oz+30],fixU:1,text:'THE LAST ROOM\nThe garrison kept\none book from\nthe fire.',frame:'wood',bg:'parchment'}}); }
+  // 3. curtain walls
+  const gateCap=[7,7,6,4];
+  for(let z=0;z<CW;z++)for(let x=0;x<CW;x++){ if(!(x<3||x>CW-4||z<3||z>CW-4)) continue; const outer=x===0||x===CW-1||z===0||z===CW-1;
+    for(let y=G;y<=G+8;y++) S(x,y,z,R(x,y,z,13)<.05&&y>G+3?0:brick(x,y,z)); S(x,G+9,z,R(x,0,z,14)<.1?0:B.STONE_BRICK);
+    if(outer){ S(x,G+10,z,R(x,1,z,15)<.12?0:brick(x,G+10,z)); if((x+z)%2===0) S(x,G+11,z,R(x,2,z,16)<.25?0:brick(x,G+11,z)); } }
+  for(let z=0;z<3;z++)for(let x=25;x<=31;x++){ box(x,G,z,x,G+gateCap[Math.abs(x-28)]-1,z,0); S(x,G-1,z,B.COBBLE); }
+  for(let x=26;x<=30;x++) for(let y=G+4;y<=G+6;y++) if(R(x,y,1,17)<.8) S(x,y,1,B.IRON_BARS);
+  for(let z=18;z<=24;z++)for(let x=CW-3;x<CW;x++){ const h=(R(x,z,3,18)*4)|0; box(x,G+h,z,x,G+11,z,0); for(let y=G;y<G+h;y++) S(x,y,z,B.COBBLE); }
+  // 4. corner towers
+  for(const sx of [0,1])for(const sz of [0,1]){ const x0=sx?48:0, z0=sz?48:0, tcx=x0+4, tcz=z0+4;
+    box(x0,G-1,z0,x0+8,G-1,z0+8,B.STONE_BRICK);
+    for(let z=z0;z<=z0+8;z++)for(let x=x0;x<=x0+8;x++){ const sh=x===x0||x===x0+8||z===z0||z===z0+8;
+      for(let y=G;y<=G+30;y++){ const fl=y===G+9||y===G+19||y===G+29; let v=0; if(sh) v=R(x,y,z,19)<.04&&y>G+6?0:brick(x,y,z); else if(fl) v=y===G+29?B.STONE_BRICK:(R(x,y,z,20)<.12?0:B.PLANKS); if(y===G+30) v=sh?brick(x,y,z):0; S(x,y,z,v); }
+      if(sh&&(x+z)%2===0) S(x,G+31,z,R(x,3,z,21)<.2?0:brick(x,G+31,z)); }
+    for(const yy of [G+4,G+14,G+24]) for(const [ax,az] of [[tcx,z0],[tcx,z0+8],[x0,tcz],[x0+8,tcz]]) { S(ax,yy,az,0); S(ax,yy+1,az,0); }
+    const fx=sx?x0:x0+8, fz=sz?z0:z0+8, dz=sz?51:5, dx=sx?51:5, wz=sz?[54,55]:[1,2], wx=sx?[54,55]:[1,2];
+    for(let y=G;y<=G+2;y++){ S(fx,y,dz,0); S(dx,y,fz,0); } S(fx,G+3,dz,0);
+    for(const zz of wz) for(let y=G+10;y<=G+12;y++) S(fx,y,zz,0);
+    for(const xx of wx) for(let y=G+10;y<=G+12;y++) S(xx,y,fz,0);
+    const ring=[]; for(let i=-3;i<=3;i++) ring.push([tcx+i,tcz-3]); for(let i=-2;i<=3;i++) ring.push([tcx+3,tcz+i]); for(let i=2;i>=-3;i--) ring.push([tcx+i,tcz+3]); for(let i=2;i>=-2;i--) ring.push([tcx-3,tcz+i]);
+    const ex=new Set(); for(const zz of wz) ex.add((sx?x0+1:x0+7)+','+zz); for(const xx of wx) ex.add(xx+','+(sz?z0+1:z0+7)); let off=0; for(let o=0;o<24;o++){ let ok=true; for(let k=3;k<=11;k++){ const c=ring[(k+o)%24]; if(ex.has(c[0]+','+c[1])) ok=false; } if(ok){ off=o; break; } }
+    const cells=[]; for(let k=0;k<30;k++) cells.push(ring[(k+off)%24]); stairs(cells,G+1,1);
+    chest(tcx+(sx?-2:2),G,tcz+(sz?-2:2),'castle'); chest(tcx+(sx?-2:2),G+10,tcz+(sz?2:-2),'castle'); if(R(sx,sz,9,22)<.7) chest(tcx+(sx?2:-2),G+20,tcz+(sz?-2:2),'dungeon');
+    wtorch(tcx,G+3,z0+1,0,1); web(tcx,G+8,tcz,.8); web(tcx+1,G+18,tcz-1,.8);
+    mob(sz?'skeleton':'zombie',tcx,G+10,tcz); }
+  // 5. the cathedral: x5..20, z10..45
+  { const x1=5,x2=20,z1=10,z2=45, hx=(x1+x2)/2;
+    for(let z=z1;z<=z2;z++)for(let x=x1;x<=x2;x++){ const sh=x===x1||x===x2||z===z1||z===z2, dx=Math.abs(x-hx), roofY=G+10+Math.floor(8-dx);
+      S(x,G-1,z,B.STONE_BRICK);
+      for(let y=G;y<=G+17;y++){ let v=0; if(y===roofY) v=R(x,y,z,23)<.18?0:brick(x,y,z); else if(sh&&y<roofY) v=R(x,y,z,24)<.05?0:brick(x,y,z); else if(y>roofY) v=0; S(x,y,z,v); } }
+    for(let z=z1+3;z<=z2-3;z+=5){ const col=[B.GLASS_R,B.GLASS_Y,B.GLASS_B][((z-z1)/5)%3|0]; for(const x of [x1,x2]){ for(let y=G+3;y<=G+8;y++){ S(x,y,z,col); S(x,y,z+1,col); } S(x,G+9,z,col); S(x,G+9,z+1,col); } }
+    for(let y=G;y<=G+7;y++) for(let x=11;x<=14;x++){ const cap=(x===11||x===14)?6:7; if(y-G<cap) S(x,y,z1,0); }
+    for(let z=z1+4;z<=z2-4;z+=6) for(const x of [9,16]) { for(let y=G;y<=G+12;y++) S(x,y,z,y%5===0?B.CHISELED_STONE:B.STONE_BRICK); if(R(x,z,1,25)<.3) box(x,G+8,z,x,G+12,z,0); }
+    for(let z=z1+2;z<=z2-8;z++) for(const x of [12,13]) if(R(x,z,2,26)<.9) S(x,G,z,B.CARPET_red);
+    for(let z=z1+4;z<=z1+27;z+=3) for(const x0 of [6,15]) for(let x=x0;x<x0+4;x++) if(R(x,z,3,27)<.8) S(x,G,z,B.SLAB_oak_d);
+    box(7,G,z2-4,18,G,z2-1,B.STONE_BRICK); box(9,G+1,z2-3,16,G+1,z2-2,B.STONE_BRICK); for(const x of [12,13]){ S(x,G+2,z2-2,B.CHISELED_STONE); }
+    box(7,G+1,z2-1,8,G+3,z2-1,B.COBBLE); chest(7,G+1,z2-3,'castle'); chest(18,G+1,z2-3,'castle'); lantern(12,G+3,z2-3); lantern(13,G+3,z2-3);
+    for(let z=z1+3;z<=z2-5;z+=7) for(const x of [7,18]) lantern(x,G+6,z);
+    for(let k=0;k<26;k++){ const x=x1+1+((R(k,1,1,28)*(x2-x1-1))|0), z=z1+1+((R(k,2,1,28)*(z2-z1-1))|0); web(x,G+9+((k%3)),z,.9); web(x,G+1,z,.2); }
+    mob('skeleton',10,G,z1+14); mob('skeleton',15,G,z1+22); mob('zombie',12,G,z2-8); }
+  // 6. the keep: x23..47, z31..52
+  { const x1=23,x2=47,z1=31,z2=52;
+    for(let z=z1;z<=z2;z++)for(let x=x1;x<=x2;x++){ const sh=x===x1||x===x2||z===z1||z===z2; S(x,G-1,z,B.STONE_BRICK);
+      for(let y=G;y<=G+21;y++){ const fl=y===G+9||y===G+19; let v=0; if(sh&&y<=G+19) v=R(x,y,z,29)<.04&&y>G+4?0:brick(x,y,z); else if(fl&&!sh) v=R(x,y,z,30)<(y===G+19?.14:.06)?0:B.PLANKS; else if(y===G+20) v=sh?brick(x,y,z):0; S(x,y,z,v); }
+      if(sh&&(x+z)%2===0) S(x,G+21,z,R(x,4,z,31)<.25?0:brick(x,G+21,z)); }
+    for(const yy of [G+4,G+14]) for(let k=x1+4;k<=x2-4;k+=5){ for(const z of [z1,z2]) { S(k,yy,z,0); S(k,yy+1,z,0); } } for(const yy of [G+4,G+14]) for(let k=z1+4;k<=z2-4;k+=5) for(const x of [x1,x2]){ S(x,yy,k,0); S(x,yy+1,k,0); }
+    for(let y=G;y<=G+5;y++) for(let x=34;x<=36;x++) if(!(y===G+5&&x!==35)) S(x,y,z1,0);
+    for(let y=G;y<=G+5;y++) S(x1,y,40,0);
+    // stairs: ground -> floor 2 (x43..45, north), floor 2 -> roof (x43..45, south)
+    for(let i=0;i<10;i++){ const f=G+1+i; for(let x=43;x<=45;x++){ box(x,f,33+i,x,f+3,33+i,0); S(x,f-1,33+i,B.STONE_BRICK); } }
+    for(let i=0;i<10;i++){ const f=G+11+i; for(let x=43;x<=45;x++){ box(x,f,50-i,x,f+3,50-i,0); S(x,f-1,50-i,B.STONE_BRICK); } }
+    // feast hall
+    for(let k=32;k<=40;k+=1) if(R(k,1,1,32)<.85){ S(k,G,41,B.TABLE_oak); S(k,G,47,B.TABLE_oak); if(R(k,2,1,32)<.7) S(k,G,42,B.CHAIR_oak_0); if(R(k,3,1,32)<.7) S(k,G,46,B.CHAIR_oak_2); }
+    chest(24,G,34,'castle'); chest(24,G,50,'castle'); chest(46,G,50,'castle'); chest(33,G,51,'castle');
+    for(let k=24;k<=46;k+=6){ wtorch(k,G+3,z2-1,0,-1); wtorch(k,G+3,z1+1,0,1); lantern(k,G+8,41); }
+    // upstairs: library and barracks
+    for(let k=x1+2;k<=x2-2;k++){ for(const z of [z2-1]) if(k<42&&R(k,1,2,33)<.8){ box(k,G+10,z,k,G+11,z,B.SHELF); } }
+    chest(25,G+10,35,'castle'); chest(33,G+10,36,'dungeon'); chest(46,G+10,35,'castle'); chest(25,G+10,51,'castle'); chest(40,G+10,51,'dungeon');
+    for(let k=0;k<30;k++){ const x=x1+1+((R(k,3,1,34)*(x2-x1-1))|0), z=z1+1+((R(k,4,1,34)*(z2-z1-1))|0); web(x,G+9,z,.9); web(x,G+19,z,.9); web(x,G+1,z,.15); }
+    mob('skeleton',28,G+10,45); mob('zombie',36,G,36); }
+  // dungeon stairs go in last so nothing above overwrites them
+  for(let t=0;t<nD;t++){ const top=t===0?G:yS(t-1), z0=t%2?19:45;
+    // columns of three cells share a feet height
+    for(let i=0;i<9;i++){ const f=top-1-i; for(let x=27;x<=29;x++){ box(x,f,z0-i,x,f+3,z0-i,0); S(x,f-1,z0-i,B.STONE_BRICK); } }
+    if(t===0) for(let z=37;z<=45;z++){ S(26,G,z,B.FENCE); S(30,G,z,B.FENCE); } }
+  // gate sign
+  decor.push({e:{kind:'sign',c:[ox+23+.5,G+3.5,oz-.03],n:[0,0,-1],u:[-1,0,0],v:[0,1,0],w:1,h:.6,sup:[ox+23,G+3,oz],cell:[ox+23,G+3,oz-1],fixU:1,text:'GREYWATCH\nabandoned\nenter at your\nown risk',frame:'wood',bg:'parchment'}});
+  return {m,yb,yt,W,tiles,decor,mobs,ox,oz,G,nD,ix}; }
+
+// ---- stamping into chunks ----
+function castleFillChunk(g,ch){ const site=castleSite(g); if(!site) return; const x0=ch.cx*CS, z0=ch.cz*CS, {ox,oz}=site;
+  if(x0>ox+CW+3||x0+CS-1<ox-4||z0>oz+CW+3||z0+CS-1<oz-4) return; const M=site.M||(site.M=buildCastle(g,site)), H=ch.blocks.length/(CS*CS), W=M.W;
+  for(let lz=0;lz<CS;lz++)for(let lx=0;lx<CS;lx++){ const wx=x0+lx, wz=z0+lz, mx=wx-ox, mz=wz-oz; if(mx<-4||mx>=CW+4||mz<-4||mz>=CW+4) continue;
+    for(let y=M.yb;y<=M.yt;y++){ if(y<1||y>=H) continue; const v=M.m[((y-M.yb)*W+(mz+4))*W+(mx+4)], i=(y*CS+lz)*CS+lx;
+      if(v===UN){ if(y<M.G){ const cur=ch.blocks[i]; if(cur===0||cur===B.WATER) ch.blocks[i]=B.STONE; } else ch.blocks[i]=0; } else ch.blocks[i]=v; } }
+  const inC=(x,z)=>x>=x0&&x<x0+CS&&z>=z0&&z<z0+CS;
+  for(const t of M.tiles) if(inC(t.x,t.z)){ (ch.genTiles=ch.genTiles||[]).push(t); }
+  for(const d of M.decor){ const c=d.e.cell; if(inC(c[0],c[2])){ (ch.genDecor=ch.genDecor||[]).push(d); } }
+  for(const q of M.mobs) if(inC(Math.floor(q.x),Math.floor(q.z))){ (ch.genMobs=ch.genMobs||[]).push(q); } }
+for(const C of [Generator,Generator2,ShowGen]){ const f=C.prototype.fill; C.prototype.fill=function(ch){ f.call(this,ch); try{ if(this.constructor===ShowGen&&this._cs===undefined){ const S=this.size, c=this.C||S/2; this._cs={ox:Math.round(c+260),oz:Math.round(c+30),G:SHOW_G+1,nD:3,dist:260}; } castleFillChunk(this,ch); }catch(e){ console.error('castle',e); } }; }
+// per-chunk extras: item frames/signs and guards appear once
+window.castlePost=function(w,ch){ w.lootDone=w.lootDone||{};
+  for(const d of ch.genDecor||[]){ const k='d:'+d.e.cell.join(','); if(!w.lootDone[k]){ w.lootDone[k]=1; w.decor.push(JSON.parse(JSON.stringify(d.e))); } }
+  if(ch.genMobs){ const k='m:'+ch.cx+','+ch.cz; if(!w.lootDone[k]){ w.lootDone[k]=1; w.pendMobs=(w.pendMobs||[]).concat(ch.genMobs); } } };
+{ const _sm=stepMobs; stepMobs=function(dt){ if(world&&world.pendMobs&&world.pendMobs.length){ let n=0; while(world.pendMobs.length&&n++<6){ const q=world.pendMobs.shift(); try{ spawnMob(q.t,q.x,q.y,q.z); }catch(e){} } } return _sm.apply(this,arguments); }; }
+window.__castle={castleSite,buildCastle,castleLoot,LORE_GATE};
 })();
 
 </script>
