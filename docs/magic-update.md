@@ -58,3 +58,9 @@ Nothing queued; ideas welcome.
 - **The last room:** a sealed sanctum behind a plate door at the east end of the bottom hall holds an item frame with the lore book *The Underworld gate*.
 - **Lore books** can now show miniature item icons inline and item-grid figures, used here for the obsidian portal frame (empty and lit).
 - Iron doors are now plate-only everywhere (vanilla behaviour).
+
+## v0.36.0 — Resource-pack mob skins
+- Packs are now read for `textures/entity/`. Supported: zombie, skeleton, pig, cow, sheep (plus dyeable `sheep_fur`), chicken, spider, wolf (and `wolf_tame`), slime. Other mobs keep their built-in look.
+- Mobs with a skin are redrawn with vanilla-proportioned models and the standard Minecraft skin layout (64x32 and 64x64 both handled, hi-res packs scale automatically). Hurt flash, baby size, slime squash, sheep shearing and dye colour still work.
+- Packs imported before this version have no entity textures saved: re-import the pack once.
+- Test: `tools/tests/phase13_mobskins.py` builds a fake pack and screenshots every skinned mob.

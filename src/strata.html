@@ -5884,13 +5884,15 @@ async function importPack(file){
   for(const name of z.files.keys()){ const m=name.match(/(?:^|\/)assets\/minecraft\/textures\/(blocks?|items?)\/([^\/]+)\.png$/i); if(!m) continue; (m[1][0].toLowerCase()==='b'?blk:itm)[m[2].toLowerCase()]=name; }
   const nB=Object.keys(blk).length, nI=Object.keys(itm).length; if(!nB&&!nI&&![...z.files.keys()].some(n=>/assets\/minecraft\/sounds\/.+\.ogg$/i.test(n))) throw new Error('No Minecraft block or item textures found in that file');
   const find=(tab,old,nm)=>{ if(tab[nm]) return tab[nm]; for(const o of [].concat(old[nm]||[])) if(tab[o]) return tab[o]; return null; };
-  const files={}, usedPaths=new Set(); let used=0, items=0;
+  const files={}, usedPaths=new Set(); let used=0, items=0, skins=0;
   for(const nm of packWanted()){ const p=find(blk,MC_OLD,nm); if(!p) continue; const d=await z.read(p); if(!d) continue; files['b/'+nm]=d; usedPaths.add(p); used++; const mm=await z.read(p+'.mcmeta'); if(mm) files['b/'+nm+'.mcmeta']=mm; }
   for(const nm of new Set(Object.values(ITEM_MC))){ const p=find(itm,MC_OLD_ITEM,nm); if(!p) continue; const d=await z.read(p); if(!d) continue; files['i/'+nm]=d; items++; }
   let desc=''; const mf=[...z.files.keys()].find(n=>/(^|\/)pack\.mcmeta$/i.test(n)); if(mf){ try{ const j=JSON.parse(new TextDecoder().decode(await z.read(mf))); desc=typeof j.pack?.description==='string'?j.pack.description:''; }catch(e){} }
   const skipped=Object.values(blk).filter(p=>!usedPaths.has(p)).length;
+  { const low=new Map(); for(const n of z.files.keys()){ const m=n.toLowerCase().match(/assets\/minecraft\/textures\/entity\/(.+\.png)$/); if(m) low.set(m[1],n); }
+    for(const [k,cands] of (window.ENT_FILES||[])) for(const c of cands){ const nm=low.get(c); if(!nm) continue; const d=await z.read(nm); if(d){ files['e/'+k]=d; skins++; break; } } }
   const snd=await packSoundsFrom(z);
-  return {name:file.name.replace(/\.zip$/i,''),desc:desc.replace(/§./g,''),files,sounds:snd.sounds,stats:{used,items,skipped,total:nB,sounds:snd.count}}; }
+  return {name:file.name.replace(/\.zip$/i,''),desc:desc.replace(/§./g,''),files,sounds:snd.sounds,stats:{used,items,skipped,total:nB,sounds:snd.count,skins}}; }
 function clearPack(){ if(typeof applyPackSounds==='function') applyPackSounds(null); PACK.on=false; PACK.name=''; PACK.has.fill(0); PACK.x.fill(0); PACK.tint.fill(0); PACK.img={}; PACK.stats=null; PACK_SLOTS.fill(0);
   gl.useProgram(prog); gl.uniform1i(U.uPackOn,0); }
 async function applyPack(rec){
@@ -9151,6 +9153,105 @@ window.castlePost=function(w,ch){ w.lootDone=w.lootDone||{};
   if(ch.genMobs){ const k='m:'+ch.cx+','+ch.cz; if(!w.lootDone[k]){ w.lootDone[k]=1; w.pendMobs=(w.pendMobs||[]).concat(ch.genMobs); } } };
 { const _sm=stepMobs; stepMobs=function(dt){ if(world&&world.pendMobs&&world.pendMobs.length){ let n=0; while(world.pendMobs.length&&n++<6){ const q=world.pendMobs.shift(); try{ spawnMob(q.t,q.x,q.y,q.z); }catch(e){} } } return _sm.apply(this,arguments); }; }
 window.__castle={castleSite,buildCastle,castleLoot,LORE_GATE};
+})();
+
+/* ===== v0.36.0: resource-pack mob skins (textures/entity) ===== */
+(function(){
+// pack entity files, relative to assets/minecraft/textures/entity/
+window.ENT_FILES=[['zombie',['zombie/zombie.png']],['skeleton',['skeleton/skeleton.png']],['pig',['pig/pig.png','pig/temperate_pig.png']],['cow',['cow/cow.png','cow/temperate_cow.png']],
+ ['sheep',['sheep/sheep.png']],['sheep_fur',['sheep/sheep_fur.png','sheep/sheep_wool.png']],['chicken',['chicken.png','chicken/chicken.png','chicken/temperate_chicken.png']],
+ ['spider',['spider/spider.png']],['wolf',['wolf/wolf.png']],['wolf_tame',['wolf/wolf_tame.png']],['slime',['slime/slime.png']]];
+const ENT={};   // key -> {tex,w,h}
+window.__ENT=ENT;
+TU.uBlend=gl.getUniformLocation(texProg,'uBlend');
+const skVAO=gl.createVertexArray(), skVBO=gl.createBuffer(); gl.bindVertexArray(skVAO); gl.bindBuffer(gl.ARRAY_BUFFER,skVBO); gl.bufferData(gl.ARRAY_BUFFER,4*5*6*6*64,gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,20,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,2,gl.FLOAT,false,20,12); gl.bindVertexArray(null);
+const SK_CAP=4*5*6*6*64/4;   // floats
+function clearEnt(){ for(const k in ENT){ try{ gl.deleteTexture(ENT[k].tex); }catch(e){} delete ENT[k]; } }
+{ const _ap=applyPack; applyPack=async function(rec){ await _ap.apply(this,arguments); clearEnt(); if(!rec||!rec.files) return;
+    for(const k in PACK.img||{}){ if(!k.startsWith('e/')) continue; const bm=PACK.img[k], t=gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bm);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      ENT[k.slice(2)]={tex:t,w:bm.width,h:bm.height}; }
+    gl.activeTexture(gl.TEXTURE0); if(PACK.stats) PACK.stats.skins=Object.keys(ENT).length; try{ packUI(); }catch(e){} }; }
+{ const _cp=clearPack; clearPack=function(){ clearEnt(); return _cp.apply(this,arguments); }; }
+
+// ---- models: parts in pixels, y up from the feet, +z forward, +x the mob's left ----
+const rX=(p,a,py,pz)=>{ const y=p[1]-py,z=p[2]-pz,c=Math.cos(a),s=Math.sin(a); return [p[0],y*c-z*s+py,y*s+z*c+pz]; };
+const rZ=(p,a,px,py)=>{ const x=p[0]-px,y=p[1]-py,c=Math.cos(a),s=Math.sin(a); return [x*c-y*s+px,x*s+y*c+py,p[2]]; };
+const rY=(p,a,px,pz)=>{ const x=p[0]-px,z=p[2]-pz,c=Math.cos(a),s=Math.sin(a); return [x*c+z*s+px,p[1],-x*s+z*c+pz]; };
+const P=(p,s,uv,o)=>Object.assign({p,s,uv},o||{});
+const sw4=(m,i)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0; return (i%3===0?1:-1)*sw; };
+const MODELS={
+ zombie:(m)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0, bob=Math.sin((m.phase||0)*.5)*.06; return {k:.0625*.925,tex:'zombie',parts:[
+   P([-4,24,-4],[8,8,8],[0,0]), P([-4,12,-2],[8,12,4],[16,16]),
+   P([-8,12,-2],[4,12,4],[40,16],{rot:[['x',-1.5+bob,22,0]]}), P([4,12,-2],[4,12,4],[32,48],{uvM:[40,16],rot:[['x',-1.5-bob,22,0]]}),
+   P([-4,0,-2],[4,12,4],[0,16],{rot:[['x',sw,12,0]]}), P([0,0,-2],[4,12,4],[16,48],{uvM:[0,16],rot:[['x',-sw,12,0]]})]}; },
+ skeleton:(m)=>{ const sw=m.moving?Math.sin(m.phase)*.6:0; return {k:.0625*.925,tex:'skeleton',parts:[
+   P([-4,24,-4],[8,8,8],[0,0]), P([-4,12,-2],[8,12,4],[16,16]),
+   P([-6,12,-1],[2,12,2],[40,16],{rot:[['x',-1.1+sw*.2,22,0]]}), P([4,12,-1],[2,12,2],[40,16],{mir:1,rot:[['x',-1.2,22,0]]}),
+   P([-3,0,-1],[2,12,2],[0,16],{rot:[['x',sw,12,0]]}), P([1,0,-1],[2,12,2],[0,16],{mir:1,rot:[['x',-sw,12,0]]})]}; },
+ pig:(m)=>({k:.0625,tex:'pig',parts:[ P([-4,8,6],[8,8,8],[0,0]), P([-2,9,14],[4,3,1],[16,16]),
+   P([-5,2,-5],[10,16,8],[28,8],{rot:[['x',-Math.PI/2,10,-1]]}),
+   P([-5,0,3],[4,6,4],[0,16],{rot:[['x',sw4(m,0),6,5]]}), P([1,0,3],[4,6,4],[0,16],{rot:[['x',sw4(m,1),6,5]]}), P([-5,0,-9],[4,6,4],[0,16],{rot:[['x',sw4(m,1),6,-7]]}), P([1,0,-9],[4,6,4],[0,16],{rot:[['x',sw4(m,0),6,-7]]})]}),
+ cow:(m)=>({k:.0625,tex:'cow',parts:[ P([-4,16,8],[8,8,6],[0,0]), P([-6,22,11],[1,3,1],[22,0]), P([5,22,11],[1,3,1],[22,0]),
+   P([-6,8,-5],[12,18,10],[18,4],{rot:[['x',-Math.PI/2,17,0]]}),
+   P([-6,0,4],[4,12,4],[0,16],{rot:[['x',sw4(m,0),12,6]]}), P([2,0,4],[4,12,4],[0,16],{rot:[['x',sw4(m,1),12,6]]}), P([-6,0,-9],[4,12,4],[0,16],{rot:[['x',sw4(m,1),12,-7]]}), P([2,0,-9],[4,12,4],[0,16],{rot:[['x',sw4(m,0),12,-7]]})]}),
+ sheep:(m)=>{ const parts=[ P([-3,16,6],[6,6,8],[0,0]), P([-4,9,-4],[8,16,6],[28,8],{rot:[['x',-Math.PI/2,17,-1]]}),
+   P([-5,0,3],[4,12,4],[0,16],{rot:[['x',sw4(m,0),12,5]]}), P([1,0,3],[4,12,4],[0,16],{rot:[['x',sw4(m,1),12,5]]}), P([-5,0,-9],[4,12,4],[0,16],{rot:[['x',sw4(m,1),12,-7]]}), P([1,0,-9],[4,12,4],[0,16],{rot:[['x',sw4(m,0),12,-7]]})];
+   const fur=m.sheared?[]:[ P([-3,16,6],[6,6,6],[0,0],{g:.6}), P([-4,9,-4],[8,16,6],[28,8],{g:1.75,rot:[['x',-Math.PI/2,17,-1]]}),
+   P([-5,6,3],[4,6,4],[0,16],{g:.5,rot:[['x',sw4(m,0),12,5]]}), P([1,6,3],[4,6,4],[0,16],{g:.5,rot:[['x',sw4(m,1),12,5]]}), P([-5,6,-9],[4,6,4],[0,16],{g:.5,rot:[['x',sw4(m,1),12,-7]]}), P([1,6,-9],[4,6,4],[0,16],{g:.5,rot:[['x',sw4(m,0),12,-7]]})];
+   return {k:.0625,tex:'sheep',parts,fur:{tex:'sheep_fur',parts:fur,col:hex(DYES[m.wool||0].wool)}}; },
+ chicken:(m)=>{ const sw=m.moving?Math.sin(m.phase*1.3)*.9:0, fl=m.onGround===false?Math.sin(performance.now()/40)*.8:0; return {k:.0625,tex:'chicken',parts:[
+   P([-2,9,3],[4,6,3],[0,0]), P([-2,11,6],[4,2,2],[14,0]), P([-1,9,5],[2,2,2],[14,4]), P([-3,4,-3],[6,8,6],[0,9],{rot:[['x',-Math.PI/2,8,0]]}),
+   P([-3,0,-1],[3,5,3],[26,0],{rot:[['x',sw,5,0]]}), P([0,0,-1],[3,5,3],[26,0],{rot:[['x',-sw,5,0]]}),
+   P([-4,7,-3],[1,4,6],[24,13],{rot:[['z',-fl,-4,11]]}), P([3,7,-3],[1,4,6],[24,13],{rot:[['z',fl,4,11]]})]}; },
+ spider:(m)=>{ const ws=m.moving?Math.sin(m.phase*1.6):0, parts=[ P([-4,5,3],[8,8,8],[32,4]), P([-3,6,-3],[6,6,6],[0,0]), P([-5,5,-15],[10,8,12],[0,12])];
+   const fan=[.7,.3,-.3,-.7], zs=[0,-1,-2,-3];
+   for(let i=0;i<4;i++) for(const sd of [-1,1]){ const a=(i%2?1:-1)*ws*.4*sd, zc=zs[i]*1.4+1;
+     parts.push(P(sd>0?[3,8,zc-1]:[-19,8,zc-1],[16,2,2],[18,0],{mir:sd<0?0:0,rot:[['y',fan[i]*sd*.9+a,sd*3,zc],['z',-sd*.75,sd*3,9]]})); }
+   return {k:.0625,tex:'spider',parts}; },
+ wolf:(m)=>{ const sit=m.sit?1:0, tail=m.tame?.9:1.0; return {k:.0625,tex:m.tame&&ENT.wolf_tame?'wolf_tame':'wolf',parts:[
+   P([-3,7.5,5],[6,6,4],[0,0]), P([-3,13.5,6],[2,2,1],[16,14]), P([1,13.5,6],[2,2,1],[16,14]), P([-1.5,7.5,8],[3,3,4],[0,10]),
+   P([-3,6.5,-5],[6,9,6],[18,14],{rot:[['x',-Math.PI/2,11,-2]]}), P([-4,8,-1],[8,6,7],[21,0],{rot:[['x',-Math.PI/2,11,2.5]]}),
+   P([-2.5,0,3],[2,8,2],[0,18],{rot:[['x',sw4(m,0),8,4]]}), P([.5,0,3],[2,8,2],[0,18],{rot:[['x',sw4(m,1),8,4]]}), P([-2.5,0,-8],[2,8,2],[0,18],{rot:[['x',sw4(m,1),8,-7]]}), P([.5,0,-8],[2,8,2],[0,18],{rot:[['x',sw4(m,0),8,-7]]}),
+   P([-1,4,-10],[2,8,2],[9,18],{rot:[['x',tail,12,-9]]})]}; },
+ slime:(m)=>{ const sq=m.onGround?.06:-.04; return {k:.125,tex:'slime',sy:1+sq*2,parts:[ P([-3,1,-3],[6,6,6],[0,16]), P([-3.3,4.1,1.5],[2,2,2],[32,0]), P([1.3,4.1,1.5],[2,2,2],[32,4]), P([-.5,3,2.5],[1,1,1],[32,8])],
+   outer:[P([-4,0,-4],[8,8,8],[0,0])]}; } };
+const modelFor=m=>{ const f=MODELS[m.type]; if(!f||!PACK.on) return null; const tk=m.type==='wolf'&&m.tame&&ENT.wolf_tame?'wolf_tame':m.type; if(!ENT[tk]&&!ENT[m.type]) return null; return f; };
+
+// ---- geometry ----
+function boxQuads(out,pt,xf,tw,th,rw,rh){ const [x0a,y0a,z0a]=pt.p, [w,h,d]=pt.s, g=pt.g||0, x0=x0a-g,y0=y0a-g,z0=z0a-g,x1=x0a+w+g,y1=y0a+h+g,z1=z0a+d+g;
+  let uv=pt.uv; const mir=!!pt.mir||(pt.uvM&&rh===32); if(pt.uvM&&rh===32) uv=pt.uvM; const [u,v]=uv;
+  const F=[{o:[x0,y1,z0],a:[x1-x0,0,0],b:[0,0,z1-z0],r:[u+d,v,w,d]},{o:[x0,y0,z1],a:[x1-x0,0,0],b:[0,0,z0-z1],r:[u+d+w,v,w,d]},
+    {o:[x0,y1,z1],a:[x1-x0,0,0],b:[0,y0-y1,0],r:[u+d,v+d,w,h]},{o:[x0,y1,z0],a:[0,0,z1-z0],b:[0,y0-y1,0],r:[u,v+d,d,h]},
+    {o:[x1,y1,z1],a:[0,0,z0-z1],b:[0,y0-y1,0],r:[u+d+w,v+d,d,h]},{o:[x1,y1,z0],a:[x0-x1,0,0],b:[0,y0-y1,0],r:[u+d+w+d,v+d,w,h]}];
+  if(mir){ const t=F[3].r; F[3].r=F[4].r; F[4].r=t; }
+  for(const f of F){ const [ru,rv,rwid,rhei]=f.r, V=[]; for(const [a,b] of [[0,0],[1,0],[1,1],[0,1]]){ const q=[f.o[0]+f.a[0]*a+f.b[0]*b,f.o[1]+f.a[1]*a+f.b[1]*b,f.o[2]+f.a[2]*a+f.b[2]*b], W=xf(q), uu=(ru+(mir?1-a:a)*rwid)/rw, vv=(rv+b*rhei)/rh; V.push([W[0],W[1],W[2],uu,vv]); }
+    for(const i of [0,1,2,0,2,3]) out.push(...V[i]); } }
+function partsOut(parts,m,K,sy,tex,out){ const e=ENT[tex]; const rw=64, rh=64*e.h/e.w, S=m.size?m.size*.5:m.baby?.55:1, cf=Math.cos(m.face), sf=Math.sin(m.face);
+  for(const pt of parts){ const rot=pt.rot||[]; boxQuads(out,pt,(q)=>{ let p=q; for(const [ax,a,c1,c2] of rot) p=ax==='x'?rX(p,a,c1,c2):ax==='y'?rY(p,a,c1,c2):rZ(p,a,c1,c2);
+      const lx=p[0]*K, ly=p[1]*K*(sy||1), lz=p[2]*K; return [m.x+(lx*cf+lz*sf)*S, m.y+ly*S, m.z+(-lx*sf+lz*cf)*S]; },e.w,e.h,rw,rh); } }
+
+// ---- drawing ----
+const skinned=m=>!!modelFor(m);
+{ const _em=emitMob; emitMob=function(vb,m){ if(skinned(m)) return; return _em.apply(this,arguments); }; }
+function drawSkins(){ if(!PACK.on||!world||!mobs.length) return; let used=false, wasCull=false; const p=player;
+  for(const m of mobs){ if(Math.hypot(m.x-p.x,m.z-p.z)>56) continue; const f=modelFor(m); if(!f) continue; const M=f(m); const tk=M.tex; if(!ENT[tk]) continue;
+    if(!used){ used=true; gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform3fv(TU.uFog,FOG); const fr=world.radius*CS; gl.uniform2f(TU.uFocus,cam.tx??player.x,cam.tz??player.z); gl.uniform2f(TU.uFogR,fr-22,fr-6); gl.bindVertexArray(skVAO); wasCull=gl.isEnabled(gl.CULL_FACE); gl.disable(gl.CULL_FACE); }
+    const L=sampleLight(m.x,m.y+.6,m.z), hurt=m.hurtT>.18?[1,.45,.45]:m.frozen>0?[.7,.8,1.1]:[1,1,1];
+    const lit=[Math.min(1.1,(L[0]/255*SUNV[0]+L[4]/255+.04)),Math.min(1.1,(L[1]/255*SUNV[1]+L[5]/255+.04)),Math.min(1.1,(L[2]/255*SUNV[2]+L[6]/255+.04))];
+    const pass=(parts,tex,mul,blend)=>{ if(!parts.length||!ENT[tex]) return; const out=[]; partsOut(parts,m,M.k,M.sy,tex,out); if(out.length>SK_CAP) return; const d=new Float32Array(out);
+      gl.uniform3f(TU.uL,lit[0]*hurt[0]*mul[0],lit[1]*hurt[1]*mul[1],lit[2]*hurt[2]*mul[2]); gl.uniform1f(TU.uBlend,blend?1:0);
+      if(blend){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); }
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,ENT[tex].tex); gl.activeTexture(gl.TEXTURE0); gl.bindBuffer(gl.ARRAY_BUFFER,skVBO); gl.bufferSubData(gl.ARRAY_BUFFER,0,d); gl.drawArrays(gl.TRIANGLES,0,d.length/5);
+      if(blend) gl.disable(gl.BLEND); };
+    pass(M.parts,tk,[1,1,1],false);
+    if(M.fur) pass(M.fur.parts,M.fur.tex,M.fur.col.map(v=>v/255),false);
+    if(M.outer) pass(M.outer,tk,[1,1,1],true); }
+  if(used){ gl.uniform1f(TU.uBlend,0); if(wasCull) gl.enable(gl.CULL_FACE); gl.useProgram(prog); gl.bindVertexArray(null); } }
+{ const _dt=drawTextured; drawTextured=function(){ _dt.apply(this,arguments); try{ drawSkins(); }catch(e){ if(!drawSkins.err){ drawSkins.err=1; console.error('skins',e); } } }; }
+window.__skins={MODELS,modelFor,partsOut};
 })();
 
 </script>
