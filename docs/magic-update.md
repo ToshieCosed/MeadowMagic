@@ -165,3 +165,11 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - New showcase worlds get a **GATE LAB** west of the wall: a 4-bit ripple counter built only from NAND/NOT gates (master-slave T flip-flops, 9 gates each), a CLOCK gate and a reset lever. Each gate is a small pod; wireless channels carry the nets, so no routing is needed.
 - Flip the lever to run. Test: `tools/tests/phase20_lab.py` (counts 0..15 with normal ripple glitches).
 - Next stages: gate-built frame RAM, read-out to the wall, animation engines (countdown, ball, sweeps).
+
+### v0.43.1 — frame RAM, writer and wall read-out
+
+- **Frame RAM** (32x20 stored blocks, 2x2 pixels each): every cell is a four-tile ring (plus write gate, hold gate, read gate, bus drivers) that remembers a level 0-16. No memory block. Rows select over channels; columns share a data bus and a read bus. Stacked in 8 layers beside the wall so it stays loaded.
+- **Wall read-out**: a scan counter (clock gates) picks stored row k; both display rows 2k and 2k+1 strobe together, one count later (down-counter, so offset -1).
+- **Writer**: a write counter picks one RAM row every 4 ticks; each column's data is (row count XOR sweep level XOR column), with a slow clock stepping the sweep.
+- Engine: wireless channel levels are cached once per tick (tile step 33 -> 20 ms headless).
+- Tests: `phase21_ram.py` (write/read all cells), `phase23_sweep.py` (writer + RAM + wall). The 64x40 wall is now 40 rows; the old analog-scan generators and `phase19`/`phase22` tests were removed.

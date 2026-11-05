@@ -7064,7 +7064,7 @@ function pistonRetract(t){ const d=DIR6[t.tech.f], h=[t.x+d[0],t.y+d[1],t.z+d[2]
   t._mv={list:mv,k:0,dur:3,ext:false,head:true}; t.tech.ext=false; markMesh(t); sfx('piston',t.x+.5,t.y+.5,t.z+.5,.5,16); }
 
 /* ---------- the tick ---------- */
-let acc=0, statT=0, uiT=0; const wch={}, wchN={};
+let acc=0, statT=0, uiT=0; const wch={}, wchN={}; const chMaxC=new Map(); const chMax=ch=>{ let v=chMaxC.get(ch); if(v===undefined){ v=0; const o=wch[ch]; if(o) for(const k in o){ const n=+o[k]; if(n>v) v=n; } chMaxC.set(ch,v); } return v; };
 function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
   if((tankGroupsT-=dt)<=0){ tankGroupsT=.5; buildTankGroups(); for(const g of tankGroups) levelGroup(g); }
   if((lineT-=dt)<=0){ lineT=1; buildLines(); updateForced(); }
@@ -7078,10 +7078,11 @@ function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
   // signals: gates read last tick's outputs, so loops settle one step at a time
   for(const t of list){ const k=t.tech.type; if(k==='gate'){ t._nso=gateEval(t); if(!t.tech.inf) t.tech.e=Math.max(0,t.tech.e-.02); } }
   for(const t of list) if(t.tech.type==='gate'&&t._nso!==t._so){ t._so=t._nso; t._chg=1; }
+  chMaxC.clear();
   for(const t of list){ const T=t.tech, k=T.type;
-    if(k==='wterm'){ const pw=T.e>.05; if(pw&&!T.inf) T.e-=.05; const chL=Math.max(0,...Object.values(wch[T.ch]||{}).map(Number)); t._rx=chL;
+    if(k==='wterm'){ const pw=T.e>.05; if(pw&&!T.inf) T.e-=.05; const chL=chMax(T.ch); t._rx=chL;
       const out=pw?wEval(t,chL):0; t._nlv=out; t._so=out>0; if(T.role==='tx'){ wchN[T.ch]=wchN[T.ch]||{}; wchN[T.ch][TK(t.x,t.y,t.z)]=out; } }
-    else if(k==='wbasic'){ const pw=T.e>.05; if(pw&&!T.inf) T.e-=.05; const chL=Math.max(0,...Object.values(wch[T.ch]||{}).map(Number)); t._rx=chL;
+    else if(k==='wbasic'){ const pw=T.e>.05; if(pw&&!T.inf) T.e-=.05; const chL=chMax(T.ch); t._rx=chL;
       if(T.role==='tx'){ let on=false; for(let d=0;d<6;d++) if(wFace(t,d)==='in'&&sigIn(t,d)) on=true; on=on&&pw; t._nlv=on?16:0; wchN[T.ch]=wchN[T.ch]||{}; wchN[T.ch][TK(t.x,t.y,t.z)]=t._nlv; } else t._nlv=pw&&chL>0?16:0; t._so=t._nlv>0; }
     else if(k==='sbcast'||k==='srecv'){ const pw=T.e>.01; if(pw&&!T.inf) T.e-=.02; t._nlv=pw?wEval(t,0):0; t._so=t._nlv>0; }
     else if(typeOf(t)==='lamp'){ const conn=anyConn(t), want=T.e>=.5&&(!conn||anySig(t)); if(want) T.e-=.5; const isOn=!!BLOCKS[world.get(t.x,t.y,t.z)].lit;
@@ -9891,35 +9892,43 @@ function buildPPU(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1], N=64, SC=window._
   const fo=o=>{ const a=[off,off,off,off,off,off]; for(const k in o) a[k]=o[k]; return a; };
   const rx=(x,y,z,ch,face)=>tech(x,y,z,'wterm',4,{role:'rx',ch,conv:'level',fo:fo({[face]:'out'})});
   const tx=(x,z,ch,op)=>tech(x,G,z,'wterm',4,{role:'tx',ch,op,conv:'level'});
-  const X0=C-32, ZB=C+110, ZS=ZB-3, CA=100, CY=101, CB=102, CP=103, EQA=110, EQB=130, PRE=140, SG=[143,144], CM=146, CXA=200, D=3, ISOX=B.ISO_X, ISOZ=B.ISO_Z;
+  const X0=C-32, ZB=C+110, ZS=ZB-3, CA=100, CY=101, CB=102, CP=103, EQA=110, EQB=130, PRE=140, SG=[143,144], CM=146, CXA=200, D=2, ISOX=B.ISO_X, ISOZ=B.ISO_Z;
   const gen=(px,pz,ch,dls,ws)=>{ tx(px,pz,ch,'ADD'); [[1,0],[0,1],[-1,0],[0,-1]].slice(0,dls.length).forEach(([dx,dz],b)=>{ const f=dx>0?1:dx<0?0:dz>0?5:4; tech(px+dx,G,pz+dz,'sbcast',f,{pl:ws[b],conv:'preset'}); tech(px+2*dx,G,pz+2*dz,'gate',f,{g:'CLOCK',dl:dls[b]}); }); };
   // ---- the screen stands upright: 64 columns x NH rows in the x/y plane. Column isolators (ISO_Y) run up the back, row isolators (ISO_X) run across the front, a light sits between them ----
-  const NH=42, YB=G+2, ZW=ZB, FM=[0,1,4,5,2,3], P=(x,y,z)=>[x,YB+(z-ZS),ZW+(y-G)], ISOY=B.ISO_Y;
+  const NH=40, YB=G+2, ZW=ZB, FM=[0,1,4,5,2,3], P=(x,y,z)=>[x,YB+(z-ZS),ZW+(y-G)], ISOY=B.ISO_Y;
   const pfo=a=>{ const n=[off,off,off,off,off,off]; for(let k=0;k<6;k++) n[FM[k]]=a[k]; return n; };
   const wt=(x,y,z,k,f,o)=>{ const q=P(x,y,z); if(o&&o.fo) o=Object.assign({},o,{fo:pfo(o.fo)}); return tech(q[0],q[1],q[2],k,FM[f],o); };
   const wrx=(x,y,z,ch,face)=>wt(x,y,z,'wterm',4,{role:'rx',ch,conv:'level',fo:fo({[face]:'out'})});
   for(let i=0;i<N;i++){ const x=X0+i; for(let z=ZS;z<ZB+NH;z++){ const q=P(x,G,z); put(q[0],q[1],q[2],ISOY); } const q=P(x,G,ZS); WIRE.addSeg(q[0],q[1],q[2],4,DK[i%3]); }
   for(let r=0;r<NH;r++){ const z=ZB+r; for(let x=X0-1;x<X0+N;x++){ const q=P(x,G+2,z); put(q[0],q[1],q[2],ISOX); } const q=P(X0-1,G+2,z); WIRE.addSeg(q[0],q[1],q[2],4,SC[r%3]); }
   for(let r=0;r<NH;r++) for(let i=0;i<N;i++) wt(X0+i,G+1,ZB+r,'mlight',5,{mode:'pal'});
-  // ---- per-column picture blocks: a = const AND S2, colour = a XOR S1, put on the column line ----
-  for(let i=0;i<N;i++){ const x=X0+i, cx=(i>>2)&15;
-    wt(x,G+2,ZS,'srecv',3,{op:'XOR',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); wrx(x,G+2,ZS-1,SG[0],4);
-    wt(x,G+3,ZS,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); wrx(x,G+4,ZS,SG[1],3); wrx(x,G+3,ZS-1,CXA+i,4);
-    tech(x,G,ZB-18,'wterm',4,{role:'tx',ch:CXA+i,conv:'preset',pl:cx}); tech(x,G+1,ZB-18,'lever',2,{on:true}); }
-  // ---- row strobes: row r fires when scan nibble == r & 15 AND scan high bits == r >> 4 ----
-  for(let r=0;r<NH;r++){ const z=ZB+r, x=X0-1; wt(x,G+4,z,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',1:'in',2:'in'})}); wrx(x-1,G+4,z,EQA+(r&15),0); wrx(x,G+5,z,EQB+(r>>4),3); }
+  // ---- column feeders: one receiver per column listens to the frame RAM's read bus (stored block c feeds display columns 2c and 2c+1) and drives the column line ----
+  const RBC=332, RSC=404, OFF=window.PPU_OFF==null?31:window.PPU_OFF;
+  for(let i=0;i<N;i++) wrx(X0+i,G+2,ZS,RBC+(i>>1),3);
+  // ---- row strobes: both display rows of stored row k fire together, OFF counts after the read select so the data has arrived ----
+  for(let r=0;r<NH;r++){ const z=ZB+r, x=X0-1; wt(x,G+4,z,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',1:'in',2:'in'})}); const m=((r>>1)+OFF)%32; wrx(x-1,G+4,z,EQA+(m&15),0); wrx(x,G+5,z,EQB+(m>>4),3); }
   // ---- the scan counter: a row every 3 ticks; a coarse row level (row >> 2); a phase counter that steps once per frame ----
-  const ZG=ZB-34; gen(X0-24,ZG,CA,[D,2*D,4*D,8*D],[1,2,4,8]); gen(X0-14,ZG,CY,[4*D,8*D,16*D,32*D],[1,2,4,8]); gen(X0-4,ZG,CB,[16*D,32*D],[1,2]); gen(X0+6,ZG,CP,[64*D,128*D,256*D,512*D],[1,2,4,8]);
-  // ---- the colour stage: S1 = row XOR phase, S2 = row OR phase, both gated by CLEAR ----
-  ['XOR','OR'].forEach((op,k)=>{ const x=X0-24+10*k, z1=ZB-44, z2=ZB-48; tx(x,z1,PRE+k,op); rx(x-1,G,z1,CY,0); rx(x+1,G,z1,CP,1); tx(x,z2,SG[k],'AND'); rx(x-1,G,z2,PRE+k,0); rx(x+1,G,z2,CM,1); });
-  tech(X0-4,G,ZB-48,'wterm',4,{role:'tx',ch:CM,conv:'preset',pl:15}); tech(X0-4,G+1,ZB-48,'lever',2,{on:true});
+  const ZG=ZB-34; gen(X0-24,ZG,CA,[D,2*D,4*D,8*D],[1,2,4,8]); gen(X0-14,ZG,CB,[16*D],[1]);
   // ---- the row decoder: sixteen "nibble == a" lines and four "high bits == b" lines ----
   const eq=(x,z,ch,rch,v)=>{ tx(x,z,ch,'EQ'); rx(x-1,G,z,rch,0); tech(x+1,G,z,'sbcast',1,{pl:v,conv:'preset'}); tech(x+2,G,z,'lever',2,{on:true}); };
-  for(let a=0;a<16;a++) eq(X0-24+6*(a%8),ZB-56-5*(a>>3),EQA+a,CA,a); for(let b=0;b<4;b++) eq(X0-24+6*b,ZB-68,EQB+b,CB,b);
+  for(let a=0;a<16;a++) eq(X0-24+6*(a%8),ZB-56-5*(a>>3),EQA+a,CA,a); for(let b=0;b<2;b++) eq(X0-24+6*b,ZB-68,EQB+b,CB,b);
+  // ---- read selects: stored row k is read while the scan count equals k ----
+  for(let k=0;k<20;k++){ const x=X0-30+4*k, z=ZB-76; tx(x,z,RSC+k,'AND'); rx(x-1,G,z,EQA+(k&15),0); rx(x+1,G,z,EQB+(k>>4),1); }
+  // ---- the picture writer: a write counter picks one stored row every 4 ticks and a slow clock steps a sweep level; every column's data line is (row count XOR sweep XOR column) ----
+  const apod=(x,y,z,ch,op,ins,cv)=>{ const f={}, slots=[[x-1,z,0,1],[x,z+1,5,4],[x,z-1,4,5]];
+    ins.forEach((c,k)=>{ if(c==null) return; const sl=slots[k]; tech(sl[0],y,sl[1],'wterm',4,{role:'rx',ch:c,conv:'level',fo:fo({[sl[2]]:'out'})}); f[sl[3]]='in'; });
+    if(cv!=null){ tech(x+1,y,z,'sbcast',1,{pl:cv,conv:'preset'}); tech(x+2,y,z,'lever',2,{on:true}); f[0]='in'; }
+    tech(x,y,z,'wterm',4,{role:'tx',ch,op,conv:'level',fo:fo(f)}); };
+  const CWA=150, CWB=151, EQW=152, EQWH=168, SWP=170, RAWC=424, DAT=300, ZW2=ZB-27;
+  gen(X0-20,ZW2,CWA,[4,8,16,32],[1,2,4,8]); gen(X0-10,ZW2,CWB,[64],[1]); gen(X0,ZW2,SWP,[64,128,256,512],[1,2,4,8]);
+  for(let a=0;a<16;a++) apod(X0-6+4*(a<9?a:a-9),G,a<9?ZB-21:ZB-17,EQW+a,'EQ',[CWA],a);
+  for(let b=0;b<2;b++) apod(X0+30+4*b,G,ZB-17,EQWH+b,'EQ',[CWB],b);
+  for(let k=0;k<20;k++) apod(X0+4*(k%10),G+2,k<10?ZB-21:ZB-17,RAWC+k,'AND',[EQW+(k&15),EQWH+(k>>4)]);
+  for(let c=0;c<32;c++) apod(X0+4*(c%16),G+2,ZB-9-4*(c>>4),DAT+c,'XOR',[CWA,SWP],c&15);
   const sign=(x,z,n,text)=>{ put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
-  sign(X0+N+3,ZB-2,S,'64x42 UPRIGHT DISPLAY\nColumn isolators behind,\nrow isolators in front.\nNo isolator ever talks\nto its neighbour.'); sign(X0-2,ZB-48,S,'CLEAR\nFlip the lever to blank\nthe whole screen.'); sign(X0-26,ZG-3,S,'SCAN COUNTER\nrow counter, coarse row\ncounter, phase counter');
-  w.meta.ppu=2; w.meta.ppuBox=[X0-30,X0+N+3,ZB-70,ZB+8,G,G+60];
-  for(let cx=(X0-30)>>4;cx<=(X0+N+3)>>4;cx++) for(let cz=(ZB-70)>>4;cz<=(ZB+8)>>4;cz++) touched.add(w.key(cx,cz));
+  sign(X0+N+3,ZB-2,S,'64x40 UPRIGHT DISPLAY\nColumn isolators behind,\nrow isolators in front.\nNo isolator ever talks\nto its neighbour.'); sign(X0-26,ZG-3,S,'SCAN COUNTER\nclock gates feed a 5-bit\ncount; decoders pick the\nstored row to read');
+  w.meta.ppu=2; w.meta.ppuBox=[X0-34,X0+N+3,ZB-80,ZB+8,G,G+60];
+  for(let cx=(X0-34)>>4;cx<=(X0+N+3)>>4;cx++) for(let cz=(ZB-80)>>4;cz<=(ZB+8)>>4;cz++) touched.add(w.key(cx,cz));
   for(const k of touched){ const ch=w.chunks.get(k); if(ch){ freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); w.chunks.delete(k); } }   // chunks that already exist are rebuilt with the new blocks
 }
 // trees, flowers and grass tufts stay out of the display's air space (cleared as each chunk is made; the display's own blocks are laid over it afterwards)
@@ -9954,14 +9963,30 @@ function tff(g,p,clk,rn){ const latch=(q,E,D,rst)=>{ g.push({n:q+'n1',t:'NAND',i
   g.push({n:p+'nc',t:'NOT',i:[clk]}); latch(p+'m',p+'nc',p+'sqb','q'); latch(p+'s',clk,p+'mq','qb'); return {q:p+'sq',qb:p+'sqb'}; }
 function counterNetlist(bits,half){ const g=[{n:'RN',t:'SRC',on:false},{n:'RST',t:'NOT',i:['RN']},{n:'CLK',t:'CLOCK',dl:half,i:['RST']}]; let clk='CLK'; const q=[];
   for(let b=0;b<bits;b++){ const r=tff(g,'t'+b,clk,'RN'); q.push(r.q); clk=r.qb; } return {gates:g,q}; }
+
+// ---- frame RAM: every cell is a four-tile ring that remembers a level 0-16 (no memory block anywhere); rows select with channels, columns share a data bus and a read bus ----
+function buildRam(bld,G,ox,oz,NC,NR,c0){ const fo=bld.fo, tech=bld.tech, D=c=>c0+c, RB=c=>c0+NC+c, Wc=r=>c0+2*NC+r, Hc=r=>c0+2*NC+NR+r, RS=r=>c0+2*NC+2*NR+r, RAW=r=>c0+2*NC+3*NR+r; let Y=G;
+  const rx=(x,z,ch,op,f)=>tech(x,Y,z,'wterm',4,{role:'rx',ch,op,conv:'level',fo:fo(f)}), tx=(x,z,ch,op,f)=>tech(x,Y,z,'wterm',4,{role:'tx',ch,op,conv:'level',fo:fo(f)}), sr=(x,z,op,f)=>tech(x,Y,z,'srecv',4,{op,conv:'level',fo:fo(f)});
+  const cells=[]; for(let r=0;r<NR;r++){ cells.push([]); for(let c=0;c<NC;c++){ const x=ox+4*(c&3), z=oz+4*r+2; Y=G+(c>>2);   // columns are stacked in layers of four so the whole RAM stays close to the wall
+    rx(x,z,D(c),'PASS',{0:'out'}); rx(x+1,z,Wc(r),'MIN',{1:'in',0:'out'});
+    const A=sr(x+2,z,'MAX',{1:'in',0:'out',4:'in',5:'out'}); sr(x+3,z,'PASS',{1:'in',4:'out'}); sr(x+3,z+1,'PASS',{5:'in',1:'out'});
+    rx(x+2,z+1,Hc(r),'MIN',{0:'in',5:'out'}); rx(x+2,z-1,RS(r),'MIN',{4:'in',5:'out'}); tx(x+2,z-2,RB(c),'PASS',{4:'in'}); cells[r].push(A); } }
+  Y=G; const ctl={data:[],raw:[],rs:[],probe:[]};
+  for(let c=0;c<NC;c++){ const x=ox+(c&15)*2, zz=oz-6-4*(c>>4); ctl.data.push(tech(x,G,zz,'wterm',4,{role:'tx',ch:D(c),conv:'preset',pl:0})); tech(x,G+1,zz,'lever',2,{on:true}); ctl.probe.push(tech(x,G,zz-10,'wterm',4,{role:'rx',ch:RB(c),conv:'level',fo:fo({})})); }
+  for(let r=0;r<NR;r++){ const z=oz+4*r+2, X=ox-12;
+    ctl.raw.push(tech(X-3,G+1,z,'lever',2,{on:false})); tech(X-3,G,z,'wterm',4,{role:'tx',ch:RAW(r),conv:'preset',pl:16});
+    rx(X,z,RAW(r),'PASS',{0:'out',4:'out'}); sr(X+1,z,'PASS',{1:'in',0:'out'}); tx(X+2,z,Wc(r),'PASS',{1:'in'}); tx(X,z+1,Hc(r),'INV',{5:'in'});
+    ctl.rs.push(tech(X-6,G+1,z,'lever',2,{on:false})); tech(X-6,G,z,'wterm',4,{role:'tx',ch:RS(r),conv:'preset',pl:16}); }
+  return {cells,ctl,NC,NR}; }
 function buildLab(w){ const C=w.gen.C, G=SHOW_G+1, bld=builder(w), ox=C-128, oz=C+60, BITS=4;
   const nl=counterNetlist(BITS,24), pl=placeNetlist(bld,G,ox,oz,nl.gates,{cols:9,ch0:60});
   const sign=(x,z,text)=>{ bld.put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n:[0,0,-1],u:[-1,0,0],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
   sign(ox+1,oz-2,'GATE LAB\n4-bit counter built\nfrom NAND gates only.\nFlip the lever to run.');
-  w.meta.lab=1; w.meta.labBox=[ox-3,ox+pl.width+3,oz-4,oz+pl.depth+3,G,G+10]; bld.flush(w.meta.labBox); window.__v42.last=pl; nl.q.forEach((n,i)=>0); return {pl,nl}; }
+  const NC=32, NR=20, rox=C+40, roz=C+24; const rm=buildRam(bld,G,rox,roz,NC,NR,300); window.__v42.ram=rm;
+  w.meta.lab=1; w.meta.labBoxes=[[ox-3,ox+pl.width+3,oz-4,oz+pl.depth+3,G,G+10],[rox-26,rox+20,roz-26,roz+4*NR+4,G,G+16]]; w.meta.labBoxes.forEach(b=>bld.flush(b)); window.__v42.last=pl; nl.q.forEach((n,i)=>0); return {pl,nl}; }
 window.__v42={buildLab,counterNetlist,placeNetlist,builder};
-{ const _f=ShowGen.prototype.fill; ShowGen.prototype.fill=function(ch){ _f.apply(this,arguments); const bx=typeof world!=="undefined"&&world&&world.meta&&world.meta.labBox; if(!bx) return; const x0=ch.cx<<4, z0=ch.cz<<4;
-    for(let lz=0;lz<16;lz++) for(let lx=0;lx<16;lx++){ const x=x0+lx, z=z0+lz; if(x<bx[0]||x>bx[1]||z<bx[2]||z>bx[3]) continue; for(let y=bx[4];y<=bx[5];y++) ch.blocks[(y*CS+lz)*CS+lx]=0; } }; }
+{ const _f=ShowGen.prototype.fill; ShowGen.prototype.fill=function(ch){ _f.apply(this,arguments); const bxs=typeof world!=="undefined"&&world&&world.meta&&world.meta.labBoxes; if(!bxs) return; const x0=ch.cx<<4, z0=ch.cz<<4;
+    for(const bx of bxs) for(let lz=0;lz<16;lz++) for(let lx=0;lx<16;lx++){ const x=x0+lx, z=z0+lz; if(x<bx[0]||x>bx[1]||z<bx[2]||z>bx[3]) continue; for(let y=bx[4];y<=bx[5];y++) ch.blocks[(y*CS+lz)*CS+lx]=0; } }; }
 { const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildLab(world); }catch(e){ console.error('lab build',e); } }; }
 })();
 
