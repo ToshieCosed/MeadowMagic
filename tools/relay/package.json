@@ -1,0 +1,1 @@
+{ "name": "strata-relay", "version": "0.1.0", "private": true, "type": "module", "description": "WebSocket relay for Strata's Minecraft compatibility mode (browsers cannot open raw Minecraft TCP or call the Microsoft/Xbox login endpoints directly)", "scripts": { "start": "node relay.mjs", "test": "node test-auth.mjs" }, "dependencies": { "ws": "^8.18.0" } }

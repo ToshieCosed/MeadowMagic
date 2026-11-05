@@ -23,3 +23,9 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 2. WebSocket relay program (browsers cannot open raw Minecraft TCP) + handshake/login.
 3. Chunk decoding.
 4. Other players: see them move, sync your own position.
+
+## Status: menu and login (2026-11-05)
+- Multiplayer -> Minecraft Compat shows a **version dropdown** (1.8.9 - 1.21.4, with protocol numbers), a **relay address** field and **Sign in with Microsoft**.
+- Sign-in is a device-code login run by `tools/relay/relay.mjs`; the browser shows the code and keeps only name + UUID. See `tools/relay/README.md` (needs your own Azure client id).
+- Verified against mock endpoints only. Not yet verified against real Microsoft/Mojang servers.
+- Next: server join through the relay (handshake, encryption, session-server join for online-mode servers), then chunks.

@@ -9994,19 +9994,42 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
 /* ===== mineCompatibility branch: multiplayer entry point ===== */
 (function(){
   const menu=document.getElementById('menu'), forge=document.getElementById('forge'); if(!menu||!forge) return;
-  const MP={mode:null};   // 'minecraft' (Minecraft Java compatibility layer) or 'strata' (this game's own protocol); nothing connects yet
+  // Java protocol numbers (data, not behaviour: only used when a Minecraft session starts)
+  const MC_VERSIONS=[['1.21.4',769],['1.21.1',767],['1.20.6',766],['1.20.4',765],['1.20.2',764],['1.19.4',762],['1.18.2',758],['1.17.1',756],['1.16.5',754],['1.12.2',340],['1.8.9',47]];
+  const MP={mode:null,version:MC_VERSIONS[0][0],protocol:MC_VERSIONS[0][1],relay:'ws://localhost:25580',auth:null};   // auth = {name,uuid} only; tokens stay in the relay
+  try{ MP.relay=localStorage.getItem('strata.relay')||MP.relay; const v=localStorage.getItem('strata.mcver'); const f=MC_VERSIONS.find(x=>x[0]===v); if(f){ MP.version=f[0]; MP.protocol=f[1]; } }catch(e){}
   const btn=document.createElement('button'); btn.className='primary'; btn.id='mpBtn'; btn.textContent='Multiplayer'; btn.style.background='var(--panel)'; btn.style.color='var(--text)'; btn.style.border='1px solid var(--line)'; btn.style.marginTop='8px';
   forge.insertAdjacentElement('afterend',btn);
   const sh=document.createElement('section'); sh.className='sheet'; sh.id='mpMenu'; sh.hidden=true; sh.setAttribute('aria-label','Multiplayer');
   sh.innerHTML='<div class="brand"><h1>MULTIPLAYER</h1></div><p class="lede">Choose what you are connecting to.</p><div class="stack" role="radiogroup" aria-label="Multiplayer type">'
    +'<button class="size" data-mp="minecraft"><i>Minecraft Compat</i><b>Java servers</b><em>Join a Minecraft server: its blocks, entities and other players</em></button>'
    +'<button class="size" data-mp="strata"><i>This Game</i><b>Strata servers</b><em>Play with others in a Strata world</em></button></div>'
+   +'<div class="stack" id="mcPanel" hidden><h2>Minecraft Compat</h2>'
+   +'<div class="field"><label class="l" for="mcVer">Minecraft version</label><select id="mcVer">'+MC_VERSIONS.map(v=>'<option value="'+v[0]+'">'+v[0]+' (protocol '+v[1]+')</option>').join('')+'</select></div>'
+   +'<div class="field"><label class="l" for="mcRelay">Relay address</label><input type="text" id="mcRelay" maxlength="120" spellcheck="false"></div>'
+   +'<button class="primary" id="mcAuth">Sign in with Microsoft</button>'
+   +'<div id="mcCode" hidden style="text-align:center"><p class="note">Open <a id="mcLink" target="_blank" rel="noopener"></a> and enter this code:</p><h1 id="mcUser" style="letter-spacing:.2em"></h1></div>'
+   +'<p class="note" id="mcStat">Not signed in.</p></div>'
    +'<p class="note" id="mpNote"></p><button class="primary" id="mpBack">Back</button>';
   document.body.appendChild(sh);
-  const note=sh.querySelector('#mpNote');
+  const $=id=>sh.querySelector('#'+id), note=$('mpNote'), panel=$('mcPanel'), ver=$('mcVer'), relay=$('mcRelay'), stat=$('mcStat'), codeBox=$('mcCode'), authBtn=$('mcAuth');
+  ver.value=MP.version; relay.value=MP.relay;
+  ver.onchange=()=>{ const f=MC_VERSIONS.find(x=>x[0]===ver.value); MP.version=f[0]; MP.protocol=f[1]; try{ localStorage.setItem('strata.mcver',f[0]); }catch(e){} };
+  relay.onchange=()=>{ MP.relay=relay.value.trim(); try{ localStorage.setItem('strata.relay',MP.relay); }catch(e){} };
   btn.onclick=()=>{ menu.hidden=true; sh.hidden=false; note.textContent=''; };
-  sh.querySelector('#mpBack').onclick=()=>{ sh.hidden=true; menu.hidden=false; };
-  sh.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{ MP.mode=b.dataset.mp; note.textContent=MP.mode==='minecraft'?'Minecraft Compat is being built: block and entity tables, then protocol, then other players. Not connectable yet.':'Strata multiplayer is not built yet.'; });
+  $('mpBack').onclick=()=>{ sh.hidden=true; menu.hidden=false; };
+  sh.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{ MP.mode=b.dataset.mp; panel.hidden=MP.mode!=='minecraft'; note.textContent=MP.mode==='minecraft'?'Not connectable yet: sign in and pick a version now; joining servers comes next.':'Strata multiplayer is not built yet.'; });
+  // Microsoft sign-in runs in the relay (the Xbox/Minecraft login endpoints refuse browser requests); the browser only shows the code
+  let ws=null;
+  const setAuth=a=>{ MP.auth=a; stat.textContent=a?'Signed in as '+a.name:'Not signed in.'; codeBox.hidden=true; authBtn.disabled=false; authBtn.textContent=a?'Sign in again':'Sign in with Microsoft'; };
+  authBtn.onclick=()=>{ try{ if(ws) ws.close(); }catch(e){} authBtn.disabled=true; stat.textContent='Contacting the relay...';
+    try{ ws=new WebSocket(MP.relay); }catch(e){ stat.textContent='Bad relay address.'; authBtn.disabled=false; return; }
+    ws.onopen=()=>ws.send(JSON.stringify({type:'auth_start'}));
+    ws.onerror=()=>{ if(!MP.auth||authBtn.disabled){ stat.textContent='Could not reach the relay at '+MP.relay+'. Start it with: node tools/relay/relay.mjs'; authBtn.disabled=false; } };
+    ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(x){ return; }
+      if(m.type==='auth_code'){ $('mcLink').textContent=m.verification_uri; $('mcLink').href=m.verification_uri; $('mcUser').textContent=m.user_code; codeBox.hidden=false; stat.textContent='Waiting for you to finish signing in...'; }
+      else if(m.type==='auth_ok') setAuth({name:m.name,uuid:m.uuid});
+      else if(m.type==='auth_error'){ setAuth(null); stat.textContent=m.message; } }; };
   window.__mp=MP;
 })();
 </script>
