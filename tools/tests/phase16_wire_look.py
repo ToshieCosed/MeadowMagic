@@ -13,7 +13,7 @@ SETUP='''async()=>{ const W=ms=>new Promise(r=>setTimeout(r,ms)); startWorld({id
  const o=T.sigLevel; T.sigLevel=(n,tw)=>n===la?(window.__red||0):n===lb?(window.__white||0):o(n,tw); window.__red=16; window.__white=4;
  // one block with different wires on all six faces
  world.set(X+3,G,Z+4,S); for(let f=0;f<6;f++) WIRE.addSeg(X+3,G,Z+4,f,[red,bl,wh,ci('lime'),ci('purple'),ci('orange')][f]);
- WIRE.rebuild(); WIRE.step(); await W(300);
+ for(let i=0;i<=3;i++) WIRE.addSeg(X+i,G-1,Z+2,2,bl); for(let i=1;i<=3;i++) WIRE.addSeg(X+3,G-1,Z+2+i,2,bl); WIRE.rebuild(); WIRE.step(); await W(300);
  const flows=()=>WIRE.nets().map(n=>({c:DYES[n.c].k,speed:n.speed,fl:n.segs.filter(s=>s.y===G&&s.z===Z).sort((a,b)=>a.x-b.x).map(s=>s.fl[0]-s.fl[1]).slice(2,4)}));
  window.X0=X+3; window.Z0=Z+2; return {flows:flows(),faces:[...world.wires.get((X+3)+','+G+','+(Z+4))].length}; }'''
 async def main():

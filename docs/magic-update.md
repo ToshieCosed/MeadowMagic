@@ -125,3 +125,6 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 
 ### v0.38.7 — floor runs turn up walls
 - Restored the inside-corner link: a wire along the floor joins the same-colour wire on the face of the wall block next to it (so a run can go horizontal, then up a pole or glass tower). Still no linking between faces of one block. Test: phase15 (3f).
+
+### v0.38.8 — cleaner corners
+- Corners and bends no longer sprout overshooting cross arms; only straight run-ends extend to the block edge.
