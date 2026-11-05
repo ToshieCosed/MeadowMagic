@@ -145,3 +145,9 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - **Pixel driver** (copper wire, advanced chip, a multicolour light): sits next to or in front of a flat wall of multicolour lights, maps the wall onto a 32×32 picture and plays a show on it — only while powered and the player is within 80 blocks, ~11 updates/s. Programs: Fireworks, Light cube; alternates every 16 s, tap the driver to lock one.
 - **Showcase world:** a 32×32 wall (1,024 lights) 46 blocks south of spawn, with a plate 24 blocks back linked by a yellow wire to the driver. New showcase worlds only.
 - Test: `tools/tests/phase18_lightshow.py`.
+
+### v0.40.1 — the showcase display is now built entirely from wiring
+- The pixel-driver wall is gone from the showcase. In its place: an **8×6 all-wire display**. Per pixel: a multicolour light, three single-colour bundles (red, green, blue) each opened by a wire, three analog level blocks (XOR) writing one colour each into its bundle, and seven wireless receivers.
+- Column levels and row levels come from a strip of broadcasters switched by levers. Animation comes from three phase generators: four free-running clock gates (each half the speed of the last) feed weighted level blocks that add on a broadcaster, so the phase counts 0–15 on a wireless channel. Red = column XOR phase 1, green = row XOR phase 2, blue = phase 3 XOR column XOR row.
+- Showcase logic blocks carry an `inf` flag so they run without an RF supply.
+- Test: `tools/tests/phase18_lightshow.py` (48 lights lit, changing).
