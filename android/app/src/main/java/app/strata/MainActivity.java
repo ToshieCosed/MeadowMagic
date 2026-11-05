@@ -6,6 +6,9 @@ import android.util.Log;
 import android.view.View;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -15,6 +18,16 @@ import java.io.File;
 import java.security.SecureRandom;
 
 public class MainActivity extends Activity {
+    private ValueCallback<Uri[]> fileCb;
+    @Override protected void onActivityResult(int req, int res, Intent data) {
+        if (req != 7701) { super.onActivityResult(req, res, data); return; }
+        if (fileCb == null) return; Uri[] r = null;
+        if (res == RESULT_OK && data != null) {
+            if (data.getClipData() != null) { int n = data.getClipData().getItemCount(); r = new Uri[n]; for (int k = 0; k < n; k++) r[k] = data.getClipData().getItemAt(k).getUri(); }
+            else if (data.getData() != null) r = new Uri[] { data.getData() };
+        }
+        fileCb.onReceiveValue(r); fileCb = null;
+    }
     private WebView web;
     private WsServer server;
     private String token;
@@ -34,7 +47,16 @@ public class MainActivity extends Activity {
         web = new WebView(this);
         WebSettings s = web.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false);
         s.setUseWideViewPort(true); s.setLoadWithOverviewMode(false); s.setTextZoom(100); s.setSupportZoom(false); s.setBuiltInZoomControls(false);
-        web.setWebChromeClient(new WebChromeClient() { @Override public boolean onConsoleMessage(ConsoleMessage m) { Log.d("StrataJS", m.message()); return true; } });
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(ConsoleMessage m) { Log.d("StrataJS", m.message()); return true; }
+            @Override public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb, FileChooserParams p) {   // lets <input type=file> (resource packs, skins, MIDI, images) open Android's picker
+                if (fileCb != null) fileCb.onReceiveValue(null);
+                fileCb = cb; Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
+                if (p != null && p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                try { startActivityForResult(Intent.createChooser(i, "Choose a file"), 7701); } catch (Exception e) { fileCb = null; return false; }
+                return true;
+            }
+        });
         if (server != null) web.addJavascriptInterface(new Bridge(), "StrataNative");
         setContentView(web);
         if (android.os.Build.VERSION.SDK_INT >= 28) getWindow().getAttributes().layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;

@@ -63,3 +63,8 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - View radius raised to 8 chunks (the server may still cap it); fog follows.
 - Own chat: if the server doesn't echo it back within ~2s it is shown locally.
 - Not yet: other players' crack animations (`block_break_animation`), item merge/despawn visuals, tool durability.
+
+## Stage 6 (1.8): field fixes
+- Android: `onShowFileChooser` so file inputs (resource packs, skins, MIDI, images) open the system picker.
+- The player is held in place until the chunk under them has arrived (max 8 s) so they don't fall through unloaded ground and get rubber-banded/hurt.
+- HUD coordinates show the server's coordinates; throw (Q / button) sends `block_dig` 4/3 so the server spawns the item; touch controls moved above the bottom hotbar; chat log sits below the top controls.
