@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Embeds src/mc/ids.json + src/mc/mcclient.js into src/strata.html between the MC-CLIENT markers."""
+import pathlib, re
+root = pathlib.Path(__file__).resolve().parent.parent
+p = root / 'src/strata.html'; s = p.read_text()
+code = (root / 'src/mc/mcclient.js').read_text(); ids = (root / 'src/mc/ids.json').read_text().strip()
+block = '/*MC-CLIENT-BEGIN*/\n' + code + '\nStrataMC.setIds(' + ids + ');\n/*MC-CLIENT-END*/\n'
+if '/*MC-CLIENT-BEGIN*/' in s:
+    s = re.sub(r'/\*MC-CLIENT-BEGIN\*/.*?/\*MC-CLIENT-END\*/\n', lambda m: block, s, flags=re.S)
+else:
+    k = '/* ===== mineCompatibility branch: multiplayer entry point ===== */'
+    assert k in s; s = s.replace(k, block + k, 1)
+p.write_text(s); print('embedded', len(block), 'bytes')

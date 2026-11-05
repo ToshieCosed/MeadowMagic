@@ -1,0 +1,1 @@
+{ "name": "strata-mctest", "private": true, "type": "module", "dependencies": { "minecraft-data": "latest", "minecraft-protocol": "latest", "ws": "^8.18.0" } }

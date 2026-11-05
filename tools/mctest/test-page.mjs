@@ -1,0 +1,15 @@
+// Browser-level test: Strata page -> relay -> offline protocol server; checks the chat UI end to end.
+import mc from 'minecraft-protocol'; import mcdata from 'minecraft-data'; import { spawn } from 'node:child_process'; import { createRequire } from 'node:module';
+const { chromium } = createRequire(import.meta.url)('playwright'); const wait = ms => new Promise(r => setTimeout(r, ms));
+const relay = spawn('node', ['../relay/relay.mjs'], { env: { ...process.env, PORT: '25591' }, stdio: 'ignore' }); await wait(1200);
+const ver = '1.20.4', d = mcdata(ver), got = []; const server = mc.createServer({ 'online-mode': false, version: ver, host: '127.0.0.1', port: 25777 });
+server.on('login', c => { c.write('login', { ...d.loginPacket, entityId: c.id }); c.once('playerJoin', () => {}); setTimeout(() => 0, 0); c.on('playerJoin', () => {});
+  server.once('playerJoin', cc => setTimeout(() => cc.write('system_chat', { content: { type: 'string', value: 'Welcome to the test server' }, isActionBar: false }), 300)); c.on('packet', (data, m) => { if (m.name === 'chat_message') got.push(data.message); }); });
+const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = []; pg.on('pageerror', e => errs.push(e.message)); pg.on('crash', () => console.log('PAGE CRASH')); pg.on('close', () => console.log('PAGE CLOSED')); server.on('error', e => console.log('srv err', e.message)); server.on('connection', c => c.on('error', e => console.log('client err', e.message)).on('end', r => console.log('client end', r)));
+await pg.addInitScript(() => { window.__mcDebug = s => (window.__dbg = window.__dbg || []).push(s); }); await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html'); await pg.waitForSelector('#mpBtn'); await pg.click('#mpBtn'); await pg.click('[data-mp=minecraft]');
+await pg.selectOption('#mcVer', { label: '1.20.3 / 1.20.4 (protocol 765)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:25591'); await pg.dispatchEvent('#mcRelay', 'change');
+await pg.fill('#mcHost', '127.0.0.1:25777'); await pg.click('#mcGo'); await pg.waitForFunction(() => document.querySelector('#mcLog').innerText.includes('Welcome'), null, { timeout: 30000 }).catch(async e => { console.log('LOG:', JSON.stringify(await pg.evaluate(() => document.querySelector('#mcLog').innerText + ' / ' + document.querySelector('#mcGame').hidden + ' / ' + document.querySelector('#mcStat').textContent + ' / ' + (window.__dbg||[]).join(','))), errs); });
+await pg.fill('#mcIn', 'hello from the page'); await pg.press('#mcIn', 'Enter'); await wait(600);
+await pg.screenshot({ path: '/tmp/mcpage.png' }); await pg.evaluate(() => document.activeElement.blur()); await wait(12500); const faded = await pg.evaluate(() => [...document.querySelectorAll('#mcLog div')].every(d => d.style.display === 'none' || d.style.opacity === '0'));
+const res = { chatShown: true, serverGot: got.includes('hello from the page'), fadedAfter11s: faded, errs }; res.pass = res.serverGot && faded && !errs.length; console.log(JSON.stringify(res));
+await b.close(); server.close(); relay.kill(); process.exit(res.pass ? 0 : 1);
