@@ -138,3 +138,10 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 ### v0.39.1 — terminal power network + stability
 - RF terminals (and flat ones) read the **whole** network: everything touching, every pole line, and now everything reachable through coloured wires/bundles, starting from every block of the screen (not just one). Readout: generator reserve and battery reserve shown separately, gain/use/battery in-out in RF/t, net per tick, line loss, node counts.
 - Wires: per-frame draw budget (wire detail scales down on huge builds), and a WebGL context-loss guard that saves the world and offers a reload instead of freezing.
+
+## v0.40.0 — multicolour light, pixel driver, light show
+- **Multicolour light** (2 from red+green+blue bulbs, copper wire, a white lamp): glows the colour its wires say. Signal-strength mode: any wire's level 1–16 picks one of the 16 dye colours. RGB mode (tap the light): a red, green and blue line (a bundle is ideal) set the three channels, level × 16 each, so mixed strengths mix a colour. Off at 0.
+- **Signal pressure plate** (2 stone): outputs a signal while a player stands within about 1.5 blocks of it.
+- **Pixel driver** (copper wire, advanced chip, a multicolour light): sits next to or in front of a flat wall of multicolour lights, maps the wall onto a 32×32 picture and plays a show on it — only while powered and the player is within 80 blocks, ~11 updates/s. Programs: Fireworks, Light cube; alternates every 16 s, tap the driver to lock one.
+- **Showcase world:** a 32×32 wall (1,024 lights) 46 blocks south of spawn, with a plate 24 blocks back linked by a yellow wire to the driver. New showcase worlds only.
+- Test: `tools/tests/phase18_lightshow.py`.
