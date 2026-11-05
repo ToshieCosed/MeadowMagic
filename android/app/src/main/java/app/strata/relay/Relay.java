@@ -128,6 +128,16 @@ public final class Relay implements WsServer.Handler {
         Session s = new Session(); s.name = Json.str(pr.json(), "name"); s.uuid = Json.str(pr.json(), "id"); s.mcToken = at; return s;
     }
 
+    /** Android can suspend the network while the user is in the browser; retry the chain a few times. */
+    private Session loginRetry(String at) throws IOException {
+        IOException last = null;
+        for (int i = 0; i < 6; i++) {
+            try { return minecraftLogin(at); }
+            catch (java.net.UnknownHostException | java.net.SocketException | java.net.SocketTimeoutException e) { last = e; try { Thread.sleep(2000); } catch (InterruptedException ie) { break; } }
+        }
+        throw last != null ? last : new IOException("network unavailable");
+    }
+
     private Session refresh() {
         try {
             String r = loadRefresh(); if (r == null) return null;
@@ -151,11 +161,13 @@ public final class Relay implements WsServer.Handler {
             long wait = Json.num(dj, "interval", 5) * 1000, end = System.currentTimeMillis() + Json.num(dj, "expires_in", 900) * 1000;
             while (System.currentTimeMillis() < end) {
                 Thread.sleep(wait);
-                Http.Res t = Http.postForm(cfg.ep.get("token"), form("client_id", clientId, "grant_type", "urn:ietf:params:oauth:grant-type:device_code", "device_code", Json.str(dj, "device_code")));
+                Http.Res t;
+                try { t = Http.postForm(cfg.ep.get("token"), form("client_id", clientId, "grant_type", "urn:ietf:params:oauth:grant-type:device_code", "device_code", Json.str(dj, "device_code"))); }
+                catch (IOException ne) { continue; }   // app was in the background (Android pauses its network); keep polling until the code expires
                 Map<String, Object> tj = t.json(); String at = Json.str(tj, "access_token");
                 if (t.ok() && at != null) {
                     String nr = Json.str(tj, "refresh_token"); if (nr != null) saveRefresh(nr);
-                    try { Session s = minecraftLogin(at); session = s; send(x, Json.of("type", "auth_ok", "name", s.name, "uuid", s.uuid)); }
+                    try { Session s = loginRetry(at); session = s; send(x, Json.of("type", "auth_ok", "name", s.name, "uuid", s.uuid)); }
                     catch (IOException e) { send(x, Json.of("type", "auth_error", "message", e.getMessage())); }
                     return;
                 }
