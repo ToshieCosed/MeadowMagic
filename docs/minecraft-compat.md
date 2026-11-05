@@ -75,3 +75,9 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Sounds: break/place sounds on server-confirmed block changes, material per Minecraft block; the pack sound lookup now also knows the 1.9+ layout (`block/<material>/break|place|hit|step`, `entity/item/pickup`, ...). Packs imported before this need re-importing to pick up the new sounds.
 - Cracks: Minecraft's `destroy_stage_0..9` from the resource pack (both `textures/blocks` and `textures/block`), else a built-in set, drawn per pixel on every face.
 - Pickup feed (+items list) shows again in compat (on the server's `collect`), and has a settings toggle (also in plain Strata).
+
+## Stage 8 (1.8): survival basics
+- `explosion` packets remove the listed blocks, add knockback, play a boom; `named_sound_effect` is mapped to Strata/pack sounds (block dig/step, mob voices, hurt, bow, explosions, doors...).
+- More mob types map onto Strata mobs (giant, magma cube, dragon/wither, endermite, guardian, snow golem, iron golem).
+- Strata's wall-climbing is OFF in Minecraft mode (setting: "Wall climbing in Minecraft mode"), and horizontal speed is capped to Minecraft's (walk 4.4, sprint 5.7, sneak 1.4 b/s) with dash disabled, so servers stop rubber-banding sprinting.
+- Not yet: other players' bodies (name tags, armor, held items, poses via `entity_equipment`/metadata), arrows and other projectiles, textured 3D drop/hand items.

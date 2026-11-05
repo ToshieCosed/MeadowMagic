@@ -3,8 +3,8 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks'];
-  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt'];
+  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 62: 'slime', 63: 'demon', 64: 'demon', 67: 'spider', 68: 'slime', 97: 'lost', 99: 'zombie', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
   // ---- late block registration (ids 8192+), removed again on stop ----
@@ -127,6 +127,13 @@
       CRK = []; for (let n = 0; n < 10; n++) { const d = new Uint8ClampedArray(1024), cnt = Math.round(order.length * (n + 1) / 10); for (let q = 0; q < cnt; q++) { const o = order[q] * 4; d[o] = d[o + 1] = d[o + 2] = 40; d[o + 3] = 200; } CRK.push(d); } }
     return CRK[st];
   }
+  const SNDMAP = { 'random.bow': 'bowShoot', 'random.bowhit': 'arrowHit', 'random.pop': 'pop', 'random.eat': 'eat', 'random.burp': 'burp', 'liquid.splash': 'splash', 'random.door_open': 'doorOpen', 'random.door_close': 'doorClose', 'random.chestopen': 'chestOpen', 'random.chestclosed': 'chestClose', 'creeper.primed': 'ignite', 'fire.ignite': 'ignite', 'random.explode': 'fall', 'game.player.hurt': 'hurt', 'game.neutral.hurt': 'hurt', 'game.hostile.hurt': 'hurt', 'game.player.die': 'hurt', 'game.hostile.die': 'hurt', 'random.orb': 'orb' };
+  const DIGB = { stone: 'STONE', grass: 'GRASS', gravel: 'GRAVEL', sand: 'SAND', wood: 'PLANKS', cloth: 'WOOL', glass: 'GLASS', snow: 'SNOW' };
+  function mcSound(name, X, y, Z, vol) {
+    let m = /^(?:dig|step)\.(\w+)$/.exec(name); if (m) { const b = B[DIGB[m[1]]] || B.STONE; sfxBlock(b, /^dig/.test(name) ? 'break' : 'step', Math.floor(X), Math.floor(y), Math.floor(Z), vol); return; }
+    if (SNDMAP[name]) { sfx(SNDMAP[name], X, y, Z, Math.min(1.5, vol || 1), 40); return; }
+    m = /^mob\.(\w+?)\.(say|hurt|death|idle|hit|step|growl|bark|howl)$/.exec(name); if (m) { const t = { creeper: 'zombie', zombiepig: 'zombie', enderman: 'walker', cave: 'spider', witch: 'lost', villager: 'lost', silverfish: 'spider', blaze: 'demon', ghast: 'demon' }[m[1]] || m[1]; const o = sfxOut(X, y, Z, Math.min(1.2, vol || 1), 32); if (o && sfxPackMob(o, t, m[2] === 'say' ? 'idle' : m[2] === 'death' ? 'death' : 'hurt')) return; if (o && m[2] !== 'step') SND.hurt(o, AC.currentTime); }
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -178,6 +185,7 @@
         quadRaw(crVB, [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)], [tex[o], tex[o + 1], tex[o + 2]], 1); }
       upload(crMesh, crVB, gl.STREAM_DRAW);
     },
+    wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     stepHealth(dt) { player.hurtT += dt; },
     stepDecay() {},
     dropHeld(all) { if (!held()) return; S.client.api.dig(all ? 3 : 4, 0, 0, 0, 0); S.client.api.swing(); },
@@ -232,6 +240,11 @@
       meta(eid, idx, it) { const d = S.dr.get(eid); if (!d || idx !== 10 || !it) return; const id = strataItem(it);
         if (!d.q) { d.q = { x: d.x, y: d.y, z: d.z, sx: d.x, sy: d.y, sz: d.z, vx: d.vx, vy: d.vy, vz: d.vz, id, n: it.count, age: 0, spin: Math.random() * 6, mc: eid }; drops.push(d.q); } else { d.q.id = id; d.q.n = it.count; } },
       collect(eid, who) { const d = S.dr.get(eid); if (who === S.eid && d && d.q) { try { feed(d.q.id, d.q.n); } catch (e) { /* ui */ } } Hd.destroy([eid]); },
+      sound(name, x, y, z, vol) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; try { mcSound(name, X, y, Z, vol); } catch (e) { /* audio */ } },
+      explosion(x, y, z, rad, rec, vx, vy, vz) { if (!S.world) return; const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
+        for (const r of rec) { const X = bx + r[0] + S.OX, Z = bz + r[2] + S.OZ; setBlock(X, by + r[1], Z, 0); }
+        try { burst(x + S.OX, y + .5, z + S.OZ, [190, 190, 190], 24, 5); sfx('fall', x + S.OX, y, z + S.OZ, 1.4, 48); } catch (e) { /* fx */ }
+        player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } },
       velocity(id, vx, vy, vz) { { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; d.q.vt = 1; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
       status(id, st) { if (st === 2 || st === 3) { if (id === S.eid) hurtFx(); else { const m = S.ents.get(id); if (m) m.hurtT = .35; } } },
       sign(x, y, z, ln) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; world.decor = world.decor || []; delSign(X, y, Z);
@@ -269,6 +282,8 @@
 
   function tick() {   // entity smoothing + our position to the server
     const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now;
+    if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4; p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
+      if (!p.inWater && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
