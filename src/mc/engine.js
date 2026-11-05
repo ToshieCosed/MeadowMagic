@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
@@ -77,8 +77,14 @@
     if (e.k === 'skip') return 0;
     return register(e);
   }
-  const lookup = (st, below) => { let v; if ((st & 8) && isDoorId(st >> 4)) v = stateToId(st, below); else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) S.mcb[v] = st >> 4; return v; };
+  const lookup = (st, below) => { let v; if ((st & 8) && isDoorId(st >> 4)) v = stateToId(st, below); else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) { S.mcb[v] = st >> 4; if (v >= 8192) MAT_OF[v] = mcMat(st >> 4); } return v; };
 
+  // Strata sound material (index into MATS_S) for a Minecraft block id: stone grass dirt gravel sand wood leaves metal glass wool snow slime plant
+  const MATSETS = [[1, 4, 14, 15, 16, 21, 22, 24, 43, 44, 45, 48, 49, 52, 56, 61, 62, 67, 73, 74, 87, 89, 97, 98, 108, 109, 112, 114, 116, 121, 128, 139, 152, 155, 156, 159, 172, 173, 179, 180, 181, 182], [2, 31], [3, 60, 110, 3], [13], [12, 88], [5, 17, 25, 47, 50, 53, 54, 58, 63, 64, 65, 68, 72, 84, 85, 96, 107, 125, 126, 134, 135, 136, 146, 162, 163, 164, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197], [18, 161], [41, 42, 57, 71, 101, 145, 147, 148, 154, 133, 66, 27, 28, 157], [20, 95, 102, 160, 79], [35, 171], [78, 80], [165], [6, 32, 37, 38, 39, 40, 59, 83, 81, 86, 103, 104, 105, 106, 111, 115, 127, 141, 142, 175, 176]];
+  const mcMat = id => { for (let m = 0; m < MATSETS.length; m++) if (MATSETS[m].includes(id)) return m; return 0; };
+  function blockSound(X, y, Z, old, nw) {   // the server confirmed a change: play the break / place sound of the right material
+    try { if (old > 0 && nw <= 0 && !isLiquid(old)) sfxBlock(old, 'break', X, y, Z); else if ((old <= 0 || isLiquid(old)) && nw > 0 && !isLiquid(nw)) sfxBlock(nw, 'place', X, y, Z); } catch (e) { /* audio */ }
+  }
   // ---- world ----
   class McGen { constructor(seed, size, h) { this.seed = seed; this.size = size; this.H = h; this.mcompat = true; }
     height() { return 64; } sample() { return 64; } biomeAt() { return 0; } spawnOK() { return 64; } village() { return false; }
@@ -115,6 +121,12 @@
   }
   const faceOf = r => { const h = r.hit, p = r.prev; if (!p) return 1; const d = [p[0] - h[0], p[1] - h[1], p[2] - h[2]]; return d[1] < 0 ? 0 : d[1] > 0 ? 1 : d[2] < 0 ? 2 : d[2] > 0 ? 3 : d[0] < 0 ? 4 : 5; };
 
+  let CRK = null; function defCrack(st) {   // built-in stand-in for destroy_stage_N: cracks that grow outwards from a few points
+    if (!CRK) { let sd = 12345; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff, order = [], seen = new Set();
+      for (let w = 0; w < 7; w++) { let px = 3 + (rnd() * 10 | 0), py = 3 + (rnd() * 10 | 0); for (let n = 0; n < 26; n++) { const k = py * 16 + px; if (!seen.has(k)) { seen.add(k); order.push(k); } px = Math.max(0, Math.min(15, px + ((rnd() * 3 | 0) - 1))); py = Math.max(0, Math.min(15, py + ((rnd() * 3 | 0) - 1))); } }
+      CRK = []; for (let n = 0; n < 10; n++) { const d = new Uint8ClampedArray(1024), cnt = Math.round(order.length * (n + 1) / 10); for (let q = 0; q < cnt; q++) { const o = order[q] * 4; d[o] = d[o + 1] = d[o + 2] = 40; d[o + 3] = 200; } CRK.push(d); } }
+    return CRK[st];
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -140,11 +152,13 @@
       const speed = good ? SP[m[1]] : 1, harvest = !(e.tl === 'pick' && !(m && m[2] === 'pickaxe'));
       return Math.max(.05, Math.ceil(1 / (speed / e.h / (harvest ? 30 : 100))) / 20 * 1.1);
     },
-    stepDrops(dt) {   // server-owned dropped items: tween/fall locally, never pick up locally (the server does that)
+    stepDrops(dt) {   // server-owned dropped items: dead-reckon the server position (gravity, ground), glide the drawn item toward it
+      const k = 1 - Math.exp(-12 * dt);
       for (let i = drops.length - 1; i >= 0; i--) { const q = drops[i]; q.age += dt; q.spin += dt * 1.8; if (!q.mc) { drops.splice(i, 1); continue; }
-        q.vy = Math.max(q.vy - 18 * dt, -20); q.vx *= Math.exp(-3 * dt); q.vz *= Math.exp(-3 * dt);
-        const nx = q.x + q.vx * dt, nz = q.z + q.vz * dt; if (!world.solid(Math.floor(nx), Math.floor(q.y), Math.floor(nz))) { q.x = nx; q.z = nz; } else q.vx = q.vz = 0;
-        const ny = q.y + q.vy * dt; if (world.solid(Math.floor(q.x), Math.floor(ny - .15), Math.floor(q.z))) { q.y = Math.floor(ny - .15) + 1.15; q.vy = 0; } else q.y = ny; }
+        q.vy = Math.max(q.vy - 32 * dt, -40); const dr = Math.exp(-2 * dt); q.vx *= dr; q.vz *= dr;
+        const nx = q.sx + q.vx * dt, nz = q.sz + q.vz * dt; if (!world.solid(Math.floor(nx), Math.floor(q.sy), Math.floor(nz))) { q.sx = nx; q.sz = nz; } else { q.vx = q.vz = 0; }
+        const ny = q.sy + q.vy * dt; if (world.solid(Math.floor(q.sx), Math.floor(ny - .05), Math.floor(q.sz))) { q.sy = Math.floor(ny - .05) + 1.05; q.vy = 0; q.vx *= .6; q.vz *= .6; } else q.sy = ny;
+        q.x += (q.sx - q.x) * k; q.y += (q.sy - q.y) * k; q.z += (q.sz - q.z) * k; }
     },
     tryInteract(sx, sy) {
       const r = pick(sx, sy); if (!r || !reachOK(...r.hit)) return false; const h = held(), a = S.client.api;
@@ -155,6 +169,17 @@
       if (!best) return null; const r = pick(sx, sy); if (r) { const c = [r.hit[0] + .5, r.hit[1] + .5, r.hit[2] + .5], tb = (c[0] - o[0]) * d[0] + (c[1] - o[1]) * d[1] + (c[2] - o[2]) * d[2]; if (tb < bt - .6) return null; } return best; },
     tapEntity(sx, sy) { const e = IMPL.pickEntity(sx, sy); if (!e) return false; const m = e.mob; if (Math.hypot(m.x - player.x, m.z - player.z) > 4.2) { toast('Too far away'); return true; }
       if ((player.atkCd || 0) > 0) return true; player.atkCd = .4; player.swingT = .25; S.client.api.attack(m.eid); S.client.api.swing(); m.hurtT = .3; return true; },
+    buildCracks() {   // Minecraft's own destroy_stage_0..9 (from the resource pack when present, a built-in set otherwise) laid over every face
+      crVB.n = 0; PAT = 0; CB = 0; if (!mining || !mining.target || mining.prog <= 0) { crMesh.n = 0; return; }
+      const [x, y, z] = mining.target.hit, stage = Math.min(9, Math.floor(mining.prog * 10)), tex = window.PACK_CRACK ? window.PACK_CRACK[stage] : defCrack(stage);
+      setVL(sampleLight(x + .5, y + 1.2, z + .5)); VL[3] = 225;
+      for (const F of FACES) for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) { const o = (j * 16 + i) * 4; if (tex[o + 3] < 60) continue;
+        const P = (u, v) => { const q = [x, y, z]; q[F.a] += F.s + (F.s ? .005 : -.005); q[F.u] += u; q[F.v] += v; return q; }, u0 = i / 16, u1 = (i + 1) / 16, v0 = 1 - (j + 1) / 16, v1 = 1 - j / 16;
+        quadRaw(crVB, [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)], [tex[o], tex[o + 1], tex[o + 2]], 1); }
+      upload(crMesh, crVB, gl.STREAM_DRAW);
+    },
+    stepHealth(dt) { player.hurtT += dt; },
+    stepDecay() {},
     dropHeld(all) { if (!held()) return; S.client.api.dig(all ? 3 : 4, 0, 0, 0, 0); S.client.api.swing(); },
     selectSlot(i) { S.saved.selectSlot(i); S.client.api.select(i); popName(); },
     clickSlot(arr, i) {
@@ -182,7 +207,7 @@
       cur: null,
       login(p) { S.gm = p.gamemode; S.eid = p.eid; }, respawn() { for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); },
       time() {},
-      health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (hp < player.hp) hurtFx(); player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
+      health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (S.lastHp != null && hp < S.lastHp) hurtFx(); S.lastHp = hp; player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
       items(wid, l) { if (wid === 0) { S.slots = l.slice(0, 45); while (S.slots.length < 45) S.slots.push(null); syncInv(); } },
@@ -205,9 +230,9 @@
       unload(cx, cz) { unloadKey(ckey(cx + (S.OX >> 4), cz + (S.OZ >> 4))); },
       dropSpawn(eid, x, y, z, vx, vy, vz) { if (S.world) S.dr.set(eid, { x: x + S.OX, y, z: z + S.OZ, vx: vx * 20, vy: vy * 20, vz: vz * 20 }); },
       meta(eid, idx, it) { const d = S.dr.get(eid); if (!d || idx !== 10 || !it) return; const id = strataItem(it);
-        if (!d.q) { d.q = { x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz, id, n: it.count, age: 0, spin: Math.random() * 6, mc: eid }; drops.push(d.q); } else { d.q.id = id; d.q.n = it.count; } },
-      collect(eid) { Hd.destroy([eid]); },
-      velocity(id, vx, vy, vz) { { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
+        if (!d.q) { d.q = { x: d.x, y: d.y, z: d.z, sx: d.x, sy: d.y, sz: d.z, vx: d.vx, vy: d.vy, vz: d.vz, id, n: it.count, age: 0, spin: Math.random() * 6, mc: eid }; drops.push(d.q); } else { d.q.id = id; d.q.n = it.count; } },
+      collect(eid, who) { const d = S.dr.get(eid); if (who === S.eid && d && d.q) { try { feed(d.q.id, d.q.n); } catch (e) { /* ui */ } } Hd.destroy([eid]); },
+      velocity(id, vx, vy, vz) { { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; d.q.vt = 1; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
       status(id, st) { if (st === 2 || st === 3) { if (id === S.eid) hurtFx(); else { const m = S.ents.get(id); if (m) m.hurtT = .35; } } },
       sign(x, y, z, ln) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; world.decor = world.decor || []; delSign(X, y, Z);
         const sol = (a, b, c) => { try { return world.solid(a, b, c); } catch (e) { return false; } }, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(d => sol(X + d[0], y, Z + d[1]));
@@ -215,7 +240,7 @@
         if (nb.length === 1 && !sol(X, y - 1, Z)) { const n = [-nb[0][0], 0, -nb[0][1]]; e = { kind: 'sign', c: [X + .5 - n[0] * .47, y + .5, Z + .5 - n[2] * .47], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, mode: 0, cell: [X, y, Z], sup: [X - n[0], y, Z - n[2]], fixU: 1 }; }
         else { const n = [0, 0, 1]; e = { kind: 'sign', c: [X + .5, y + .95, Z + .5], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, sup: [X, y - 1, Z], cell: [X, y, Z], post: 1, fixU: 1, mode: 0 }; }
         e.mcCell = [X, y, Z]; e.text = text; e.frame = 'wood'; e.bg = 'planks'; world.decor.push(e); world.changed = true; },
-      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ; setBlock(X, y, Z, lookup(st, belowId(X, y, Z))); doorAbove(X, y, Z); },
+      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); },
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n) { if (n) S.names.set(u, n); else S.names.delete(u); },
       spawn(e) {
@@ -223,10 +248,10 @@
         const x = e.x + S.OX, z = e.z + S.OZ, m = { eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
-      move(id, dx, dy, dz) { { const d = S.dr.get(id); if (d && d.q) { d.q.x += dx; d.q.y += dy; d.q.z += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
+      move(id, dx, dy, dz) { { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
       look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
-      teleport(id, x, y, z, yaw) { { const d = S.dr.get(id); if (d && d.q) { d.q.x = x + S.OX; d.q.y = y; d.q.z = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
+      teleport(id, x, y, z, yaw) { { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
       destroy(l) { for (const id of l) { const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;

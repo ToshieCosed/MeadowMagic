@@ -68,3 +68,10 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Android: `onShowFileChooser` so file inputs (resource packs, skins, MIDI, images) open the system picker.
 - The player is held in place until the chunk under them has arrived (max 8 s) so they don't fall through unloaded ground and get rubber-banded/hurt.
 - HUD coordinates show the server's coordinates; throw (Q / button) sends `block_dig` 4/3 so the server spawns the item; touch controls moved above the bottom hotbar; chat log sits below the top controls.
+
+## Stage 7 (1.8): feel
+- The server owns hearts and hunger: Strata's local regen/decay is off in compat, which also stops the permanent red "hurt" tint (local regen made the client HP exceed the server's, so every health packet looked like damage).
+- Dropped items: the drawn item glides toward a dead-reckoned server position (gravity 32 b/s²), so throws are smooth.
+- Sounds: break/place sounds on server-confirmed block changes, material per Minecraft block; the pack sound lookup now also knows the 1.9+ layout (`block/<material>/break|place|hit|step`, `entity/item/pickup`, ...). Packs imported before this need re-importing to pick up the new sounds.
+- Cracks: Minecraft's `destroy_stage_0..9` from the resource pack (both `textures/blocks` and `textures/block`), else a built-in set, drawn per pixel on every face.
+- Pickup feed (+items list) shows again in compat (on the server's `collect`), and has a settings toggle (also in plain Strata).

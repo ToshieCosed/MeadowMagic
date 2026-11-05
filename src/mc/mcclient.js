@@ -186,7 +186,7 @@
           const eid = r.vi(); for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
             if (t === 0) r.i8(); else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; }
         } return;
-        case 'collect': if (P === 47 && H && H.collect) { H.collect(r.vi()); } return;
+        case 'collect': if (P === 47 && H && H.collect) { const a = r.vi(); H.collect(a, r.vi()); } return;
         case 'block_change': if (P === 47 && H && H.block) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
           const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;
