@@ -9930,5 +9930,41 @@ window.__v41={buildPPU};
 { const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildPPU(world); }catch(e){ console.error('ppu build',e); } }; }
 })();
 
+
+/* ===== v0.43: gate-level logic lab (flip-flops and a counter made only of NAND gates, wires/channels and levers) ===== */
+(function(){
+const X=window.T19, TBK=window.TECH.TECHB;
+function builder(w){ const touched=new Set(), off='off';
+  const put=(x,y,z,v)=>{ const k=w.key(x>>4,z>>4); touched.add(k); let e=w.edits.get(k); if(!e){ e=new Map(); w.edits.set(k,e); } e.set((y*CS+(z&15))*CS+(x&15),v); };
+  const tech=(x,y,z,k,f,o)=>{ put(x,y,z,TBK[k]); const t=X.newTech(x,y,z,k,f); Object.assign(t.tech,{inf:1,e:(window.TECH.TT[k]||{}).cap||20},o||{}); return t; };
+  const fo=o=>{ const a=[off,off,off,off,off,off]; for(const k in o) a[k]=o[k]; return a; };
+  const flush=box=>{ for(let cx=box[0]>>4;cx<=box[1]>>4;cx++) for(let cz=box[2]>>4;cz<=box[3]>>4;cz++) touched.add(w.key(cx,cz));
+    for(const k of touched){ const ch=w.chunks.get(k); if(ch){ freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); w.chunks.delete(k); } } };
+  return {put,tech,fo,flush}; }
+// a netlist is a list of {n:name, t:type, i:[input net names]}; every gate becomes a small pod: receivers feed its back and sides, a transmitter broadcasts its output on a channel
+function placeNetlist(bld,G,ox,oz,gates,o){ o=o||{}; const nets=new Map(); let ch=o.ch0||60; const chOf=n=>{ if(!nets.has(n)) nets.set(n,ch++); return nets.get(n); };
+  const W=o.cols||9, tiles={}, fo=bld.fo;
+  gates.forEach((g,idx)=>{ const px=ox+3*(idx%W)+1, pz=oz+3*Math.floor(idx/W)+1, ins=g.i||[];
+    const slots=(g.t==='NOT'||g.t==='CLOCK'||g.t==='BUF')?[[px-1,pz,0]]:ins.length>2?[[px,pz+1,5],[px,pz-1,4],[px-1,pz,0]]:[[px,pz+1,5],[px,pz-1,4]];
+    ins.forEach((n,k)=>{ const sl=slots[k]; bld.tech(sl[0],G,sl[1],'wterm',4,{role:'rx',ch:chOf(n),conv:'level',fo:fo({[sl[2]]:'out'})}); });
+    if(g.t==='SRC') tiles[g.n]=bld.tech(px,G,pz,'lever',2,{on:!!g.on}); else tiles[g.n]=bld.tech(px,G,pz,'gate',0,{g:g.t,dl:g.dl});
+    bld.tech(px+1,G,pz,'wterm',4,{role:'tx',ch:chOf(g.n),conv:'level',fo:fo({1:'in'})}); });
+  return {tiles,nets,width:3*Math.min(W,gates.length),depth:3*Math.ceil(gates.length/W)}; }
+// master-slave T flip-flop out of nine NAND/NOT gates: two NAND latches, the master open while the clock is low and the slave while it is high; reset (RN low) clears it
+function tff(g,p,clk,rn){ const latch=(q,E,D,rst)=>{ g.push({n:q+'n1',t:'NAND',i:[D,E]}); g.push({n:q+'n2',t:'NAND',i:[q+'n1',E]}); g.push({n:q+'q',t:'NAND',i:rst==='q'?[q+'n1',q+'qb',rn]:[q+'n1',q+'qb']}); g.push({n:q+'qb',t:'NAND',i:rst==='qb'?[q+'n2',q+'q',rn]:[q+'n2',q+'q']}); };
+  g.push({n:p+'nc',t:'NOT',i:[clk]}); latch(p+'m',p+'nc',p+'sqb','q'); latch(p+'s',clk,p+'mq','qb'); return {q:p+'sq',qb:p+'sqb'}; }
+function counterNetlist(bits,half){ const g=[{n:'RN',t:'SRC',on:false},{n:'RST',t:'NOT',i:['RN']},{n:'CLK',t:'CLOCK',dl:half,i:['RST']}]; let clk='CLK'; const q=[];
+  for(let b=0;b<bits;b++){ const r=tff(g,'t'+b,clk,'RN'); q.push(r.q); clk=r.qb; } return {gates:g,q}; }
+function buildLab(w){ const C=w.gen.C, G=SHOW_G+1, bld=builder(w), ox=C-128, oz=C+60, BITS=4;
+  const nl=counterNetlist(BITS,24), pl=placeNetlist(bld,G,ox,oz,nl.gates,{cols:9,ch0:60});
+  const sign=(x,z,text)=>{ bld.put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n:[0,0,-1],u:[-1,0,0],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
+  sign(ox+1,oz-2,'GATE LAB\n4-bit counter built\nfrom NAND gates only.\nFlip the lever to run.');
+  w.meta.lab=1; w.meta.labBox=[ox-3,ox+pl.width+3,oz-4,oz+pl.depth+3,G,G+10]; bld.flush(w.meta.labBox); window.__v42.last=pl; nl.q.forEach((n,i)=>0); return {pl,nl}; }
+window.__v42={buildLab,counterNetlist,placeNetlist,builder};
+{ const _f=ShowGen.prototype.fill; ShowGen.prototype.fill=function(ch){ _f.apply(this,arguments); const bx=typeof world!=="undefined"&&world&&world.meta&&world.meta.labBox; if(!bx) return; const x0=ch.cx<<4, z0=ch.cz<<4;
+    for(let lz=0;lz<16;lz++) for(let lx=0;lx<16;lx++){ const x=x0+lx, z=z0+lz; if(x<bx[0]||x>bx[1]||z<bx[2]||z>bx[3]) continue; for(let y=bx[4];y<=bx[5];y++) ch.blocks[(y*CS+lz)*CS+lx]=0; } }; }
+{ const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildLab(world); }catch(e){ console.error('lab build',e); } }; }
+})();
+
 </script>
 </body></html>

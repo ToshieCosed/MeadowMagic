@@ -159,3 +159,9 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - **64x42 upright showcase display** (new showcase worlds only, about 110 blocks south of centre; a wall, 64 wide and 42 tall, column isolators behind, row isolators in front): 2688 lights, 4474 tiles. Per-column and per-row scan using isolator lines, XOR/AND receivers and wireless-channel generators. A frame takes about 9.6 s at 20 tps.
 - Fixes: wire cleanup skips unloaded chunks; trees are cleared under the display.
 - Tests: `tools/tests/phase19_ppu.py` (64/64 rows verified), `phase15_wires.py`.
+
+## v0.43.0 — gate lab (stage 1 of the gate-built display)
+
+- New showcase worlds get a **GATE LAB** west of the wall: a 4-bit ripple counter built only from NAND/NOT gates (master-slave T flip-flops, 9 gates each), a CLOCK gate and a reset lever. Each gate is a small pod; wireless channels carry the nets, so no routing is needed.
+- Flip the lever to run. Test: `tools/tests/phase20_lab.py` (counts 0..15 with normal ripple glitches).
+- Next stages: gate-built frame RAM, read-out to the wall, animation engines (countdown, ball, sweeps).
