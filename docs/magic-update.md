@@ -151,3 +151,10 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - Column levels and row levels come from a strip of broadcasters switched by levers. Animation comes from three phase generators: four free-running clock gates (each half the speed of the last) feed weighted level blocks that add on a broadcaster, so the phase counts 0–15 on a wireless channel. Red = column XOR phase 1, green = row XOR phase 2, blue = phase 3 XOR column XOR row.
 - Showcase logic blocks carry an `inf` flag so they run without an RF supply.
 - Test: `tools/tests/phase18_lightshow.py` (48 lights lit, changing).
+
+## v0.41.0 — insulated cables, colour locks, latch lights, multiplexed display
+- **Insulated cables** (16 tints, craft: bundle + wool). A cable only joins cables of its own tint, and it plugs into a normal wire bundle only with its end cells; mid-run it ignores neighbouring bundles, wires and terminals. Packed trunks of different tints never cross-talk.
+- **Colour lock**: tap a signal broadcaster/receiver/wireless terminal with a coloured wire to lock it to that colour on bundles (tap again to unlock). Lets many blocks share one multi-colour bus.
+- **Multicolour light, latch mode** (third tap state): a yellow strobe line samples the red/green/blue lines and the light holds that colour.
+- **Showcase multiplexed display** (new showcase worlds, ~96 blocks south of the centre): 16 latch lights share one RGB bus; a scan counter selects one pixel at a time (EQ block per pixel) and strobes it over its own cable through a packed 4x4 trunk; a slow phase counter shifts the picture each frame.
+- Test: `tools/tests/phase19_mux.py` (steps the simulation directly; checks every pixel samples the colour for its own scan slot, i.e. no cross-talk).

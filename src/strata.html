@@ -9671,6 +9671,7 @@ const WID=DYES.map(d=>I['CWIRE_'+d.k]), WIDSET=new Set(WID);
 const ck=(x,y,z)=>x+','+y+','+z;
 const Wm=()=>world.wires||(world.wires=new Map());
 const isBundle=b=>b>0&&BLOCKS[b]&&BLOCKS[b].bundle;
+const isCable=b=>b>0&&BLOCKS[b]&&BLOCKS[b].cable!=null;   // insulated cable (v0.41): only its two ends plug into normal bundles, and only same-tint cables join each other
 let adj=new Map(), dirty=true, nets=[], geo=[], termIdx=new Map(), cleanT=0, lastW=null;
 const hasSeg=(x,y,z,f,c)=>{ const a=Wm().get(ck(x,y,z)); return !!a&&a.indexOf(f*16+c)>=0; };
 function addSeg(x,y,z,f,c){ const k=ck(x,y,z); let a=Wm().get(k); if(!a) Wm().set(k,a=[]); const v=f*16+c; if(a.indexOf(v)>=0) return false; a.push(v); dirty=true; return true; }
@@ -9680,6 +9681,11 @@ function neigh(x,y,z,f,c){ const out=[]; for(let d=0;d<6;d++){ if((d>>1)===(f>>1
     if(hasSeg(nx,ny,nz,f,c)) out.push([nx,ny,nz,f,d]);   // next block, same face
     const fv=D6[f], wx=nx+fv[0], wy=ny+fv[1], wz=nz+fv[2]; if(hasSeg(wx,wy,wz,OPP[d],c)) out.push([wx,wy,wz,OPP[d],d]); }   // inside corner: floor run meets the wall beside it. Faces of ONE block never join.
   return out; }
+const sameTint=(a,b)=>BLOCKS[a].cable===BLOCKS[b].cable;
+const cableEnd=(x,y,z)=>{ const me=world.get(x,y,z); let n=0; for(const v of D6){ const o=world.get(x+v[0],y+v[1],z+v[2]); if(isCable(o)&&sameTint(me,o)) n++; } return n<=1; };
+// bundle-to-bundle joins freely; cable-to-cable only when the tint matches; cable-to-bundle only at the cable's end cell
+function joins(ax,ay,az,bx,by,bz){ const a=world.get(ax,ay,az), b=world.get(bx,by,bz), ca=isCable(a), cb=isCable(b); if(!(ca||isBundle(a))||!(cb||isBundle(b))) return false;
+  if(ca&&cb) return sameTint(a,b); if(ca) return cableEnd(ax,ay,az); if(cb) return cableEnd(bx,by,bz); return true; }
 function bundlesAt(x,y,z,f){ const out=[]; if(isBundle(world.get(x,y,z))) out.push([x,y,z,-1]); for(let d=0;d<6;d++){ if(d===OPP[f]) continue; const v=D6[d]; if(isBundle(world.get(x+v[0],y+v[1],z+v[2]))) out.push([x+v[0],y+v[1],z+v[2],d]); } return out; }
 
 // ---------------- building the networks ----------------
@@ -9694,7 +9700,7 @@ function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
   for(const [k,a] of [...wires]){ const [x,y,z]=k.split(',').map(Number), b=world.get(x,y,z); if(b===0||(b>0&&isW(b))){ for(const v of a) spawnDrop(x+.5,y+.5,z+.5,WID[v&15],1); wires.delete(k); } }
   const par=new Map(), find=k=>{ let r=k; while(par.get(r)!==r) r=par.get(r); while(par.get(k)!==r){ const n=par.get(k); par.set(k,r); k=n; } return r; }, mk=k=>{ if(!par.has(k)) par.set(k,k); }, uni=(a,b)=>{ mk(a); mk(b); a=find(a); b=find(b); if(a!==b) par.set(a,b); };
   const cl=new Map(), clusters=[]; const clusterOf=(x,y,z)=>{ const k=ck(x,y,z); if(cl.has(k)) return cl.get(k); const c={id:clusters.length,cells:[],cols:new Set()}; clusters.push(c); const q=[[x,y,z]]; cl.set(k,c);
-    while(q.length){ const p=q.pop(); c.cells.push(p); for(const v of D6){ const nx=p[0]+v[0], ny=p[1]+v[1], nz=p[2]+v[2], nk=ck(nx,ny,nz); if(!cl.has(nk)&&isBundle(world.get(nx,ny,nz))){ cl.set(nk,c); q.push([nx,ny,nz]); } } } return c; };
+    while(q.length){ const p=q.pop(); c.cells.push(p); for(const v of D6){ const nx=p[0]+v[0], ny=p[1]+v[1], nz=p[2]+v[2], nk=ck(nx,ny,nz); if(!cl.has(nk)&&joins(p[0],p[1],p[2],nx,ny,nz)){ cl.set(nk,c); q.push([nx,ny,nz]); } } } return c; };
   const segs=[]; geo=[]; const segBy=new Map(); adj=new Map(); const link=(a,b)=>{ (adj.get(a)||adj.set(a,[]).get(a)).push(b); (adj.get(b)||adj.set(b,[]).get(b)).push(a); };
   for(const [k,a] of wires){ const [x,y,z]=k.split(',').map(Number); for(const v of a){ const f=v>>4, c=v&15, key=k+','+v, arm=[0,0,0,0,0,0], seg={x,y,z,f,c,v,key,net:null}; mk(key);
       seg.nbs=[]; seg.arm=arm; seg.fl=[0,0,0,0,0,0];
@@ -9708,7 +9714,7 @@ function rebuild(){ dirty=false; const wires=Wm(), tAt=X.tAt;
       cand.forEach((q,ci)=>{ const t=tAt(q[0],q[1],q[2]); if(t){ n.terms.push({t,face:q[3],node:s.key}); if(ci>=3) s.arm[OPP[q[3]]]=1; } }); { const A=s.arm; for(let d=0;d<6;d+=2) if(((d>>1)!==(s.f>>1))&&A[d]!==A[d+1]&&A[d]+A[d+1]===1&&false){} } if(!n.pk||s.key<n.pk) n.pk=s.key; }
   for(const sg of segs){ const A=sg.arm, ax=[0,2,4].filter(d=>(d>>1)!==(sg.f>>1)&&(A[d]||A[d+1])); if(ax.length===1&&A[ax[0]]!==A[ax[0]+1]){ A[ax[0]]=1; A[ax[0]+1]=1; } }   // straight ends run to the block edge; corners stay clean
   for(const C of clusters) for(const c of C.cols){ const root=find('B'+C.id+':'+c); if(!par.has('B'+C.id+':'+c)) continue; const n=get(root); n.c=c;
-    for(const p of C.cells) for(let d=0;d<6;d++){ const v=D6[d], t=tAt(p[0]+v[0],p[1]+v[1],p[2]+v[2]); if(t&&!isBundle(world.get(t.x,t.y,t.z))) n.terms.push({t,face:OPP[d],node:'B'+C.id+':'+c}); } }
+    for(const p of C.cells){ if(isCable(world.get(p[0],p[1],p[2]))) continue; for(let d=0;d<6;d++){ const v=D6[d], t=tAt(p[0]+v[0],p[1]+v[1],p[2]+v[2]); if(t&&!isBundle(world.get(t.x,t.y,t.z))&&!isCable(world.get(t.x,t.y,t.z))&&(t.tech.col==null||t.tech.col===c)) n.terms.push({t,face:OPP[d],node:'B'+C.id+':'+c}); } } }
   for(const n of nets) for(const e of n.terms){ const k=ck(e.t.x,e.t.y,e.t.z); let a=termIdx.get(k); if(!a) termIdx.set(k,a=[]); a.push({face:e.face,net:n}); } }
 
 // ---------------- the simulation: strongest signal wins, RF is shared out by demand ----------------
@@ -9800,7 +9806,8 @@ const RI=DYES.findIndex(d=>d.k==='red'), GI=DYES.findIndex(d=>d.k==='green'), BI
 let L={mls:[],drv:[],pl:[],t:0};
 const lists=()=>{ const n=performance.now(); if(n-L.t>400){ L.t=n; const a=X.techList(); L.mls=a.filter(t=>t.tech.type==='mlight'); L.drv=a.filter(t=>t.tech.type==='gdrive'); L.pl=a.filter(t=>t.tech.type==='pplate'); } return L; };
 // a loose light reads its wires: one signal strength picks one of the 16 colours; in RGB mode a red, green and blue line (usually a bundle) mix a colour
-function wireRGB(t){ const m=WIRE.colors(t); if(!m.size) return null;
+function wireRGB(t){ const m=WIRE.colors(t); if(!m.size) return t.tech.mode==='latch'?t.tech.held||null:null;
+  if(t.tech.mode==='latch'){ if((m.get(YI)||0)>0){ const r=m.get(RI)||0, g=m.get(GI)||0, b=m.get(BI)||0; t.tech.held=[Math.min(255,r*16),Math.min(255,g*16),Math.min(255,b*16)]; } return t.tech.held&&(t.tech.held[0]|t.tech.held[1]|t.tech.held[2])?t.tech.held:null; }   // latch mode: a yellow strobe line samples the red/green/blue lines and the light keeps that colour
   if(t.tech.mode==='rgb'){ const r=m.get(RI)||0, g=m.get(GI)||0, b=m.get(BI)||0; return (r|g|b)?[Math.min(255,r*16),Math.min(255,g*16),Math.min(255,b*16)]:null; }
   let v=0; for(const x of m.values()) if(x>v) v=x; return v>0?DC[(v-1)%16]:null; }
 
@@ -9852,7 +9859,7 @@ setInterval(()=>{ try{ if(!world||world.preview||typeof game!=='function'||!game
 
 // ---------- taps: loose light toggles RGB mode, driver locks a program ----------
 { const _t=tryInteract; tryInteract=function(sx,sy){ const s=held(), it=s&&ITEMS[s.id]; if(!(it&&it.wireC!=null)&&!(player.crouch&&buildMode)){ const r=pick(sx,sy); if(r){ const t=X.tAt(r.hit[0],r.hit[1],r.hit[2]);
-        if(t&&t.tech.type==='mlight'){ t.tech.mode=t.tech.mode==='rgb'?'single':'rgb'; world.changed=true; toast(t.tech.mode==='rgb'?'Multicolour light: RGB mode (red, green and blue lines mix a colour)':'Multicolour light: signal-strength mode (level 1–16 picks one of 16 colours)'); return true; }
+        if(t&&t.tech.type==='mlight'){ t.tech.mode=t.tech.mode==='rgb'?'latch':t.tech.mode==='latch'?'single':'rgb'; world.changed=true; toast(t.tech.mode==='rgb'?'Multicolour light: RGB mode (red, green and blue lines mix a colour)':t.tech.mode==='latch'?'Multicolour light: latch mode (a yellow strobe line samples the red, green and blue lines and it holds the colour)':'Multicolour light: signal-strength mode (level 1–16 picks one of 16 colours)'); return true; }
         if(t&&t.tech.type==='gdrive'){ const n=t.tech.lock==null?0:t.tech.lock+1; t.tech.lock=n>=PROG.length?null:n; world.changed=true; toast(t.tech.lock==null?'Pixel driver: automatic show':'Pixel driver: '+PROG[t.tech.lock].name+' only'); return true; } } }
     return _t(sx,sy); }; }
 
@@ -9893,6 +9900,69 @@ function buildLightShow(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1];
   sign(C-14,CZ-2,S,'ALL-WIRE DISPLAY\n8x6 pixels. Every pixel is\n3 bundles, 3 analog blocks\nand 7 receivers'); sign(C-12,ZS-11,S,'PHASE CLOCKS\n4 clocks per generator,\neach half the speed of\nthe last, weighted and added'); sign(C-14,CZ+2,S,'LEVEL STRIP\nColumn and row levels.\nXOR with the phases\nmakes the plasma'); w.meta.lightshow=2; }
 { const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildLightShow(world); }catch(e){ console.error('lightshow build',e); } }; }
 window.__v40={PROG,collect,wireRGB,buildLightShow,ST};
+})();
+
+/* ===== v0.41.0: insulated cables, colour-locked logic blocks, and the multiplexed display ===== */
+(function(){
+const X=window.T19, WIRE=window.WIRE;
+// ---- 16 insulated cables: one per tint; a tint only joins its own tint, and only plugs into a normal bundle with its ends ----
+for(let i=0;i<16;i++){ const d=DYES[i], id=NB('CABLE_'+d.k), c=hex(d.dye), dk=c.map(v=>Math.round(v*.42)+14), lt=c.map(v=>Math.min(255,Math.round(v*.75)+50)), gr=[34,36,44];
+  def(id,d.name+' insulated cable','#3a3e4a','#2c2f3a',0,{opaque:false,lightOpaque:0,shape:1,decor:1,cable:i,boxes:[[.15,.15,.15,.85,.85,.85]],
+    rboxes:[[.15,.15,.15,.85,.85,.85,gr],[.12,.12,.36,.88,.88,.64,c],[.36,.12,.12,.64,.88,.88,dk],[.12,.36,.12,.88,.64,.88,lt],
+      [.3,.3,0,.7,.7,.15,lt],[.3,.3,.85,.7,.7,1,lt],[0,.3,.3,.15,.7,.7,lt],[.85,.3,.3,1,.7,.7,lt],[.3,0,.3,.7,.15,.7,lt],[.3,.85,.3,.7,1,.7,lt]]}); pat(id,PT.METAL);
+  r_(id,2,['b','W'],{keys:{b:[B.BUNDLE],W:[d.woolB]},cat:'decor'}); }
+// ---- tap a logic block with a coloured wire to lock it to that colour on bundles (tap again to unlock) ----
+{ const _ud=useDecor; useDecor=function(sx,sy){ const s=held(), it=s&&ITEMS[s.id]; if(it&&it.wireC!=null){ const r=pick(sx,sy); if(r){ const t=X.tAt(r.hit[0],r.hit[1],r.hit[2]); if(t&&['wterm','wbasic','sbcast','srecv'].includes(t.tech.type)){ t.tech.col=t.tech.col===it.wireC?null:it.wireC; world.changed=true; WIRE.rebuild&&WIRE.rebuild(); toast(t.tech.col==null?'Colour lock off: this block talks on every line of a bundle':'Locked to '+DYES[t.tech.col].name.toLowerCase()+': it only reads and drives the '+DYES[t.tech.col].name.toLowerCase()+' line of a bundle'); return true; } } } return _ud(sx,sy); }; }
+
+// ---- showcase: one shared colour bus, sixteen isolated strobe cables, sixteen latch lights ----
+function buildMuxShow(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1], RI=DYES.findIndex(d=>d.k==='red'), GI=DYES.findIndex(d=>d.k==='green'), BI=DYES.findIndex(d=>d.k==='blue'), YI=DYES.findIndex(d=>d.k==='yellow');
+  const occ=new Set(), K=(x,y,z)=>x+','+y+','+z, stone=B.STONE, BUNDLE=B.BUNDLE, TBK=window.TECH.TECHB;
+  const put=(x,y,z,v)=>{ occ.add(K(x,y,z)); const cx=x>>4, cz=z>>4, k=w.key(cx,cz); let e=w.edits.get(k); if(!e){ e=new Map(); w.edits.set(k,e); } e.set((y*CS+(z&15))*CS+(x&15),v); };
+  const tech=(x,y,z,k,f,o)=>{ put(x,y,z,TBK[k]); const t=X.newTech(x,y,z,k,f); Object.assign(t.tech,{inf:1,e:(TECH.TT[k]||{}).cap||20},o||{}); return t; };
+  const BX=C+30, BY=G+2, BZ=C+96, Z0=BZ-48, CH_S=70, off='off';
+  const fo=(o)=>{ const a=[off,off,off,off,off,off]; for(const k in o) a[k]=o[k]; return a; };
+  const res={cables:0,failed:0};
+  // ---- scan counter (step every 3 ticks, 0..15) and a slow phase counter (one step per frame) ----
+  const gen=(px,pz,ch,dl)=>{ tech(px,G,pz,'wterm',4,{role:'tx',ch,op:'ADD',conv:'level'}); const WT=[1,2,4,8];
+    [[1,0],[0,1],[-1,0],[0,-1]].forEach(([dx,dz],b)=>{ const f=dx>0?1:dx<0?0:dz>0?5:4; tech(px+dx,G,pz+dz,'sbcast',f,{pl:WT[b],conv:'preset'}); tech(px+2*dx,G,pz+2*dz,'gate',f,{g:'CLOCK',dl:dl*(1<<b)}); }); };
+  gen(BX-12,Z0-8,CH_S,3); gen(BX-12,Z0-16,CH_S+1,48);
+  // ---- the shared colour bus: a comb of bundles behind the lights, with red, green and blue lines ----
+  for(let r=0;r<4;r++) for(let x=BX;x<=BX+9;x++) put(x,BY+3*r,BZ+1,BUNDLE);
+  for(let y=BY;y<=BY+9;y++) put(BX,y,BZ+1,BUNDLE);
+  [RI,GI,BI].forEach((c,k)=>{ put(BX+k,BY-1,BZ+1,stone); WIRE.addSeg(BX+k,BY-1,BZ+1,2,c); });
+  // data generators sit on the bus, each locked to its own colour: red = scan XOR phase, green = scan + phase, blue = 16 - scan
+  [[RI,'XOR',1],[GI,'ADD',1],[BI,'INV',0]].forEach(([c,op,usesP],k)=>{ const gy=BY+3*k; tech(BX-1,gy,BZ+1,'srecv',0,{op,conv:'level',col:c,fo:fo({0:'out',4:'in',5:usesP?'in':off})});
+    tech(BX-1,gy,BZ+2,'wterm',4,{role:'rx',ch:CH_S,conv:'level',fo:fo({5:'out'})}); if(usesP) tech(BX-1,gy,BZ,'wterm',4,{role:'rx',ch:CH_S+1,conv:'level',fo:fo({4:'out'})}); });
+  // ---- 16 pixels (latch lights), 16 scan selectors, 16 strobe ends ----
+  const trunk=[], px=[], src=[];
+  for(let p=0;p<16;p++){ const c=p&3, r=p>>2, x=BX+3*c, y=BY+3*r, sx=BX-18+4*c, sy=BY+3*r;
+    tech(x,y,BZ,'mlight',5,{mode:'latch'}); put(x,y,BZ-1,BUNDLE); put(x,y-1,BZ-1,stone); WIRE.addSeg(x,y-1,BZ-1,2,YI);
+    put(sx,sy,Z0,BUNDLE); put(sx,sy-1,Z0,stone); WIRE.addSeg(sx,sy-1,Z0,2,YI);
+    tech(sx,sy,Z0-1,'srecv',4,{op:'EQ',conv:'level',fo:fo({1:'in',4:'out',5:'in'})}); tech(sx,sy,Z0-2,'wterm',4,{role:'rx',ch:CH_S,conv:'level',fo:fo({4:'out'})});
+    tech(sx-1,sy,Z0-1,'sbcast',0,{pl:p,conv:'preset'}); tech(sx-2,sy,Z0-1,'lever',2,{on:true});
+    px.push([x,y]); src.push([sx,sy]); }
+  { const slots=[]; for(let i=0;i<16;i++) slots.push([BX+5+(i&3),BY+3+(i>>2),Math.abs((i&3)-1.5)+Math.abs((i>>2)-1.5)]); slots.sort((a,b)=>a[2]-b[2]); for(const q of slots) trunk.push([q[0],q[1]]); }   // the first cables take the middle of the packed trunk, so the later ones can still reach the outside slots
+  // ---- route each cable from its selector to its own pixel: cheapest path through free cells, cables like to run packed against each other ----
+  const X0=BX-22, X1=BX+16, Y0=BY-1, Y1=BY+12, ZA=Z0+2, ZB=BZ-3, NX=X1-X0+1, NY=Y1-Y0+1, NZ=ZB-ZA+1, idx=(x,y,z)=>((z-ZA)*NY+(y-Y0))*NX+(x-X0), cab=new Set();
+  const D=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+  const rsv=new Map(); for(let p=0;p<16;p++){ for(const k of [K(src[p][0],src[p][1],Z0+1),K(src[p][0],src[p][1],ZA),K(px[p][0],px[p][1],BZ-2),K(px[p][0],px[p][1],ZB)]) rsv.set(k,p); }   // every cable's first and last cells are kept free for it
+  for(let p=0;p<16;p++){ const [x,y]=px[p], [sx,sy]=src[p], tint=B['CABLE_'+DYES[p].k], dist=new Float64Array(NX*NY*NZ).fill(1e9), prev=new Int32Array(NX*NY*NZ).fill(-1), hp=[];
+    const push=(c,n)=>{ hp.push([c,n]); let i=hp.length-1; while(i>0){ const q=(i-1)>>1; if(hp[q][0]<=hp[i][0]) break; [hp[q],hp[i]]=[hp[i],hp[q]]; i=q; } };
+    const pop=()=>{ const t=hp[0], l=hp.pop(); if(hp.length){ hp[0]=l; let i=0; for(;;){ let a=2*i+1, b=a+1, m=i; if(a<hp.length&&hp[a][0]<hp[m][0]) m=a; if(b<hp.length&&hp[b][0]<hp[m][0]) m=b; if(m===i) break; [hp[m],hp[i]]=[hp[i],hp[m]]; i=m; } } return t; };
+    const bad=new Set(); for(const e of [[sx,sy,Z0+1],[x,y,BZ-2]]) for(const v of D) bad.add(K(e[0]+v[0],e[1]+v[1],e[2]+v[2]));   // keep both ends clean: one neighbour each, so they plug into their bundle
+    bad.delete(K(sx,sy,ZA)); bad.delete(K(x,y,ZB));
+    const free=(a,b,c)=>a>=X0&&a<=X1&&b>=Y0&&b<=Y1&&c>=ZA&&c<=ZB&&!occ.has(K(a,b,c))&&!bad.has(K(a,b,c))&&(!rsv.has(K(a,b,c))||rsv.get(K(a,b,c))===p);
+    const s0=idx(sx,sy,ZA), g0=idx(x,y,ZB); dist[s0]=0; push(0,[sx,sy,ZA]); let found=false;
+    while(hp.length){ const [c,[a,b,d]]=pop(); const i=idx(a,b,d); if(c>dist[i]) continue; if(i===g0){ found=true; break; }
+      for(const v of D){ const na=a+v[0], nb=b+v[1], nd=d+v[2]; if(!free(na,nb,nd)) continue; let near=0; for(const u of D) if(cab.has(K(na+u[0],nb+u[1],nd+u[2]))) near=1; const j=idx(na,nb,nd), nc=c+1+(near?0:.35)+((v[0]!==0||v[1]!==0)?.02:0); if(nc<dist[j]){ dist[j]=nc; prev[j]=i; push(nc,[na,nb,nd]); } } }
+    if(!found){ res.failed++; continue; }
+    const path=[[x,y,BZ-2],[x,y,BZ-3]]; let i=g0; const cells=[]; while(i>=0){ const a=i%NX, b=((i/NX)|0)%NY, d=(i/(NX*NY))|0; cells.push([X0+a,Y0+b,ZA+d]); i=prev[i]; } for(const q of cells) path.push(q); path.push([sx,sy,Z0+1]);
+    for(const q of path){ put(q[0],q[1],q[2],tint); cab.add(K(q[0],q[1],q[2])); } res.cables++; }
+  const sign=(x,z,n,text)=>{ put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
+  sign(BX-3,BZ-4,S,'MULTIPLEXED DISPLAY\n16 lights share ONE colour bus.\nA scan counter strobes one\nlight at a time through its\nown insulated cable'); sign(BX-10,Z0+10,S,'SCAN COUNTER + PHASE\nFast counter = which pixel.\nSlow counter = the picture\nshifting each frame'); sign(BX+3,Z0-4,S,'SELECTORS\nEach one is scan == its number\nand feeds the first end of\nits own cable');
+  w.meta.muxshow=1+res.failed; return res; }
+window.__v41={buildMuxShow};
+{ const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildMuxShow(world); }catch(e){ console.error('muxshow build',e); } }; }
 })();
 
 </script>
