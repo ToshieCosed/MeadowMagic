@@ -931,7 +931,7 @@ TB('crank','Hand crank','#7a6a5a','#6a5a4a',{solid:false});
 TB('moulder','Silicon moulder','#6c6f76','#5a5d64',{lightOpaque:1});
 TB('spress','Silicon press','#707a70','#5e685e',{lightOpaque:1});
 TB('gpress','Greater circuit press','#7a7090','#685e7e',{lightOpaque:1});
-TB('terminal','RF terminal','#2c3036','#24282c',{lightOpaque:1});
+TB('terminal','RF terminal','#2c3036','#24282c',{lightOpaque:1}); TB('fterm','Flat RF terminal','#2c3036','#24282c',{solid:false});
 TB('wterm','Wireless terminal','#3c4450','#323a44',{lightOpaque:1});
 TB('piston','Piston','#9a8a6a','#7e7e80',{lightOpaque:1});
 TB('spiston','Slimy piston','#7ab05a','#7e7e80',{lightOpaque:1});
@@ -6807,7 +6807,7 @@ RC(I.LINKER,1,['Q','S'],{Q:[I.RADIO],S:[I.STICK]});
 RC(TECHB.sbcast,1,['wCw','TKT'],{w:[CU_WIRE[0]],C:[I.CHIP_BASIC],T:[B.STONE,B.COBBLE],K:ANYCOIL}); RC(TECHB.srecv,1,['TKT','wCw'],{w:[CU_WIRE[0]],C:[I.CHIP_BASIC],T:[B.STONE,B.COBBLE],K:ANYCOIL});
 RC(TECHB.wbasic,1,['IGI','KQK','III'],{I:[I.IRON],G:GL,K:ANYCOIL,Q:[I.RADIO]});
 RC(TECHB.wterm,1,['SAS','bWr','SSS'],{S:[I.STEEL],A:[I.CHIP_ADV],W:[TECHB.wbasic],b:[TECHB.sbcast],r:[TECHB.srecv]},{tier:8});
-RC(TECHB.terminal,1,['GGG','CKC','III'],{G:GL,C:[I.CHIP_BASIC],K:ANYCOIL,I:[I.IRON]});
+RC(TECHB.terminal,1,['GGG','CKC','III'],{G:GL,C:[I.CHIP_BASIC],K:ANYCOIL,I:[I.IRON]}); RC(TECHB.fterm,2,['T'],{T:[TECHB.terminal]});
 RC(TECHB.piston,1,['PPP','TIT','TwT'],{P:PL,T:[B.COBBLE],I:[I.IRON],w:ANYWIRE});
 RC(TECHB.spiston,1,['j','p'],{j:SLIMES.map(s=>s.jelly),p:[TECHB.piston]});
 SMELTS.push({a:[I.IRON_SHARD],out:I.NUG_IRON,time:4,tier:1}); SMELT_IN.add(I.IRON_SHARD);
@@ -6826,7 +6826,7 @@ const TT={
   extr1:{cap:2000,rate:40,io:'in',tier:1,slots:['in','out','charge'],ui:1}, extr2:{cap:4000,rate:80,io:'in',tier:2,slots:['in','out','charge'],ui:1}, extr3:{cap:8000,rate:160,io:'in',tier:3,slots:['in','out','charge'],ui:1},
   moulder:{cap:4000,rate:40,io:'in',slots:['in','out','charge'],ui:1}, spress:{cap:4000,rate:40,io:'in',slots:['in','in2','out','charge'],ui:1},
   gpress:{cap:8000,rate:80,io:'in',slots:['in','in2','in3','in4','out','charge'],ui:1},
-  terminal:{cap:100,rate:4,io:'in'}, wterm:{cap:200,rate:4,io:'in',sig:1,ui:1}, wbasic:{cap:200,rate:4,io:'in',sig:1,ui:1}, sbcast:{cap:20,rate:2,io:'both',sig:1,ui:1}, srecv:{cap:20,rate:2,io:'both',sig:1,ui:1},
+  terminal:{cap:100,rate:4,io:'in'}, fterm:{cap:100,rate:4,io:'in'}, wterm:{cap:200,rate:4,io:'in',sig:1,ui:1}, wbasic:{cap:200,rate:4,io:'in',sig:1,ui:1}, sbcast:{cap:20,rate:2,io:'both',sig:1,ui:1}, srecv:{cap:20,rate:2,io:'both',sig:1,ui:1},
   mwcru:{slots:['fuel','in'],ui:1}, spout:{}, stand:{}, xpdrain:{}, crank:{}, sifter:{slots:['out0','out1','out2','out3','out4','out5','out6','out7','out8'],ui:1},
   tank1:{tank:1,tcap:16000,ui:1}, tank2:{tank:2,tcap:32000,ui:1}, tank3:{tank:3,tcap:64000,ui:1}, tank4:{tank:4,tcap:128000,ui:1}, wtable:{},
 };
@@ -6852,6 +6852,7 @@ W('afterPlace',o=>function(x,y,z,id,s){ o.apply(this,arguments); const bd=BLOCKS
   if(k==='lever'||k.startsWith('lamp')||k==='tap'||k==='spout'||k==='crank'||k==='hopper') f=away;
   else if(k==='gate'||k==='sbcast'||k==='srecv') f=look;
   else if(k==='piston'||k==='spiston'){ const p=cam.mode==='fp'?cam.fpPitch:0; f=p<-.75?2:p>.75?3:OPP[look]; }
+  if(k==='fterm'&&(away<=1||away>=4)) f=away;   // flat screens hang on the wall they were placed against
   const t=newTech(x,y,z,k,f), T=TD(t); t.tech.e=0;
   if(s&&s.x&&s.x.e) t.tech.e=Math.min(T.cap||0,s.x.e);
   if(s&&s.x&&s.x.fl){ t.tech.fl=s.x.fl; t.tech.amt=s.x.amt; }
@@ -7086,7 +7087,7 @@ function techTick(){ const list=techList().filter(t=>loaded(t.x,t.z)), dt=.05;
       if(want!==isOn){ T.lt=(T.lt||0)+1; if(T.lt>2){ T.lt=0; const L=LAMPS[BLOCKS[world.get(t.x,t.y,t.z)].lamp]; world.set(t.x,t.y,t.z,want?L.on:L.off); } } else T.lt=0; }
     else if(k==='tap'){ const on=anySig(t)&&T.e>=.2; if(on) T.e-=.2; t._on=on; if(on) stepTap(t); }
     else if(k==='piston'||k==='spiston'){ if(t._mv){ if(++t._mv.k>=t._mv.dur) finishMove(t); continue; } const on=anySig(t,T.f); if(on&&!T.ext&&T.e>=10){ if(pistonExtend(t)) T.e-=10; } else if(!on&&T.ext) pistonRetract(t); }
-    else if(k==='terminal'){ t._on=T.e>=.1; if(t._on) T.e-=.1; }
+    else if(k==='terminal'||k==='fterm'){ t._on=T.e>=.1; if(t._on) T.e-=.1; }
     else if(k==='mwcru') stepCrucible(t,dt);
     else if(k==='sifter') stepSifter(t);
     else if(k==='crank'){ if(T.spin>0){ T.spin=Math.max(0,T.spin-dt); T.ang=(T.ang||0)+dt*7; markDyn(); } }
@@ -7120,7 +7121,7 @@ W('tryInteract',o=>function(sx,sy){ const r=pick(sx,sy); if(!r) return o.apply(t
   if(isTank(t)&&it&&it.bucket){ const bk=it.bucket; if(bk==='empty'){ const g=t._grp||[t], fl=gFluid(g); if((fl==='water'||fl==='lava')&&gAmt(g)>=1000){ tankTake(t,1000); s.n--; if(!s.n) inv.slots[inv.sel]=null; const id=fl==='water'?I.BUCKET_WATER:I.BUCKET_LAVA; if(addItem(id,1)) spawnDrop(player.x,player.y+1,player.z,id,1); invChanged(); } else toast('Buckets can only take water or lava'); return true; }
     const fl=bk==='w'?'water':bk==='l'?'lava':null; if(fl){ if(tankAdd(t,fl,1000)>=1000){ if(!creative()){ inv.slots[inv.sel]={id:I.BUCKET,n:1}; invChanged(); } } else toast('No room for that'); return true; } }
   if(k==='phead'||k==='windtop'){ if(k==='windtop'){ const b=tAt(x,y-1,z); if(b){ openTech(b); return true; } } return true; }
-  if(k==='gate'||D.ui||k==='terminal'){ openTech(t); return true; }
+  if(k==='gate'||D.ui||k==='terminal'||k==='fterm'){ openTech(t); return true; }
   return o.apply(this,arguments); });
 
 /* ---------- machine panel ---------- */
@@ -7177,7 +7178,7 @@ function body(t){ const T=t.tech, k=T.type; let h=''; if(window.body20){ const r
   if(WIRELESS.has(k)) h+=`<div class="tu-box"><div class="tu-row">Channel <input type="number" min="0" max="255" value="${T.ch}" data-ch style="width:70px"> <button class="tu-b" data-role="tx" aria-pressed="${T.role==='tx'}">Broadcaster</button><button class="tu-b" data-role="rx" aria-pressed="${T.role==='rx'}">Receiver</button></div>
       <div class="tu-row" style="margin-top:8px"><button class="tu-b" data-cl aria-pressed="${!!T.cl}">Chunk loading ${T.cl?'on':'off'}</button><span class="tu-lab">Keeps this area running from anywhere in the overworld. Only circuits run there: no creatures, no lighting updates.</span></div>
       <div class="tu-rf" style="margin-top:6px">Power: ${T.e>.05?'on':'off · needs RF from a neighbour'}</div></div>`;
-  if(k==='terminal') h+=`<div class="tu-box tu-rf">${termLines(t).join('<br>')}</div>`;
+  if(k==='terminal'||k==='fterm') h+=`<div class="tu-box tu-rf">${termLines(t).join('<br>')}</div>`;
   return h+rfBox(t)+slotsRow(t); }
 function clRow(t){ return `<div class="tu-box tu-row"><button class="tu-b" data-cl aria-pressed="${!!t.tech.cl}">Chunk loading ${t.tech.cl?'on':'off'}</button><span class="tu-lab">Keeps the 3×3 chunks around this block running while you're anywhere in this world. Only machines and circuits run there (${world.forced?world.forced.size:0} chunks held now).</span></div>`; }
 function renderTech(full){ const t=cur; if(!t) return; if(!world.tiles.has(TK(t.x,t.y,t.z))){ closeTech(); return; }
@@ -7210,29 +7211,34 @@ function termLines(t){ const net=network(t).filter(n=>TD(n).cap&&n!==t); let e=0
   for(const L of lc) loss=Math.max(loss,L.loss*100); const f=c?e/c:0, bar='#'.repeat(Math.round(f*20)).padEnd(20,'.');
   return ['RF TERMINAL v1.0','=================',`STORED ${fmt(e)}/${fmt(c)} RF`,`[${bar}] ${Math.round(f*100)}%`,`GEN  +${i.toFixed(1)} RF/s`,`USE  -${o.toFixed(1)} RF/s`,`LOSS  ${loss.toFixed(1)} %`,`NODES ${net.length}  GEN ${gen}  USE ${use}`,`LINES ${lc.size}`]; }
 const termTex=new Map();
-function termGroups(){ const terms=techList().filter(t=>t.tech.type==='terminal'&&Math.hypot(t.x-player.x,t.z-player.z)<40), seen=new Set(), out=[];
-  for(const t of terms){ if(seen.has(t)) continue; const f=t.tech.f, g=[t], q=[t]; seen.add(t); const side=f===0||f===1?[4,5,2,3]:[0,1,2,3];
-    while(q.length){ const a=q.pop(); for(const d of side){ const n=tN(a,d); if(n&&n.tech.type==='terminal'&&n.tech.f===f&&!seen.has(n)){ seen.add(n); g.push(n); q.push(n); } } }
-    out.push(g); } return out; }
-function drawTerminals(){ const gs=termGroups(); if(!gs.length) return; const now=performance.now();
+let _tg=null,_tgT=0;
+function termGroups(){ const now=performance.now(); if(_tg&&now-_tgT<300) return _tg; _tgT=now;
+  // screens are the biggest solid rectangles of same-kind terminals facing the same way on one wall (a ragged build becomes several screens, never one oversized one)
+  const by=new Map(); for(const t of techList()){ const ty=t.tech.type; if((ty!=='terminal'&&ty!=='fterm')||Math.hypot(t.x-player.x,t.z-player.z)>40) continue; const f=t.tech.f; if(f>5||f===2||f===3) continue; const lay=f<2?t.x:t.z, k=ty+'|'+f+'|'+lay; let m=by.get(k); if(!m) by.set(k,m=new Map()); m.set((f<2?t.z:t.x)+','+t.y,t); }
+  const out=[]; for(const m of by.values()){ const used=new Set(), cells=[...m.entries()].map(([k,t])=>[+k.split(',')[0],+k.split(',')[1],t]).sort((p,q)=>p[1]-q[1]||p[0]-q[0]);
+    for(const [u,v,t] of cells){ const k0=u+','+v; if(used.has(k0)) continue; let w=1; while(m.has((u+w)+','+v)&&!used.has((u+w)+','+v)&&w<24) w++; let h=1; grow: while(h<12){ for(let i=0;i<w;i++){ const kk=(u+i)+','+(v+h); if(!m.has(kk)||used.has(kk)) break grow; } h++; }
+      const g=[]; for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const kk=(u+i)+','+(v+j); used.add(kk); g.push(m.get(kk)); } out.push(g); } }
+  return _tg=out; }
+function drawTerminals(){ const gs=termGroups(); if(!gs.length){ for(const [k,e] of termTex){ if(e.tex) gl.deleteTexture(e.tex); termTex.delete(k); } return; } const now=performance.now(), live=new Set();
   gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform2f(TU.uFogR,1e5,1e5); gl.uniform1f(gl.getUniformLocation(texProg,'uBlend'),0); gl.bindVertexArray(texVAO); gl.bindBuffer(gl.ARRAY_BUFFER,texVBO);
-  for(const g of gs){ const t0=g[0], f=t0.tech.f, d=DIR6[f], on=g.some(t=>t._on);
-    const xs=g.map(t=>t.x), ys=g.map(t=>t.y), zs=g.map(t=>t.z), x0=Math.min(...xs), x1=Math.max(...xs)+1, y0=Math.min(...ys), y1=Math.max(...ys)+1, z0=Math.min(...zs), z1=Math.max(...zs)+1;
-    const wide=f===0||f===1?z1-z0:x1-x0, tall=y1-y0, key=TK(x0,y0,z0)+'_'+f; let e=termTex.get(key);
+  for(const g of gs){ const t0=g[0], f=t0.tech.f, d=DIR6[f], on=g.some(t=>t._on), th=t0.tech.type==='fterm'?.12:1;
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9,z0=1e9,z1=-1e9; for(const t of g){ if(t.x<x0)x0=t.x; if(t.x>x1)x1=t.x; if(t.y<y0)y0=t.y; if(t.y>y1)y1=t.y; if(t.z<z0)z0=t.z; if(t.z>z1)z1=t.z; } x1++; y1++; z1++;
+    const wide=f===0||f===1?z1-z0:x1-x0, tall=y1-y0, key=TK(x0,y0,z0)+'_'+f+'_'+wide+'x'+tall; live.add(key); let e=termTex.get(key);
     if(!e){ const c=document.createElement('canvas'); e={c,t:0,tex:null}; termTex.set(key,e); }
-    if(now-e.t>500){ e.t=now; const c=e.c; c.width=Math.max(64,128*wide); c.height=Math.max(64,128*tall); const x=c.getContext('2d'); x.fillStyle=on?'#020a04':'#050505'; x.fillRect(0,0,c.width,c.height);
+    if(now-e.t>500){ e.t=now; const c=e.c, ppb=Math.max(12,Math.min(128,Math.floor(1024/Math.max(wide,tall)))); c.width=Math.max(32,ppb*wide); c.height=Math.max(32,ppb*tall); const x=c.getContext('2d'); x.fillStyle=on?'#020a04':'#050505'; x.fillRect(0,0,c.width,c.height);
       if(on){ const lines=termLines(t0), fs=Math.max(8,Math.floor(Math.min(c.width/22,c.height/(lines.length+1)))); x.font=`bold ${fs}px ui-monospace,Consolas,monospace`; x.textBaseline='top';
         lines.forEach((l,i)=>{ x.fillStyle=i<2?'#9dffb0':'#3cff6a'; x.fillText(l,fs*.6,fs*.4+i*fs*1.05); }); if((now/500|0)%2) { x.fillStyle='#3cff6a'; x.fillRect(fs*.6,fs*.4+lines.length*fs*1.05,fs*.55,fs*.9); }
         x.fillStyle='rgba(0,0,0,.25)'; for(let y=0;y<c.height;y+=3) x.fillRect(0,y,c.width,1); }
       if(!e.tex) e.tex=glTex(c,false); else { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,e.tex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c); gl.activeTexture(gl.TEXTURE0); } }
-    const m=.07, o2=.003; let q;
-    if(f===4) q=[[x0+m,y0+m,z1+o2],[x1-m,y0+m,z1+o2],[x1-m,y1-m,z1+o2],[x0+m,y1-m,z1+o2]]; else if(f===5) q=[[x1-m,y0+m,z0-o2],[x0+m,y0+m,z0-o2],[x0+m,y1-m,z0-o2],[x1-m,y1-m,z0-o2]];
-    else if(f===0) q=[[x1+o2,y0+m,z1-m],[x1+o2,y0+m,z0+m],[x1+o2,y1-m,z0+m],[x1+o2,y1-m,z1-m]]; else if(f===1) q=[[x0-o2,y0+m,z0+m],[x0-o2,y0+m,z1-m],[x0-o2,y1-m,z1-m],[x0-o2,y1-m,z0+m]]; else continue;
+    const m=th<1?.04:.07, o2=.003, zf=th<1?z0+th+o2:z1+o2, zb=th<1?z1-th-o2:z0-o2, xf=th<1?x0+th+o2:x1+o2, xb=th<1?x1-th-o2:x0-o2; let q;
+    if(f===4) q=[[x0+m,y0+m,zf],[x1-m,y0+m,zf],[x1-m,y1-m,zf],[x0+m,y1-m,zf]]; else if(f===5) q=[[x1-m,y0+m,zb],[x0+m,y0+m,zb],[x0+m,y1-m,zb],[x1-m,y1-m,zb]];
+    else if(f===0) q=[[xf,y0+m,z1-m],[xf,y0+m,z0+m],[xf,y1-m,z0+m],[xf,y1-m,z1-m]]; else if(f===1) q=[[xb,y0+m,z0+m],[xb,y0+m,z1-m],[xb,y1-m,z1-m],[xb,y1-m,z0+m]]; else continue;
     const uv=[[0,1],[1,1],[1,0],[0,0]], dd=new Float32Array(20); for(let i=0;i<4;i++){ dd.set(q[i],i*5); dd[i*5+3]=uv[i][0]; dd[i*5+4]=uv[i][1]; }
     const L=on?1:Math.max(.15,sampleLight(x0+.5+d[0],y0+.5,z0+.5+d[2])[0]/255*.5); gl.uniform3f(TU.uL,L,L,L);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,e.tex); gl.activeTexture(gl.TEXTURE0); gl.bufferSubData(gl.ARRAY_BUFFER,0,dd); gl.drawArrays(gl.TRIANGLE_FAN,0,4); }
+  for(const [k,e] of termTex) if(!live.has(k)){ if(e.tex) gl.deleteTexture(e.tex); termTex.delete(k); }   // old sizes of a screen being built are freed, not leaked
   gl.useProgram(prog); gl.bindVertexArray(null); }
-window.drawTerminals=drawTerminals;
+window.drawTerminals=drawTerminals; window.__tt={termGroups:()=>termGroups(),termTex};
 
 /* ---------- drawing: static models (chunk mesh) ---------- */
 // orient a model built facing +z (up = +y) to face direction f
@@ -7270,6 +7276,7 @@ window.techMesh=function(vb,vg,b,bd,wx,y,wz){ const t=tAt(wx,y,wz), k=bd.tech, f
   if(k==='mwcru'){ ID([0,0,0],[1,.35,1],[122,70,54]); ID([.08,.35,.08],[.92,.95,.92],[78,74,72]); ID([.18,.95,.18],[.82,1,.82],[40,36,34]); return; }
   if(k==='wtable'){ ID([0,.8,0],[1,.95,1],[168,116,63]); for(const [a,c] of [[.05,.05],[.83,.05],[.05,.83],[.83,.83]]) ID([a,0,c],[a+.12,.8,c+.12],[138,94,52]); ID([.3,.95,.48],[.85,.97,.52],[190,190,196]); return; }
   if(k==='sifter'){ ID([0,0,0],[1,.15,1],dk); for(const [a,c] of [[0,0],[.88,0],[0,.88],[.88,.88]]) ID([a,0,c],[a+.12,1,c+.12],S); ID([.12,.6,.12],[.88,.66,.88],[200,190,160]); return; }
+  if(k==='fterm'){ bx([0,0,0],[1,1,.12],[44,48,54]); bx([.03,.03,.12],[.97,.97,.135],[20,22,24]); return; }
   if(k==='terminal'){ bx([0,0,0],[1,1,.9],[44,48,54]); bx([.04,.04,.9],[.96,.96,.97],[20,22,24]); return; }
   if(k==='sbcast'||k==='srecv'){ bx([0,0,0],[1,.18,1],S); bx([.12,.18,.12],[.88,.24,.88],k==='sbcast'?[80,150,230]:[190,110,230]); bx([.44,.18,.6],[.56,.27,.96],[235,235,235]); bx([.34,.18,.82],[.66,.27,.88],[235,235,235]); return; }
   if(k==='wbasic'){ bx([0,0,0],[1,.7,1],S); bx([.47,.7,.47],[.53,1.05,.53],[150,150,160]); bx([.1,.2,.98],[.3,.35,1.01],[30,30,34]); return; }
@@ -8197,6 +8204,7 @@ const M={
  moulder:[[0,0,0,1,.5,1,'#6c6f76'],[.1,.5,.1,.9,.55,.9,'#2a2c30'],[.2,.55,.2,.8,.6,.8,'#e0e8f0'],[0,.5,0,.1,.8,.1,ST],[.9,.5,.9,1,.8,1,ST]],
  spress:[[0,0,0,1,.4,1,'#707a70'],[.1,.4,.1,.9,.9,.3,'#5a6a5a'],[.1,.4,.7,.9,.9,.9,'#5a6a5a'],[.3,.4,.4,.7,.7,.6,IR],[.4,.7,.4,.6,1,.6,DK]],
  gpress:[[0,0,0,1,.4,1,'#7a7090'],[.1,.4,.1,.9,.9,.3,'#5a5078'],[.1,.4,.7,.9,.9,.9,'#5a5078'],[.3,.4,.4,.7,.7,.6,GO],[.4,.7,.4,.6,1,.6,PU]],
+ fterm:[[0,0,0,1,1,.14,'#2c3036'],[.06,.06,.14,.94,.94,.16,'#3ad0e0']],
  terminal:[[0,0,0,1,.9,1,'#2c3036'],[.12,.3,.99,.88,.8,1.01,'#103040'],[.18,.38,.99,.82,.72,1.02,'#3ad0e0'],[.12,.1,.99,.4,.2,1.01,GR],[.99,.3,.12,1.01,.8,.88,'#103040']],
  wterm:[[0,0,0,1,.7,1,'#3c4450'],[.12,.25,.99,.88,.62,1.01,'#103040'],[.18,.3,.99,.82,.56,1.02,'#5ae0a0'],[.46,.7,.46,.54,1,.54,IR],[.4,.95,.4,.6,1,.6,RD]],
  piston:[[0,0,0,1,.7,1,'#9a8a6a'],[.1,.7,.1,.9,.76,.9,'#5a5040'],[.4,.76,.4,.6,1,.6,IR]],
@@ -9776,5 +9784,6 @@ const PH=new Map(); let lastT=0;
 window.__v38={ck,neigh,segBoxes};
 })();
 
+setInterval(()=>{ try{ if(world&&!world.preview&&game()&&world.changed) saveGame(); }catch(e){} },6000);
 </script>
 </body></html>

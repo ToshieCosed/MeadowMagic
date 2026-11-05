@@ -128,3 +128,9 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 
 ### v0.38.8 — cleaner corners
 - Corners and bends no longer sprout overshooting cross arms; only straight run-ends extend to the block edge.
+
+## v0.39.0 — terminal screens: freeze fix + flat terminals
+- Fixed a leak/freeze: every time a block was added to a terminal screen a new screen texture (up to 128 px per block, no limit) was created and the old one never freed, so a big wall exhausted GPU/memory. Textures are now capped at 1024 px, resized in place, and freed when a screen changes. Screen detection is cached and only forms solid rectangles (a ragged/partial build becomes several screens instead of one oversized one that stretched over missing blocks).
+- New **Flat RF terminal** (craft 1 RF terminal → 2): a thin, non-solid panel that hangs on the wall it was placed against; adjacent flat terminals merge into a bigger flat screen, and they behave like RF terminals.
+- Independent 6-second autosave (works even if the render loop stalls), in addition to the existing one.
+- Test: `tools/tests/phase17_terminals.py`.
