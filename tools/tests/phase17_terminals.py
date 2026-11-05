@@ -16,7 +16,12 @@ JS='''async()=>{ const W=ms=>new Promise(r=>setTimeout(r,ms)); startWorld({id:'w
  for(let y=0;y<3;y++) for(let x=0;x<4;x++) tech(X+26+x,G+y,Z+2,'fterm',4,{e:50});
  await W(800); mode='inv'; const t0=performance.now(); for(let i=0;i<20;i++) await W(50); res.invMs=Math.round(performance.now()-t0); mode='play';
  res.groups=__tt.termGroups().map(g=>g.length).sort((a,b)=>b-a).slice(0,6);
- res.fterm=!!TB.fterm; return res; }'''
+ res.fterm=!!TB.fterm;
+ // a terminal beside one of four joined vibrant banks sees all four, plus a solar on a wire
+ { const x=X+2, z=Z+4; for(let i=0;i<4;i++) tech(x+i,G,z,'capbank3',4,{e:700000}); const tm=[tech(x,G+1,z,'fterm',4,{e:50}),tech(x+1,G+1,z,'fterm',4,{e:50})];
+   const sol=tech(x+8,G,z,'solar1',4,{e:100}), bk=tech(x+10,G,z,'capbank3',4,{e:100000}); world.set(x+9,G,z,B.STONE); for(let i=4;i<=9;i++){ world.set(x+i,G-1,z,B.STONE); } for(let i=4;i<=9;i++) if(i!==8) WIRE.addSeg(x+i,G-1,z,2,3); WIRE.addSeg(x+4,G,z,0,3); WIRE.rebuild(); await W(300);
+   res.lines=__tt.termLines(tm); }
+ return res; }'''
 async def main():
     async with async_playwright() as p:
         b=await p.chromium.launch(executable_path=os.environ.get('CHROME','/usr/bin/google-chrome'),headless=True,args=['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'])

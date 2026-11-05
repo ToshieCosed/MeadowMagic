@@ -134,3 +134,7 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - New **Flat RF terminal** (craft 1 RF terminal → 2): a thin, non-solid panel that hangs on the wall it was placed against; adjacent flat terminals merge into a bigger flat screen, and they behave like RF terminals.
 - Independent 6-second autosave (works even if the render loop stalls), in addition to the existing one.
 - Test: `tools/tests/phase17_terminals.py`.
+
+### v0.39.1 — terminal power network + stability
+- RF terminals (and flat ones) read the **whole** network: everything touching, every pole line, and now everything reachable through coloured wires/bundles, starting from every block of the screen (not just one). Readout: generator reserve and battery reserve shown separately, gain/use/battery in-out in RF/t, net per tick, line loss, node counts.
+- Wires: per-frame draw budget (wire detail scales down on huge builds), and a WebGL context-loss guard that saves the world and offers a reload instead of freezing.

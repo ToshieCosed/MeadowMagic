@@ -7203,13 +7203,13 @@ function renderTech(full){ const t=cur; if(!t) return; if(!world.tiles.has(TK(t.
 W('stepTiles',o=>function(dt){ o.apply(this,arguments); if(mode==='tech'&&(uiT-=dt)<=0){ uiT=.25; renderTech(false); } });
 
 /* ---------- RF terminal: the network it sits on, as a retro screen ---------- */
-function network(t){ const seen=new Set([t]), q=[t];
-  while(q.length){ const a=q.pop(); for(let d=0;d<6;d++){ const n=tN(a,d); if(n&&!seen.has(n)&&(TD(n).cap||TD(n).line)){ seen.add(n); q.push(n); } } if(a._lc) for(const n of a._lc.nodes) if(!seen.has(n)){ seen.add(n); q.push(n); } }
+function network(t0){ const roots=Array.isArray(t0)?t0:[t0], t=roots[0], seen=new Set(roots), q=[...roots];
+  while(q.length){ const a=q.pop(); for(let d=0;d<6;d++){ const n=tN(a,d); if(n&&!seen.has(n)&&(TD(n).cap||TD(n).line)){ seen.add(n); q.push(n); } } if(a._lc) for(const n of a._lc.nodes) if(!seen.has(n)){ seen.add(n); q.push(n); } if(window.WIRE) for(const n of WIRE.tilesOf(a)) if(!seen.has(n)&&world.tiles.get(TK(n.x,n.y,n.z))===n&&(TD(n).cap||TD(n).line)){ seen.add(n); q.push(n); } }
   return [...seen]; }
-function termLines(t){ const net=network(t).filter(n=>TD(n).cap&&n!==t); let e=0,c=0,i=0,o=0,gen=0,use=0,loss=0,lc=new Set();
-  for(const n of net){ const D=TD(n); if(D.io==='out'||D.io==='both'){ e+=n.tech.e; c+=D.cap; } if(n._gen||n.tech.type==='windmill'){ gen++; i+=n._inR||0; } if(D.io==='in'&&n.tech.type!=='inducer'){ use++; o+=n._inR||0; } if(n._lc) lc.add(n._lc); }
-  for(const L of lc) loss=Math.max(loss,L.loss*100); const f=c?e/c:0, bar='#'.repeat(Math.round(f*20)).padEnd(20,'.');
-  return ['RF TERMINAL v1.0','=================',`STORED ${fmt(e)}/${fmt(c)} RF`,`[${bar}] ${Math.round(f*100)}%`,`GEN  +${i.toFixed(1)} RF/s`,`USE  -${o.toFixed(1)} RF/s`,`LOSS  ${loss.toFixed(1)} %`,`NODES ${net.length}  GEN ${gen}  USE ${use}`,`LINES ${lc.size}`]; }
+function termLines(t){ const roots=Array.isArray(t)?t:[t], net=network(roots).filter(n=>TD(n).cap&&!roots.includes(n)); let ge=0,gc=0,be=0,bc=0,gain=0,bi=0,bo=0,use=0,gens=0,bats=0,cons=0,loss=0; const lc=new Set();
+  for(const n of net){ const D=TD(n); if(D.capm||D.cb){ bats++; be+=n.tech.e; bc+=D.cap; bi+=n._inR||0; bo+=n._outR||0; } else if(D.io==='out'||n.tech.type==='windmill'){ gens++; ge+=n.tech.e; gc+=D.cap; gain+=n._gen!=null?(n._inR||0):(n._inR||0); } else if(D.io==='in'&&n.tech.type!=='inducer'&&n.tech.type!=='terminal'&&n.tech.type!=='fterm'){ cons++; use+=n._inR||0; } if(n._lc) lc.add(n._lc); }
+  for(const L of lc) loss=Math.max(loss,L.loss*100); const f=bc?be/bc:0, bar='#'.repeat(Math.round(f*20)).padEnd(20,'.'), T=v=>(v/20).toFixed(1), net2=(gain+bi-bo-use)/20;
+  return ['RF TERMINAL v2.0','=================',`GEN RESERVE  ${fmt(ge)}/${fmt(gc)} RF`,`BATT RESERVE ${fmt(be)}/${fmt(bc)} RF`,`[${bar}] ${Math.round(f*100)}%`,`GAIN  +${T(gain)} RF/t`,`USE   -${T(use)} RF/t`,`BATT  +${T(bi)} / -${T(bo)} RF/t`,`NET   ${net2>=0?'+':''}${net2.toFixed(1)} RF/t`,`LOSS  ${loss.toFixed(1)} %`,`NODES ${net.length}  GEN ${gens}  BAT ${bats}  USE ${cons}`,`LINES ${lc.size}`]; }
 const termTex=new Map();
 let _tg=null,_tgT=0;
 function termGroups(){ const now=performance.now(); if(_tg&&now-_tgT<300) return _tg; _tgT=now;
@@ -7226,7 +7226,7 @@ function drawTerminals(){ const gs=termGroups(); if(!gs.length){ for(const [k,e]
     const wide=f===0||f===1?z1-z0:x1-x0, tall=y1-y0, key=TK(x0,y0,z0)+'_'+f+'_'+wide+'x'+tall; live.add(key); let e=termTex.get(key);
     if(!e){ const c=document.createElement('canvas'); e={c,t:0,tex:null}; termTex.set(key,e); }
     if(now-e.t>500){ e.t=now; const c=e.c, ppb=Math.max(12,Math.min(128,Math.floor(1024/Math.max(wide,tall)))); c.width=Math.max(32,ppb*wide); c.height=Math.max(32,ppb*tall); const x=c.getContext('2d'); x.fillStyle=on?'#020a04':'#050505'; x.fillRect(0,0,c.width,c.height);
-      if(on){ const lines=termLines(t0), fs=Math.max(8,Math.floor(Math.min(c.width/22,c.height/(lines.length+1)))); x.font=`bold ${fs}px ui-monospace,Consolas,monospace`; x.textBaseline='top';
+      if(on){ const lines=termLines(g), fs=Math.max(8,Math.floor(Math.min(c.width/22,c.height/(lines.length+1)))); x.font=`bold ${fs}px ui-monospace,Consolas,monospace`; x.textBaseline='top';
         lines.forEach((l,i)=>{ x.fillStyle=i<2?'#9dffb0':'#3cff6a'; x.fillText(l,fs*.6,fs*.4+i*fs*1.05); }); if((now/500|0)%2) { x.fillStyle='#3cff6a'; x.fillRect(fs*.6,fs*.4+lines.length*fs*1.05,fs*.55,fs*.9); }
         x.fillStyle='rgba(0,0,0,.25)'; for(let y=0;y<c.height;y+=3) x.fillRect(0,y,c.width,1); }
       if(!e.tex) e.tex=glTex(c,false); else { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,e.tex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c); gl.activeTexture(gl.TEXTURE0); } }
@@ -7238,7 +7238,7 @@ function drawTerminals(){ const gs=termGroups(); if(!gs.length){ for(const [k,e]
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,e.tex); gl.activeTexture(gl.TEXTURE0); gl.bufferSubData(gl.ARRAY_BUFFER,0,dd); gl.drawArrays(gl.TRIANGLE_FAN,0,4); }
   for(const [k,e] of termTex) if(!live.has(k)){ if(e.tex) gl.deleteTexture(e.tex); termTex.delete(k); }   // old sizes of a screen being built are freed, not leaked
   gl.useProgram(prog); gl.bindVertexArray(null); }
-window.drawTerminals=drawTerminals; window.__tt={termGroups:()=>termGroups(),termTex};
+window.drawTerminals=drawTerminals; window.__tt={termGroups:()=>termGroups(),termTex,termLines};
 
 /* ---------- drawing: static models (chunk mesh) ---------- */
 // orient a model built facing +z (up = +y) to face direction f
@@ -9737,7 +9737,7 @@ let tickc=0;
 setInterval(()=>{ try{ step(); }catch(e){ console.error('wires',e); } },50);
 // the tech blocks ask these when they look for input
 const lvEx=(n,t)=>Math.max(n.b1t===t?n.b2:n.b1,n.live?16:0);
-window.WIRE={ nets:()=>nets, rebuild, addSeg, delSeg, hasSeg, step,
+window.WIRE={ tilesOf(t){ const a=termIdx.get(ck(t.x,t.y,t.z)); if(!a) return []; const out=[]; for(const e of a) for(const q of e.net.terms) if(q.t!==t) out.push(q.t); return out; }, nets:()=>nets, rebuild, addSeg, delSeg, hasSeg, step,
   inLevel(t,d){ const a=termIdx.get(ck(t.x,t.y,t.z)); if(!a) return 0; let m=0; for(const e of a) if(e.face===d) m=Math.max(m,lvEx(e.net,t)); return m; },
   conn(t,d){ const a=termIdx.get(ck(t.x,t.y,t.z)); if(!a) return false; for(const e of a) if(e.face===d) return true; return false; } };
 
@@ -9772,8 +9772,8 @@ function placeWire(sx,sy,c){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap th
 const PH=new Map(); let lastT=0;
 { const _ed=emitDecor; emitDecor=function(vb){ _ed.apply(this,arguments); if(!geo.length) return; const now=performance.now(), dt=Math.min(.1,Math.max(0,(now-lastT)/1000)); lastT=now;
     for(const n of nets) if(n.speed) PH.set(n.pk,((PH.get(n.pk)||0)+(.5+n.speed*.35)*dt)%1000);
-    const px=player.x, pz=player.z, P=.125, TAU=Math.PI*2, hw=.029; PAT=0; setVL(VL_EMISSIVE);
-    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], cz=s.c*.0006, n0=s.sf+((s.f&1)?-.034-cz:.004+cz), n1=s.sf+((s.f&1)?-.004-cz:.034+cz), cs=dd<14?1/32:dd<28?1/16:.5;
+    const px=player.x, pz=player.z, P=.125, TAU=Math.PI*2, hw=.029; PAT=0; setVL(VL_EMISSIVE); let budget=2400;
+    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], cz=s.c*.0006, n0=s.sf+((s.f&1)?-.034-cz:.004+cz), n1=s.sf+((s.f&1)?-.004-cz:.034+cz), cs=(budget<500||dd>=28)?.5:dd<14&&budget>1500?1/32:1/16; budget-=(1+s.arm.reduce((a,v)=>a+v,0)*(.5/cs))|0;
       const col=(sh,tw)=>{ const g=on?.95+.32*sh:.62+.2*sh; return [Math.min(255,base[0]*g+(on?24:0)),Math.min(255,base[1]*g+(on?24:0)),Math.min(255,base[2]*g+(on?24:0))]; };
       const put=(lo,hi,c)=>{ const mn=[0,0,0], mx=[0,0,0]; mn[a]=org[a]+n0; mx[a]=org[a]+n1; mn[pl[0]]=org[pl[0]]+lo[0]; mx[pl[0]]=org[pl[0]]+hi[0]; mn[pl[1]]=org[pl[1]]+lo[1]; mx[pl[1]]=org[pl[1]]+hi[1]; emitBox(vb,mn,mx,c,IDT); };
       put([lane-hw,lane-hw],[lane+hw,lane+hw],col(.4,0));
@@ -9785,5 +9785,6 @@ window.__v38={ck,neigh,segBoxes};
 })();
 
 setInterval(()=>{ try{ if(world&&!world.preview&&game()&&world.changed) saveGame(); }catch(e){} },6000);
+canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); try{ saveGame(); }catch(_){} if(document.getElementById('glLost')) return; const d=document.createElement('div'); d.id='glLost'; d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(10,14,20,.92);color:#fff;font:600 18px system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px'; d.textContent='The device reset the graphics. Your world was saved. Tap to reload.'; d.onclick=()=>location.reload(); document.body.appendChild(d); });
 </script>
 </body></html>
