@@ -1,11 +1,14 @@
 // Strata Minecraft-compat relay. Run: MS_CLIENT_ID=<your Azure app id> node relay.mjs   (default port 25580)
 // Handles the documented Microsoft -> Xbox Live -> XSTS -> Minecraft services login so tokens never reach the browser.
 import { WebSocketServer } from 'ws';
+import net from 'node:net';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CLIENT_ID = process.env.MS_CLIENT_ID || '';
+let CLIENT_ID = process.env.MS_CLIENT_ID || '';
 const PORT = +(process.env.PORT || 25580);
 const STORE = process.env.RELAY_STORE || path.join(path.dirname(fileURLToPath(import.meta.url)), '.relay-auth.json');
 const EP = Object.assign({
@@ -14,7 +17,8 @@ const EP = Object.assign({
   xbl: 'https://user.auth.xboxlive.com/user/authenticate',
   xsts: 'https://xsts.auth.xboxlive.com/xsts/authorize',
   mclogin: 'https://api.minecraftservices.com/authentication/login_with_xbox',
-  profile: 'https://api.minecraftservices.com/minecraft/profile'
+  profile: 'https://api.minecraftservices.com/minecraft/profile',
+  sessionjoin: 'https://sessionserver.mojang.com/session/minecraft/join'
 }, JSON.parse(process.env.RELAY_ENDPOINTS || '{}'));
 const SCOPE = 'XboxLive.signin offline_access';
 const XSTS_ERR = { 2148916233: 'This Microsoft account has no Xbox profile yet. Sign in once at xbox.com to create one.', 2148916235: 'Xbox Live is not available in this account\'s country.', 2148916236: 'The account needs adult verification (Xbox).', 2148916237: 'The account needs adult verification (Xbox).', 2148916238: 'Child accounts must be added to a Microsoft family before they can sign in.' };
@@ -51,7 +55,8 @@ async function refresh() {
 }
 
 let session = null;   // { name, uuid, mcToken, expires } kept only in this process
-async function authFlow(send) {
+async function authFlow(send, clientId) {
+  if (clientId) CLIENT_ID = clientId;
   if (!CLIENT_ID) return send({ type: 'auth_error', message: 'Relay has no MS_CLIENT_ID. Register an Azure app (public client) and start the relay with MS_CLIENT_ID=<id>.' });
   try { const s = await refresh(); if (s) { session = s; return send({ type: 'auth_ok', name: s.name, uuid: s.uuid, remembered: true }); } } catch (e) { /* fall through to a fresh sign-in */ }
   const d = await post(EP.devicecode, { client_id: CLIENT_ID, scope: SCOPE });
@@ -72,13 +77,68 @@ async function authFlow(send) {
   send({ type: 'auth_error', message: 'The code expired. Try again.' });
 }
 
+// ---- Minecraft transport: the page sends/receives whole packet bodies; this layer does TCP framing, zlib compression and AES/CFB8 encryption ----
+const vi = n => { const a = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; a.push(b); } while (n); return Buffer.from(a); };
+const readVi = (b, o) => { let v = 0, s = 0, i = o; for (;;) { if (i >= b.length) return null; const x = b[i++]; v |= (x & 0x7f) << s; if (!(x & 0x80)) return { v, len: i - o }; s += 7; if (s > 35) throw new Error('bad varint'); } };
+const mcDigest = buf => { let h = crypto.createHash('sha1').update(buf).digest(); const neg = h[0] & 0x80; if (neg) { h = Buffer.from(h); let c = 1; for (let i = h.length - 1; i >= 0; i--) { const x = (~h[i] & 0xff) + c; h[i] = x & 0xff; c = x >> 8; } } const hex = h.toString('hex').replace(/^0+/, '') || '0'; return (neg ? '-' : '') + hex; };
+
+function tcpOpen(ws, send, ctx, host, port) {
+  tcpClose(ctx);
+  const sock = net.connect({ host, port }); sock.setNoDelay(true);
+  Object.assign(ctx, { sock, enc: null, dec: null, compress: -1, login: true, pending: null, buf: Buffer.alloc(0) });
+  sock.on('connect', () => send({ type: 'tcp_open_ok' }));
+  sock.on('error', e => send({ type: 'tcp_error', message: e.message }));
+  sock.on('close', () => { if (ctx.sock === sock) { ctx.sock = null; send({ type: 'tcp_closed' }); } });
+  sock.on('data', d => {
+    try {
+      if (ctx.dec) d = ctx.dec.update(d);
+      ctx.buf = Buffer.concat([ctx.buf, d]);
+      for (;;) {
+        const r = readVi(ctx.buf, 0); if (!r || ctx.buf.length < r.len + r.v) break;
+        let body = ctx.buf.subarray(r.len, r.len + r.v); ctx.buf = ctx.buf.subarray(r.len + r.v);
+        if (ctx.compress >= 0) { const dl = readVi(body, 0), rest = body.subarray(dl.len); body = dl.v === 0 ? rest : zlib.inflateSync(rest); }
+        if (ws.readyState === 1) ws.send(body, { binary: true });
+        if (ctx.login) { const id = readVi(body, 0); if (id.v === 3) { const t = readVi(body, id.len); ctx.compress = t.v | 0; } else if (id.v === 2) ctx.login = false; }
+      }
+    } catch (e) { send({ type: 'tcp_error', message: 'bad packet stream: ' + e.message }); tcpClose(ctx); }
+  });
+}
+function tcpClose(ctx) { if (ctx.sock) { const s = ctx.sock; ctx.sock = null; s.destroy(); } }
+function tcpSend(ctx, body) {
+  if (!ctx.sock) return;
+  let data = body;
+  if (ctx.compress >= 0) data = body.length >= ctx.compress ? Buffer.concat([vi(body.length), zlib.deflateSync(body)]) : Buffer.concat([vi(0), body]);
+  let frame = Buffer.concat([vi(data.length), data]);
+  if (ctx.enc) frame = ctx.enc.update(frame);
+  ctx.sock.write(frame);
+  if (ctx.pending) { const k = ctx.pending; ctx.pending = null; ctx.enc = crypto.createCipheriv('aes-128-cfb8', k, k); ctx.dec = crypto.createDecipheriv('aes-128-cfb8', k, k); }   // everything after the encryption response is encrypted
+}
+async function encryptBegin(ctx, send, m) {
+  if (!session) return send({ type: 'mc_error', message: 'Not signed in.' });
+  try {
+    const secret = crypto.randomBytes(16), pub = Buffer.from(m.publicKey, 'base64'), token = Buffer.from(m.verifyToken, 'base64');
+    const hash = mcDigest(Buffer.concat([Buffer.from(m.serverId || '', 'utf8'), secret, pub]));
+    const j = await post(EP.sessionjoin, { accessToken: session.mcToken, selectedProfile: session.uuid, serverId: hash }, true);
+    if (j.status !== 204 && !j.ok) return send({ type: 'mc_error', message: 'Session server refused the join (' + j.status + ').' });
+    const key = crypto.createPublicKey({ key: pub, format: 'der', type: 'spki' }), enc = b => crypto.publicEncrypt({ key, padding: crypto.constants.RSA_PKCS1_PADDING }, b);
+    ctx.pending = secret; send({ type: 'mc_encrypt_ready', secret: enc(secret).toString('base64'), token: enc(token).toString('base64') });
+  } catch (e) { send({ type: 'mc_error', message: e.message }); }
+}
+
 const wss = new WebSocketServer({ port: PORT });
 wss.on('connection', ws => {
-  const send = o => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
-  ws.on('message', buf => { let m; try { m = JSON.parse(buf.toString()); } catch { return; }
-    if (m.type === 'auth_start') authFlow(send).catch(e => send({ type: 'auth_error', message: e.message }));
+  const send = o => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); }, ctx = {};
+  ws.on('message', (buf, isBinary) => {
+    if (isBinary) return tcpSend(ctx, Buffer.from(buf));
+    let m; try { m = JSON.parse(buf.toString()); } catch { return; }
+    if (m.type === 'auth_start') authFlow(send, m.clientId).catch(e => send({ type: 'auth_error', message: e.message }));
     else if (m.type === 'auth_status') send(session ? { type: 'auth_ok', name: session.name, uuid: session.uuid, remembered: true } : { type: 'auth_none' });
-    else if (m.type === 'auth_logout') { session = null; saveStore({}); send({ type: 'auth_none' }); } });
-  send({ type: 'hello', relay: 'strata-minecraft-compat', version: 1 });
+    else if (m.type === 'auth_logout') { session = null; saveStore({}); send({ type: 'auth_none' }); }
+    else if (m.type === 'tcp_open') tcpOpen(ws, send, ctx, String(m.host), +m.port);
+    else if (m.type === 'tcp_close') tcpClose(ctx);
+    else if (m.type === 'mc_encrypt_begin') encryptBegin(ctx, send, m);
+  });
+  ws.on('close', () => tcpClose(ctx));
+  send({ type: 'hello', relay: 'strata-minecraft-compat', version: 2 });
 });
-console.log('Strata relay listening on ws://localhost:' + PORT + (CLIENT_ID ? '' : '  (no MS_CLIENT_ID set: sign-in disabled)'));
+console.log('Strata relay listening on ws://localhost:' + PORT + (CLIENT_ID ? '' : '  (no MS_CLIENT_ID set: enter one in the menu)'));

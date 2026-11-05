@@ -16,3 +16,6 @@ Device-code sign-in -> Xbox Live -> XSTS -> Minecraft services -> profile. Only 
     node test-auth.mjs       # relay against fake endpoints (mock-ms.mjs)
     python tools/tests/phase24_mcauth.py   # the menu + relay together
 The real endpoints have not been exercised yet.
+
+## Android app (no PC needed)
+`android/` wraps the game in a WebView and runs the same relay in-process on a random loopback port (`app.strata.relay.Relay`, pure JDK). The page finds it through `window.StrataNative.info()`, so the relay address field is hidden and you only enter your Azure client id. The Java relay is tested against the same mock tests as the Node one. GitHub Actions (`.github/workflows/android.yml`) builds the APK and publishes a Release on every push. The APK is signed with the committed sideload key `android/strata.jks` so builds update in place.
