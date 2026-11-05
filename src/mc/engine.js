@@ -3,8 +3,8 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt'];
-  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat' };   // anything else (fish, phantoms, ...) is skipped
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity'];
+  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
   // ---- late block registration (ids 8192+), removed again on stop ----
@@ -53,10 +53,21 @@
       if (meta & 8) { const bd = below > 0 && BLOCKS[below]; const d = bd && bd.door; return m.door + (d ? d.fi * 4 + (d.open ? 2 : 0) : 0) + 1; }
       return m.door + [3, 0, 1, 2][meta & 3] * 4 + ((meta & 4) ? 2 : 0);
     }
+    if (bid === 96 || bid === 167) { const m = TRAP_MATS.find(q => q.k === (bid === 96 ? 'oak' : 'iron')); if (m) return m.trap + ((((meta & 8) ? 1 : 0) * 4 + [0, 2, 3, 1][meta & 3]) * 2 + ((meta & 4) ? 1 : 0)); }
+    if (bid === 77 || bid === 143) { const o = meta & 7, pr = (meta & 8) ? .0625 : .125, d = pr, a = .3125, b = .6875; const bx = { 1: [0, .375, a, d, .625, b], 2: [1 - d, .375, a, 1, .625, b], 3: [a, .375, 0, b, .625, d], 4: [a, .375, 1 - d, b, .625, 1], 5: [a, 0, .375, b, d, .625], 0: [a, 1 - d, .375, b, 1, .625] }[o] || [a, 0, .375, b, d, .625]; return shape('btn' + bid + ':' + o + ':' + (meta & 8), bid === 77 ? 'Stone button' : 'Wooden button', bid === 77 ? '#9aa0a7' : '#b8945f', [bx], { solid: false }); }
+    if (bid === 69) { const o = meta & 7, on = (meta & 8) ? 1 : 0, t = on ? .22 : -.22; let boxes;
+      if (o === 5 || o === 6) boxes = [[.3, 0, .3, .7, .15, .7], [.43 + t * (o === 5 ? 1 : 0), .1, .43 + t * (o === 6 ? 1 : 0), .57 + t * (o === 5 ? 1 : 0), .7, .57 + t * (o === 6 ? 1 : 0)]];
+      else if (o === 0 || o === 7) boxes = [[.3, .85, .3, .7, 1, .7], [.43, .3, .43, .57, .9, .57]];
+      else { const w = { 1: 0, 2: 1, 3: 2, 4: 3 }[o]; const f = [[0, .3, .3, .15, .7, .7], [.85, .3, .3, 1, .7, .7], [.3, .3, 0, .7, .7, .15], [.3, .3, .85, .7, .7, 1]][w]; boxes = [f, [.43, .4 + t * .5, .43, .57, .55 + t * .5, .57].map((v, i) => v)]; }
+      return shape('lev' + o + ':' + on, 'Lever', '#8a8f96', boxes, { solid: false }); }
     if (bid === 65) return [0, 0, B.LADDER_N, B.LADDER_S, B.LADDER_W, B.LADDER_E][meta & 7] || null;
     if (bid === 27 || bid === 28 || bid === 66 || bid === 157) return B.RAIL;
     if (bid === 70 || bid === 72 || bid === 147 || bid === 148) { const m = PLATE_MATS.find(q => q.k === (bid === 72 ? 'wood' : bid === 70 ? 'stone' : 'iron')); return m && (m.plate + (meta & 1)); }
     return null;
+  }
+  function shape(key, name, col, boxes, extra) {
+    key = 'S' + key; if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
+    def(id, name, col, col, 0, Object.assign({ opaque: false, lightOpaque: 0, shape: 1, decor: 1, noItem: 1, boxes }, extra || {})); post(id); S.vis.set(key, id); return id;
   }
   function stateToId(st, below) {   // protocol 47: st = blockId<<4 | meta
     { const n = native(st >> 4, st & 15, below); if (n) return n; }
@@ -83,7 +94,7 @@
   function strataItem(mc) {
     const key = mc.id + ':' + mc.damage, c = S.itemMap.get(key); if (c) return c;
     const it = StrataMC.items18[mc.id] || ['item' + mc.id, 'Item ' + mc.id, 64]; let sid = 0;
-    if (mc.id < 256) { sid = native(mc.id, mc.damage, 0) || stateToId((mc.id << 4) | mc.damage, 0) || 0; if (sid && !ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: 64, block: sid, mcCompat: 1 }; S.items.push(sid); } }
+    if (mc.id < 256) { sid = native(mc.id, mc.damage, 0) || stateToId((mc.id << 4) | mc.damage, 0) || 0; if (sid && !ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } }
     else {
       const m = /^(wooden|stone|iron|golden|diamond)_(pickaxe|axe|shovel|sword|hoe)$/.exec(it[0]);
       if (m) sid = GEN[TOOLS[m[1]] + ':' + TT[m[2]]] || 0;
@@ -91,7 +102,7 @@
       if (!sid) { if (!S.byName) { S.byName = new Map(); for (let i = 0; i < ITEMS.length; i++) if (ITEMS[i] && ITEMS[i].name && !ITEMS[i].mcCompat) S.byName.set(ITEMS[i].name.toLowerCase(), i); }
         const nm = it[1].toLowerCase().replace('cap', 'helmet').replace('tunic', 'chestplate').replace('pants', 'leggings').replace('golden', 'gold'); sid = S.byName.get(nm) || S.byName.get(it[1].toLowerCase()) || 0; }
     }
-    if (!sid) { sid = 30000 + mc.id; if (!ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: it[2] || 64, mcCompat: 1 }; S.items.push(sid); } }
+    if (!sid) { sid = 30000 + mc.id; if (!ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: it[2] || 64, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } }
     S.itemMap.set(key, sid); return sid;
   }
   const toStack = mc => { if (!mc) return null; const id = strataItem(mc), t = ITEMS[id]; return { id, n: mc.count, d: t && t.dur ? t.dur : undefined, mc }; };
@@ -103,13 +114,29 @@
     inv.cursor = toStack(S.cursor); invChanged(); if (mode === 'inv') renderInv();
   }
   const faceOf = r => { const h = r.hit, p = r.prev; if (!p) return 1; const d = [p[0] - h[0], p[1] - h[1], p[2] - h[2]]; return d[1] < 0 ? 0 : d[1] > 0 ? 1 : d[2] < 0 ? 2 : d[2] > 0 ? 3 : d[0] < 0 ? 4 : 5; };
+
+  function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
+  function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
+  // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
+  window.__mcIcon = it => { const c = document.createElement('canvas'); c.width = c.height = 60; const g = c.getContext('2d'); let h = 0; for (const ch of it.name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    g.fillStyle = `hsl(${h % 360},45%,42%)`; g.beginPath(); g.moveTo(30, 6); g.lineTo(54, 22); g.lineTo(46, 52); g.lineTo(14, 52); g.lineTo(6, 22); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 2.5; g.stroke(); g.fillStyle = '#fff'; g.font = 'bold 20px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const w = it.name.split(/\s+/); g.fillText((w[0][0] + (w[1] ? w[1][0] : (w[0][1] || ''))).toUpperCase(), 30, 33); return c; };
+  function tipOf(el) { const t = el.closest && el.closest('.slot'); if (!t || t.title) return; const l = t.getAttribute('aria-label'); if (l) t.title = l; }
+  let nameT = 0; function popName() { const h = held(); let el = document.getElementById('mcItemName'); if (!el) { el = document.createElement('div'); el.id = 'mcItemName'; el.style.cssText = 'position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;color:#fff;font:600 14px sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .4s;opacity:0'; document.body.appendChild(el); }
+    el.textContent = h ? ITEMS[h.id].name : ''; el.style.opacity = h ? 1 : 0; clearTimeout(nameT); nameT = setTimeout(() => { el.style.opacity = 0; }, 1800); }
   const IMPL = {
     mineBlock(r) { const [x, y, z] = r.hit, f = faceOf(r), a = S.client.api; a.dig(0, x - S.OX, y, z - S.OZ, f); a.dig(2, x - S.OX, y, z - S.OZ, f); a.swing(); flash = { c: [x, y, z], t: .2 }; },
     tryInteract(sx, sy) {
       const r = pick(sx, sy); if (!r || !reachOK(...r.hit)) return false; const h = held(), a = S.client.api;
       a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8); a.swing(); return true;
     },
-    selectSlot(i) { S.saved.selectSlot(i); S.client.api.select(i); },
+    pickEntity(sx, sy) { const [o, d] = camRay(sx, sy); let best = null, bt = Infinity;
+      for (const m of S.mobs) { const { hw, h } = mobBox(m); if (Math.hypot(m.x - player.x, m.z - player.z) > 40) continue; const t = rayBox(o, d, [m.x - hw - .1, m.y, m.z - hw - .1], [m.x + hw + .1, m.y + h, m.z + hw + .1]); if (t < bt) { bt = t; best = { mob: m }; } }
+      if (!best) return null; const r = pick(sx, sy); if (r) { const c = [r.hit[0] + .5, r.hit[1] + .5, r.hit[2] + .5], tb = (c[0] - o[0]) * d[0] + (c[1] - o[1]) * d[1] + (c[2] - o[2]) * d[2]; if (tb < bt - .6) return null; } return best; },
+    tapEntity(sx, sy) { const e = IMPL.pickEntity(sx, sy); if (!e) return false; const m = e.mob; if (Math.hypot(m.x - player.x, m.z - player.z) > 4.2) { toast('Too far away'); return true; }
+      if ((player.atkCd || 0) > 0) return true; player.atkCd = .4; player.swingT = .25; S.client.api.attack(m.eid); S.client.api.swing(); m.hurtT = .3; return true; },
+    selectSlot(i) { S.saved.selectSlot(i); S.client.api.select(i); popName(); },
     clickSlot(arr, i) {
       const slot = arr === inv.slots ? (i < 9 ? 36 + i : i) : arr === inv.armor ? 5 + i : -1; if (slot < 0) return;
       S.client.api.click(slot, inv.one ? 1 : 0, S.action++, 0, S.slots[slot] || null, 0);
@@ -133,11 +160,11 @@
   function makeHandler() {
     const Hd = {
       cur: null,
-      login(p) { S.gm = p.gamemode; }, respawn() { for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); },
+      login(p) { S.gm = p.gamemode; S.eid = p.eid; }, respawn() { for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); },
       time() {},
-      health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (hp < player.hp) player.hurtT = 0; player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
+      health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (hp < player.hp) hurtFx(); player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
-      held(n) { if (S.world) { inv.sel = n; invChanged(); } },
+      held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
       items(wid, l) { if (wid === 0) { S.slots = l.slice(0, 45); while (S.slots.length < 45) S.slots.push(null); syncInv(); } },
       slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); } },
       position(p) {
@@ -156,12 +183,20 @@
         dirtyAround(sx, sz);
       },
       unload(cx, cz) { unloadKey(ckey(cx + (S.OX >> 4), cz + (S.OZ >> 4))); },
-      block(x, y, z, st) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; setBlock(X, y, Z, lookup(st, belowId(X, y, Z))); doorAbove(X, y, Z); },
+      velocity(id, vx, vy, vz) { if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
+      status(id, st) { if (st === 2 || st === 3) { if (id === S.eid) hurtFx(); else { const m = S.ents.get(id); if (m) m.hurtT = .35; } } },
+      sign(x, y, z, ln) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; world.decor = world.decor || []; delSign(X, y, Z);
+        const sol = (a, b, c) => { try { return world.solid(a, b, c); } catch (e) { return false; } }, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(d => sol(X + d[0], y, Z + d[1]));
+        let e; const text = ln.join('\n').replace(/\n+$/, '');
+        if (nb.length === 1 && !sol(X, y - 1, Z)) { const n = [-nb[0][0], 0, -nb[0][1]]; e = { kind: 'sign', c: [X + .5 - n[0] * .47, y + .5, Z + .5 - n[2] * .47], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, mode: 0, cell: [X, y, Z], sup: [X - n[0], y, Z - n[2]], fixU: 1 }; }
+        else { const n = [0, 0, 1]; e = { kind: 'sign', c: [X + .5, y + .95, Z + .5], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, sup: [X, y - 1, Z], cell: [X, y, Z], post: 1, fixU: 1, mode: 0 }; }
+        e.mcCell = [X, y, Z]; e.text = text; e.frame = 'wood'; e.bg = 'planks'; world.decor.push(e); world.changed = true; },
+      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ; setBlock(X, y, Z, lookup(st, belowId(X, y, Z))); doorAbove(X, y, Z); },
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n) { if (n) S.names.set(u, n); else S.names.delete(u); },
       spawn(e) {
-        if (!S.world) return; const type = e.kind === 'player' ? 'lost' : LIVING[e.type]; if (!type) return;
-        const x = e.x + S.OX, z = e.z + S.OZ, m = { type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
+        if (!S.world) return; const type = e.kind === 'player' ? 'lost' : LIVING[e.type]; if (!type) return; if (e.eid === S.eid) return;
+        const x = e.x + S.OX, z = e.z + S.OZ, m = { eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
       move(id, dx, dy, dz) { const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
@@ -185,14 +220,14 @@
 
   function tick() {   // entity smoothing + our position to the server
     const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now;
-    for (const m of S.mobs) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
+    for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
   }
 
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
     S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0 };
-    MCE.active = true; const Hd = makeHandler();
+    MCE.active = true; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 6;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
@@ -205,7 +240,7 @@
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];
-      document.body.classList.remove('mc-compat'); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null;
+      document.body.classList.remove('mc-compat'); document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null;
       for (const id of s.regs) { BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;
       document.getElementById('menu').hidden = true; startPreview();

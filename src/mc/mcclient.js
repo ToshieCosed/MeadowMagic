@@ -171,6 +171,13 @@
           const sk = r.bool(), n = r.vi(), ms = []; for (let i = 0; i < n; i++) ms.push([r.i32(), r.i32(), r.u16()]);
           for (const [x, z, mask] of ms) H.chunk(x, z, sections18(r, mask, sk, true), true);
         } return;
+        case 'entity_velocity': if (P === 47 && H && H.velocity) { const eid = r.vi(); H.velocity(eid, r.i16() / 8000, r.i16() / 8000, r.i16() / 8000); } return;
+        case 'entity_status': if (P === 47 && H && H.status) { const eid = r.d.getInt32(r.p); r.p += 4; H.status(eid, r.i8()); } return;
+        case 'update_sign': if (P === 47 && H && H.sign) {
+          const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6, ln = [];
+          for (let i = 0; i < 4; i++) { let t = r.str(); try { const j = JSON.parse(t); t = typeof j === 'string' ? j : (j.text || '') + (j.extra ? j.extra.map(e => e.text || '').join('') : ''); } catch (e) { /* plain */ } ln.push(t); }
+          H.sign(px, py, pz, ln);
+        } return;
         case 'block_change': if (P === 47 && H && H.block) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
           const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;

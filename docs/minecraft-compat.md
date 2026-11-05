@@ -50,3 +50,9 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Window 0 is mirrored into Strata's hotbar/inventory/armor (tools and armor map to Strata items, else generic compat items). Clicking squares sends `window_click`; the UI updates from the server's `set_slot`.
 - Hearts follow `update_health`; game mode follows login/`game_state_change`; auto-respawn on death. Hotbar sits at the bottom in compat mode.
 - Not yet: buttons, signs, trapdoors, levers, attacking entities, tool-speed tuning.
+
+## Stage 4 (1.8): mobs, interactables, items, knockback
+- Tapping a mob sends `use_entity` (attack); hurt flashes follow `entity_status`. More mob types map onto Strata mobs (creeper/enderman -> zombie/walker, ghast/blaze -> demon, villager -> lost, ...).
+- Trapdoors use Strata's; buttons and levers are compat shape blocks (state from the server; tapping sends `block_place`). Signs become Strata sign decor from `update_sign` (orientation guessed from neighbouring blocks).
+- Items with no Strata equivalent become compat items (category `compat`) with a generated icon (tinted gem + initials). Slot tooltips show item names; holding/selecting shows the name above the hotbar.
+- Knockback: `entity_velocity` for the player's own entity is applied to Strata's player; damage flashes the hurt overlay.
