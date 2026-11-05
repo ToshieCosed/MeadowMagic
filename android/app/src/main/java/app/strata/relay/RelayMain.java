@@ -7,7 +7,7 @@ import java.util.Map;
 public final class RelayMain {
     public static void main(String[] a) throws Exception {
         Relay.Config c = new Relay.Config();
-        c.clientId = System.getenv().getOrDefault("MS_CLIENT_ID", "");
+        c.clientId = System.getenv().getOrDefault("MS_CLIENT_ID", c.clientId);
         c.store = new File(System.getenv().getOrDefault("RELAY_STORE", ".relay-auth.json"));
         String eps = System.getenv("RELAY_ENDPOINTS");
         if (eps != null) for (Map.Entry<String, Object> e : Json.obj(eps).entrySet()) c.ep.put(e.getKey(), String.valueOf(e.getValue()));

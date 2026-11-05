@@ -33,7 +33,7 @@ import java.security.spec.X509EncodedKeySpec;
  */
 public final class Relay implements WsServer.Handler {
     public static final class Config {
-        public String clientId = ""; public File store; public String token = "";
+        public String clientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb"; public File store; public String token = "";
         public final Map<String, String> ep = new LinkedHashMap<>();
         public Config() {
             ep.put("devicecode", "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode");

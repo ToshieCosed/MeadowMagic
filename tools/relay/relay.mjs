@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-let CLIENT_ID = process.env.MS_CLIENT_ID || '';
+let CLIENT_ID = process.env.MS_CLIENT_ID || 'c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb';
 const PORT = +(process.env.PORT || 25580);
 const STORE = process.env.RELAY_STORE || path.join(path.dirname(fileURLToPath(import.meta.url)), '.relay-auth.json');
 const EP = Object.assign({

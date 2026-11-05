@@ -10007,7 +10007,7 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
    +'<div class="stack" id="mcPanel" hidden><h2>Minecraft Compat</h2>'
    +'<div class="field"><label class="l" for="mcVer">Minecraft version</label><select id="mcVer">'+MC_VERSIONS.map(v=>'<option value="'+v[0]+'">'+v[0]+' (protocol '+v[1]+')</option>').join('')+'</select></div>'
    +'<div class="field"><label class="l" for="mcRelay">Relay address</label><input type="text" id="mcRelay" maxlength="120" spellcheck="false"></div>'
-   +'<div class="field" id="mcCidBox" hidden><label class="l" for="mcCid">Azure client id (your own app registration)</label><input type="text" id="mcCid" maxlength="60" spellcheck="false"></div>'
+   +'<div class="field" id="mcCidBox" hidden><label class="l" for="mcCid">Azure client id (optional override)</label><input type="text" id="mcCid" maxlength="60" spellcheck="false"></div>'
    +'<button class="primary" id="mcAuth">Sign in with Microsoft</button>'
    +'<div id="mcCode" hidden style="text-align:center"><p class="note">Open <a id="mcLink" target="_blank" rel="noopener"></a> and enter this code:</p><h1 id="mcUser" style="letter-spacing:.2em"></h1></div>'
    +'<p class="note" id="mcStat">Not signed in.</p></div>'
@@ -10028,7 +10028,7 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
   const setAuth=a=>{ MP.auth=a; stat.textContent=a?'Signed in as '+a.name:'Not signed in.'; codeBox.hidden=true; authBtn.disabled=false; authBtn.textContent=a?'Sign in again':'Sign in with Microsoft'; };
   authBtn.onclick=()=>{ try{ if(ws) ws.close(); }catch(e){} authBtn.disabled=true; stat.textContent='Contacting the relay...';
     try{ ws=new WebSocket(MP.relay); }catch(e){ stat.textContent='Bad relay address.'; authBtn.disabled=false; return; }
-    ws.onopen=()=>ws.send(JSON.stringify({type:'auth_start',clientId:NAT?$('mcCid').value.trim():undefined}));
+    ws.onopen=()=>ws.send(JSON.stringify({type:'auth_start',clientId:(NAT&&$('mcCid').value.trim())||undefined}));
     ws.onerror=()=>{ if(!MP.auth||authBtn.disabled){ stat.textContent='Could not reach the relay at '+MP.relay+'. Start it with: node tools/relay/relay.mjs'; authBtn.disabled=false; } };
     ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(x){ return; }
       if(m.type==='auth_code'){ $('mcLink').textContent=m.verification_uri; $('mcLink').href=m.verification_uri; $('mcUser').textContent=m.user_code; codeBox.hidden=false; stat.textContent='Waiting for you to finish signing in...'; }
