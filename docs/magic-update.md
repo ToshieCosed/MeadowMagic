@@ -156,6 +156,6 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 
 - **Bundle isolators (ISO_X/Y/Z)**: join normal bundles at their ends and chain only along their own axis. They never join parallel neighbours, so thick rows of them run side by side with no cross-talk. Tiles beside an isolator are terminals. Wires join an isolator only when hosted on it.
 - **Palette latch light** (`pal` mode, tap cycle single -> rgb -> latch -> pal): 3 strobe colours + 3 data colours; a strobe pulse latches one of 16 colours.
-- **64x64 showcase display** (new showcase worlds only, about 110 blocks south of centre): 4096 lights, 5948 tiles. Per-column and per-row scan using isolator lines, XOR/AND receivers and wireless-channel generators. A frame takes about 9.6 s at 20 tps.
+- **64x42 upright showcase display** (new showcase worlds only, about 110 blocks south of centre; a wall, 64 wide and 42 tall, column isolators behind, row isolators in front): 2688 lights, 4474 tiles. Per-column and per-row scan using isolator lines, XOR/AND receivers and wireless-channel generators. A frame takes about 9.6 s at 20 tps.
 - Fixes: wire cleanup skips unloaded chunks; trees are cleared under the display.
 - Tests: `tools/tests/phase19_ppu.py` (64/64 rows verified), `phase15_wires.py`.

@@ -1,4 +1,5 @@
-<title>Strata</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta name="theme-color" content="#1b2230">
+<style>html,body{margin:0;padding:0}[hidden]{display:none!important}</style><title>Strata</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Caveat:wght@500;700&family=Cinzel:wght@500;700&family=Special+Elite&family=Press+Start+2P&family=Dancing+Script:wght@600&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Pirata+One&display=swap">
@@ -306,7 +307,7 @@ input[type=text]{font:500 15px var(--f-display);color:var(--text);background:var
 #loading .bar i{display:block;height:100%;width:0;background:var(--sun)}
 #nogl{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;background:var(--ink)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
+</style></head><body>
 
 <canvas id="gl"></canvas>
 
@@ -9923,17 +9924,21 @@ function buildPPU(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1], N=64, SC=window._
   const tx=(x,z,ch,op)=>tech(x,G,z,'wterm',4,{role:'tx',ch,op,conv:'level'});
   const X0=C-32, ZB=C+110, ZS=ZB-3, CA=100, CY=101, CB=102, CP=103, EQA=110, EQB=130, PRE=140, SG=[143,144], CM=146, CXA=200, D=3, ISOX=B.ISO_X, ISOZ=B.ISO_Z;
   const gen=(px,pz,ch,dls,ws)=>{ tx(px,pz,ch,'ADD'); [[1,0],[0,1],[-1,0],[0,-1]].slice(0,dls.length).forEach(([dx,dz],b)=>{ const f=dx>0?1:dx<0?0:dz>0?5:4; tech(px+dx,G,pz+dz,'sbcast',f,{pl:ws[b],conv:'preset'}); tech(px+2*dx,G,pz+2*dz,'gate',f,{g:'CLOCK',dl:dls[b]}); }); };
-  // ---- the screen: lights, a column isolator under each column, a row isolator over each row ----
-  for(let i=0;i<N;i++){ const x=X0+i; for(let z=ZS;z<ZB+N;z++) put(x,G,z,ISOZ); WIRE.addSeg(x,G,ZS,2,DK[i%3]); }
-  for(let r=0;r<N;r++){ const z=ZB+r; for(let x=X0-1;x<X0+N;x++) put(x,G+2,z,ISOX); WIRE.addSeg(X0-1,G+2,z,2,SC[r%3]); }
-  for(let r=0;r<N;r++) for(let i=0;i<N;i++) tech(X0+i,G+1,ZB+r,'mlight',5,{mode:'pal'});
+  // ---- the screen stands upright: 64 columns x NH rows in the x/y plane. Column isolators (ISO_Y) run up the back, row isolators (ISO_X) run across the front, a light sits between them ----
+  const NH=42, YB=G+2, ZW=ZB, FM=[0,1,4,5,2,3], P=(x,y,z)=>[x,YB+(z-ZS),ZW+(y-G)], ISOY=B.ISO_Y;
+  const pfo=a=>{ const n=[off,off,off,off,off,off]; for(let k=0;k<6;k++) n[FM[k]]=a[k]; return n; };
+  const wt=(x,y,z,k,f,o)=>{ const q=P(x,y,z); if(o&&o.fo) o=Object.assign({},o,{fo:pfo(o.fo)}); return tech(q[0],q[1],q[2],k,FM[f],o); };
+  const wrx=(x,y,z,ch,face)=>wt(x,y,z,'wterm',4,{role:'rx',ch,conv:'level',fo:fo({[face]:'out'})});
+  for(let i=0;i<N;i++){ const x=X0+i; for(let z=ZS;z<ZB+NH;z++){ const q=P(x,G,z); put(q[0],q[1],q[2],ISOY); } const q=P(x,G,ZS); WIRE.addSeg(q[0],q[1],q[2],4,DK[i%3]); }
+  for(let r=0;r<NH;r++){ const z=ZB+r; for(let x=X0-1;x<X0+N;x++){ const q=P(x,G+2,z); put(q[0],q[1],q[2],ISOX); } const q=P(X0-1,G+2,z); WIRE.addSeg(q[0],q[1],q[2],4,SC[r%3]); }
+  for(let r=0;r<NH;r++) for(let i=0;i<N;i++) wt(X0+i,G+1,ZB+r,'mlight',5,{mode:'pal'});
   // ---- per-column picture blocks: a = const AND S2, colour = a XOR S1, put on the column line ----
   for(let i=0;i<N;i++){ const x=X0+i, cx=(i>>2)&15;
-    tech(x,G+2,ZS,'srecv',3,{op:'XOR',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); rx(x,G+2,ZS-1,SG[0],4);
-    tech(x,G+3,ZS,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); rx(x,G+4,ZS,SG[1],3); rx(x,G+3,ZS-1,CXA+i,4);
+    wt(x,G+2,ZS,'srecv',3,{op:'XOR',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); wrx(x,G+2,ZS-1,SG[0],4);
+    wt(x,G+3,ZS,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',2:'in',5:'in'})}); wrx(x,G+4,ZS,SG[1],3); wrx(x,G+3,ZS-1,CXA+i,4);
     tech(x,G,ZB-18,'wterm',4,{role:'tx',ch:CXA+i,conv:'preset',pl:cx}); tech(x,G+1,ZB-18,'lever',2,{on:true}); }
   // ---- row strobes: row r fires when scan nibble == r & 15 AND scan high bits == r >> 4 ----
-  for(let r=0;r<N;r++){ const z=ZB+r, x=X0-1; tech(x,G+4,z,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',1:'in',2:'in'})}); rx(x-1,G+4,z,EQA+(r&15),0); rx(x,G+5,z,EQB+(r>>4),3); }
+  for(let r=0;r<NH;r++){ const z=ZB+r, x=X0-1; wt(x,G+4,z,'srecv',3,{op:'AND',conv:'level',fo:fo({3:'out',1:'in',2:'in'})}); wrx(x-1,G+4,z,EQA+(r&15),0); wrx(x,G+5,z,EQB+(r>>4),3); }
   // ---- the scan counter: a row every 3 ticks; a coarse row level (row >> 2); a phase counter that steps once per frame ----
   const ZG=ZB-34; gen(X0-24,ZG,CA,[D,2*D,4*D,8*D],[1,2,4,8]); gen(X0-14,ZG,CY,[4*D,8*D,16*D,32*D],[1,2,4,8]); gen(X0-4,ZG,CB,[16*D,32*D],[1,2]); gen(X0+6,ZG,CP,[64*D,128*D,256*D,512*D],[1,2,4,8]);
   // ---- the colour stage: S1 = row XOR phase, S2 = row OR phase, both gated by CLEAR ----
@@ -9943,9 +9948,9 @@ function buildPPU(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1], N=64, SC=window._
   const eq=(x,z,ch,rch,v)=>{ tx(x,z,ch,'EQ'); rx(x-1,G,z,rch,0); tech(x+1,G,z,'sbcast',1,{pl:v,conv:'preset'}); tech(x+2,G,z,'lever',2,{on:true}); };
   for(let a=0;a<16;a++) eq(X0-24+6*(a%8),ZB-56-5*(a>>3),EQA+a,CA,a); for(let b=0;b<4;b++) eq(X0-24+6*b,ZB-68,EQB+b,CB,b);
   const sign=(x,z,n,text)=>{ put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
-  sign(X0+N+3,ZB-2,S,'64x64 PALETTE DISPLAY\nColumn isolators below,\nrow isolators above.\nNo isolator ever talks\nto its neighbour.'); sign(X0-2,ZB-48,S,'CLEAR\nFlip the lever to blank\nthe whole screen.'); sign(X0-26,ZG-3,S,'SCAN COUNTER\nrow counter, coarse row\ncounter, phase counter');
-  w.meta.ppu=2; w.meta.ppuBox=[X0-30,X0+N+3,ZB-70,ZB+N+3,G,G+14];
-  for(let cx=(X0-30)>>4;cx<=(X0+N+3)>>4;cx++) for(let cz=(ZB-70)>>4;cz<=(ZB+N+3)>>4;cz++) touched.add(w.key(cx,cz));
+  sign(X0+N+3,ZB-2,S,'64x42 UPRIGHT DISPLAY\nColumn isolators behind,\nrow isolators in front.\nNo isolator ever talks\nto its neighbour.'); sign(X0-2,ZB-48,S,'CLEAR\nFlip the lever to blank\nthe whole screen.'); sign(X0-26,ZG-3,S,'SCAN COUNTER\nrow counter, coarse row\ncounter, phase counter');
+  w.meta.ppu=2; w.meta.ppuBox=[X0-30,X0+N+3,ZB-70,ZB+8,G,G+60];
+  for(let cx=(X0-30)>>4;cx<=(X0+N+3)>>4;cx++) for(let cz=(ZB-70)>>4;cz<=(ZB+8)>>4;cz++) touched.add(w.key(cx,cz));
   for(const k of touched){ const ch=w.chunks.get(k); if(ch){ freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); w.chunks.delete(k); } }   // chunks that already exist are rebuilt with the new blocks
 }
 // trees, flowers and grass tufts stay out of the display's air space (cleared as each chunk is made; the display's own blocks are laid over it afterwards)
@@ -9956,3 +9961,4 @@ window.__v41={buildPPU};
 })();
 
 </script>
+</body></html>
