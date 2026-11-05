@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
@@ -77,7 +77,7 @@
     if (e.k === 'skip') return 0;
     return register(e);
   }
-  const lookup = (st, below) => { if ((st & 8) && isDoorId(st >> 4)) return stateToId(st, below); let v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); return v; };
+  const lookup = (st, below) => { let v; if ((st & 8) && isDoorId(st >> 4)) v = stateToId(st, below); else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) S.mcb[v] = st >> 4; return v; };
 
   // ---- world ----
   class McGen { constructor(seed, size, h) { this.seed = seed; this.size = size; this.H = h; this.mcompat = true; }
@@ -126,7 +126,26 @@
   let nameT = 0; function popName() { const h = held(); let el = document.getElementById('mcItemName'); if (!el) { el = document.createElement('div'); el.id = 'mcItemName'; el.style.cssText = 'position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;color:#fff;font:600 14px sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .4s;opacity:0'; document.body.appendChild(el); }
     el.textContent = h ? ITEMS[h.id].name : ''; el.style.opacity = h ? 1 : 0; clearTimeout(nameT); nameT = setTimeout(() => { el.style.opacity = 0; }, 1800); }
   const IMPL = {
-    mineBlock(r) { const [x, y, z] = r.hit, f = faceOf(r), a = S.client.api; a.dig(0, x - S.OX, y, z - S.OZ, f); a.dig(2, x - S.OX, y, z - S.OZ, f); a.swing(); flash = { c: [x, y, z], t: .2 }; },
+    mineBlock(r) { const [x, y, z] = r.hit, f = faceOf(r), a = S.client.api, k = r.hit.join(','); if (!S.dig || S.dig.key !== k) a.dig(0, x - S.OX, y, z - S.OZ, f); a.dig(2, x - S.OX, y, z - S.OZ, f); S.dig = null; a.swing(); flash = { c: [x, y, z], t: .2 }; },
+    stepMining(dt) {
+      S.saved.stepMining(dt); const a = S.client.api, k = mining && mining.key || null;
+      if (S.dig && S.dig.key !== k) { a.dig(1, S.dig.x, S.dig.y, S.dig.z, S.dig.f); S.dig = null; }
+      if (k && !S.dig && mining.target) { const r = mining.target, f = faceOf(r); S.dig = { key: k, x: r.hit[0] - S.OX, y: r.hit[1], z: r.hit[2] - S.OZ, f }; a.dig(0, S.dig.x, S.dig.y, S.dig.z, f); a.swing(); }
+    },
+    mineTime(b) {   // Minecraft's own break-time formula, so cracks and the server's check agree
+      if (b <= 0) return Infinity; if (world.meta.gameMode === 'creative') return .05;
+      const e = StrataMC.blocks18[S.mcb[b]]; if (!e || e.h == null) return Infinity; if (e.h >= 100 || e.h < 0) return Infinity; if (e.h === 0) return .05;
+      const h = held(), nm = h && h.mc && StrataMC.items18[h.mc.id] ? StrataMC.items18[h.mc.id][0] : '', m = /^(wooden|stone|iron|golden|diamond)_(pickaxe|axe|shovel|sword|hoe)$/.exec(nm);
+      const TT2 = { pickaxe: 'pick', axe: 'axe', shovel: 'shovel' }, SP = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 }, good = m && TT2[m[2]] === e.tl;
+      const speed = good ? SP[m[1]] : 1, harvest = !(e.tl === 'pick' && !(m && m[2] === 'pickaxe'));
+      return Math.max(.05, Math.ceil(1 / (speed / e.h / (harvest ? 30 : 100))) / 20 * 1.1);
+    },
+    stepDrops(dt) {   // server-owned dropped items: tween/fall locally, never pick up locally (the server does that)
+      for (let i = drops.length - 1; i >= 0; i--) { const q = drops[i]; q.age += dt; q.spin += dt * 1.8; if (!q.mc) { drops.splice(i, 1); continue; }
+        q.vy = Math.max(q.vy - 18 * dt, -20); q.vx *= Math.exp(-3 * dt); q.vz *= Math.exp(-3 * dt);
+        const nx = q.x + q.vx * dt, nz = q.z + q.vz * dt; if (!world.solid(Math.floor(nx), Math.floor(q.y), Math.floor(nz))) { q.x = nx; q.z = nz; } else q.vx = q.vz = 0;
+        const ny = q.y + q.vy * dt; if (world.solid(Math.floor(q.x), Math.floor(ny - .15), Math.floor(q.z))) { q.y = Math.floor(ny - .15) + 1.15; q.vy = 0; } else q.y = ny; }
+    },
     tryInteract(sx, sy) {
       const r = pick(sx, sy); if (!r || !reachOK(...r.hit)) return false; const h = held(), a = S.client.api;
       a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8); a.swing(); return true;
@@ -150,7 +169,7 @@
     window.__mcActive = true; window.__cmobs = S.mobs;
     const meta = { id: 'mcompat', name: S.o.host, seedNum: 1, size: SIZE, height: HGT, gen: 'mcompat', sea: 63, gameMode: S.gm === 1 ? 'creative' : 'survival', mc: 1 };
     enterPlay(meta, null); S.world = true;
-    world.radius = 5; world.ready = () => true; player.maxHp = 20; player.hp = S.hp != null ? S.hp : 20; syncInv();
+    world.radius = 8; world.ready = () => true; player.maxHp = 20; player.hp = S.hp != null ? S.hp : 20; syncInv();
     world.generate = function (cx, cz) { if (!S.store.has(ckey(cx, cz))) return null; const ch = World.prototype.generate.call(this, cx, cz); return ch; };
     document.body.classList.add('mc-compat'); if(!document.getElementById('mcCompatCss')){ const st=document.createElement('style'); st.id='mcCompatCss'; st.textContent='body.mc-compat #wname,body.mc-compat #clock,body.mc-compat #invTabs,body.mc-compat .craftRow{display:none!important}body.mc-compat #hotbar{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:96vw}'; document.head.appendChild(st); }
     S.o.onWorld && S.o.onWorld();
@@ -183,7 +202,11 @@
         dirtyAround(sx, sz);
       },
       unload(cx, cz) { unloadKey(ckey(cx + (S.OX >> 4), cz + (S.OZ >> 4))); },
-      velocity(id, vx, vy, vz) { if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
+      dropSpawn(eid, x, y, z, vx, vy, vz) { if (S.world) S.dr.set(eid, { x: x + S.OX, y, z: z + S.OZ, vx: vx * 20, vy: vy * 20, vz: vz * 20 }); },
+      meta(eid, idx, it) { const d = S.dr.get(eid); if (!d || idx !== 10 || !it) return; const id = strataItem(it);
+        if (!d.q) { d.q = { x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy, vz: d.vz, id, n: it.count, age: 0, spin: Math.random() * 6, mc: eid }; drops.push(d.q); } else { d.q.id = id; d.q.n = it.count; } },
+      collect(eid) { Hd.destroy([eid]); },
+      velocity(id, vx, vy, vz) { { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
       status(id, st) { if (st === 2 || st === 3) { if (id === S.eid) hurtFx(); else { const m = S.ents.get(id); if (m) m.hurtT = .35; } } },
       sign(x, y, z, ln) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; world.decor = world.decor || []; delSign(X, y, Z);
         const sol = (a, b, c) => { try { return world.solid(a, b, c); } catch (e) { return false; } }, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(d => sol(X + d[0], y, Z + d[1]));
@@ -199,11 +222,11 @@
         const x = e.x + S.OX, z = e.z + S.OZ, m = { eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
-      move(id, dx, dy, dz) { const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
+      move(id, dx, dy, dz) { { const d = S.dr.get(id); if (d && d.q) { d.q.x += dx; d.q.y += dy; d.q.z += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
       look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
-      teleport(id, x, y, z, yaw) { const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
-      destroy(l) { for (const id of l) { const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
+      teleport(id, x, y, z, yaw) { { const d = S.dr.get(id); if (d && d.q) { d.q.x = x + S.OX; d.q.y = y; d.q.z = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
+      destroy(l) { for (const id of l) { const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;
   }
@@ -226,9 +249,9 @@
 
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0 };
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), dig: null };
     MCE.active = true; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
-    const prev = o.onClose; o.world = Hd; o.viewDistance = 6;
+    const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     S.t1 = setInterval(tick, 33);
@@ -240,7 +263,7 @@
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];
-      document.body.classList.remove('mc-compat'); document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null;
+      document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null;
       for (const id of s.regs) { BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;
       document.getElementById('menu').hidden = true; startPreview();

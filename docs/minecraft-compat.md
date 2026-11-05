@@ -56,3 +56,10 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Trapdoors use Strata's; buttons and levers are compat shape blocks (state from the server; tapping sends `block_place`). Signs become Strata sign decor from `update_sign` (orientation guessed from neighbouring blocks).
 - Items with no Strata equivalent become compat items (category `compat`) with a generated icon (tinted gem + initials). Slot tooltips show item names; holding/selecting shows the name above the hotbar.
 - Knockback: `entity_velocity` for the player's own entity is applied to Strata's player; damage flashes the hurt overlay.
+
+## Stage 5 (1.8): real mining timing, drops, view range, chat
+- Break time uses Minecraft's formula (hardness, tool tier/speed, harvest rule) so Strata's 10-stage crack overlay matches vanilla. A dig is started (`block_dig` 0) when you start mining a block, aborted (1) if you let go/switch, and finished (2) when the bar fills; the world changes only on the server's `block_change`.
+- Dropped items are server entities (`spawn_entity` type 2 + `entity_metadata` slot): shown with Strata's drop renderer, moved by server updates, picked up by the server (`collect`).
+- View radius raised to 8 chunks (the server may still cap it); fog follows.
+- Own chat: if the server doesn't echo it back within ~2s it is shown locally.
+- Not yet: other players' crack animations (`block_break_animation`), item merge/despawn visuals, tool durability.

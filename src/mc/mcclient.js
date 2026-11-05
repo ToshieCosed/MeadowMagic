@@ -178,6 +178,15 @@
           for (let i = 0; i < 4; i++) { let t = r.str(); try { const j = JSON.parse(t); t = typeof j === 'string' ? j : (j.text || '') + (j.extra ? j.extra.map(e => e.text || '').join('') : ''); } catch (e) { /* plain */ } ln.push(t); }
           H.sign(px, py, pz, ln);
         } return;
+        case 'spawn_entity': if (P === 47 && H && H.dropSpawn) {
+          const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32; r.i8(); r.i8(); const data = r.i32(); let vx = 0, vy = 0, vz = 0; if (data) { vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; }
+          if (type === 2) H.dropSpawn(eid, x, y, z, vx, vy, vz);
+        } return;
+        case 'entity_metadata': if (P === 47 && H && H.meta) {
+          const eid = r.vi(); for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
+            if (t === 0) r.i8(); else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; }
+        } return;
+        case 'collect': if (P === 47 && H && H.collect) { H.collect(r.vi()); } return;
         case 'block_change': if (P === 47 && H && H.block) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
           const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;
