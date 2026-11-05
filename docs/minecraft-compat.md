@@ -35,3 +35,11 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Tests (dev only): `cd tools/mctest && npm i && node test-mcproto.mjs` logs in and chats on 28 versions against minecraft-protocol offline servers through the real relay; `node test-page.mjs` drives the page UI.
 - Not covered yet: signed chat (servers with enforce-secure-profile reject unsigned player chat on 1.19.1+; commands work), SRV lookups (give host:port), world/blocks/entities, 26.2+ (no packet data yet).
 - The in-game screen is a blank sky; nothing in it touches the Strata world.
+
+## Stage 2: protocol 47 (1.8) world, blocks and entities
+- Chunks (`map_chunk`, `map_chunk_bulk`), `block_change`, `multi_block_change`, server position, entity spawn/move/teleport/destroy are decoded in `mcclient.js` and handed to `src/mc/engine.js`, which builds a Strata world (`gen: 'mcompat'`, 2048x2048x256, coordinates offset so the spawn lands mid-world) fed from the server.
+- Blocks: `src/mc/blocks18.json` (made by `tools/mctest/gen_blocks18.mjs`) maps every 1.8 id/meta to a flat-colour look. A few map to existing Strata blocks (grass, dirt, stone, sand, water, lava, leaves, glass, plants); the rest are registered late as ids 8192+ and removed on disconnect. Slabs and stairs are full cubes for now; doors, ladders, rails, signs, buttons, carpet, snow layers and vines are not drawn.
+- While a compat world is active the engine disables: mob AI and spawning, growth, decay, health, fluid flow, mining and saving (all restored on disconnect). Compat mobs live in a separate `__cmobs` list.
+- Entities: pig, sheep, cow, chicken, horse, wolf, spider, zombie, skeleton, slime, bat and other players (generic humanoid) are drawn; everything else is skipped at the protocol layer.
+- Our position is sent every 50 ms with Strata's own physics. Not yet: breaking/placing blocks, day/night sync, name tags, inventory, other versions.
+- Test: `tools/mctest/test-world18.mjs` (needs `npm i` in `tools/mctest`) serves real 1.8 chunks and entities to the page, checks decode, meshing, entities, block change, and that disconnect restores the engine.

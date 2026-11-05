@@ -13,6 +13,8 @@
     i32(n) { return this.b(n >> 24).b(n >> 16).b(n >> 8).b(n); }
     i64(n) { const d = new DataView(new ArrayBuffer(8)); d.setBigInt64(0, BigInt(n)); for (let i = 0; i < 8; i++) this.a.push(d.getUint8(i)); return this; }
     bool(x) { return this.b(x ? 1 : 0); }
+    f32(n) { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, n); for (let i = 0; i < 4; i++) this.a.push(d.getUint8(i)); return this; }
+    f64(n) { const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, n); for (let i = 0; i < 8; i++) this.a.push(d.getUint8(i)); return this; }
     raw(u) { for (const x of u) this.a.push(x); return this; }
     bytes(u) { this.vi(u.length); return this.raw(u); }
     uuid(h) { h = (h || '').replace(/-/g, '').padEnd(32, '0'); for (let i = 0; i < 16; i++) this.a.push(parseInt(h.substr(i * 2, 2), 16)); return this; }
@@ -26,6 +28,12 @@
     skip(n) { this.p += n; }
     i32() { const v = this.d.getInt32(this.p); this.p += 4; return v; }
     bool() { return this.b() !== 0; }
+    i8() { return this.d.getInt8(this.p++); }
+    u16() { const v = this.d.getUint16(this.p); this.p += 2; return v; }
+    i16() { const v = this.d.getInt16(this.p); this.p += 2; return v; }
+    f32() { const v = this.d.getFloat32(this.p); this.p += 4; return v; }
+    f64() { const v = this.d.getFloat64(this.p); this.p += 8; return v; }
+    i64() { const v = this.d.getBigInt64(this.p); this.p += 8; return Number(v); }
     uuid() { let h = ''; for (let i = 0; i < 16; i++) h += this.u[this.p++].toString(16).padStart(2, '0'); return h; }
     bytes() { const n = this.vi(); const r = this.u.subarray(this.p, this.p + n); this.p += n; return r; }
     rest() { return this.u.subarray(this.p); }
@@ -69,11 +77,24 @@
   const b64 = u => { let s = ''; for (const x of u) s += String.fromCharCode(x); return btoa(s); };
   const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
+  // ---- Minecraft 1.8 (protocol 47) world data ----
+  const popc = m => { let n = 0; for (; m; m >>= 1) n += m & 1; return n; };
+  function sections18(r, mask, sky, groundUp) {   // r positioned at the chunk data: blocks (state = id<<4|meta), block light, sky light, then biomes
+    const out = [];
+    for (let i = 0; i < 16; i++) if (mask & (1 << i)) { const a = new Uint16Array(4096); for (let j = 0; j < 4096; j++) { a[j] = r.u[r.p] | (r.u[r.p + 1] << 8); r.p += 2; } out.push({ y: i, blocks: a }); }
+    for (let i = 0; i < out.length; i++) r.skip(2048);
+    if (sky) for (let i = 0; i < out.length; i++) r.skip(2048);
+    if (groundUp) r.skip(256);
+    return out;
+  }
+  const ang = b => b * 360 / 256;
+
   function connect(o) {
     const P = o.protocol, ids = IDS[P];
     if (!ids) throw new Error('No packet table for protocol ' + P);
     const rev = {}; for (const k of ['lc', 'cc', 'pc']) { rev[k] = {}; for (const n in (ids[k] || {})) rev[k][ids[k][n]] = n; }
-    let state = 'login', ws, pend = 0, closed = false, joined = false;
+    let state = 'login', ws, pend = 0, closed = false, joined = false, sky = true, posT = null;
+    const H = o.world || null;
     const say = t => { try { o.onChat && o.onChat(t); } catch (e) { /* ui */ } };
     const status = t => { try { o.onStatus && o.onStatus(t); } catch (e) { /* ui */ } };
     const end = why => { if (closed) return; closed = true; try { ws.close(); } catch (e) { /* closed */ } try { o.onClose && o.onClose(why); } catch (e) { /* ui */ } };
@@ -118,7 +139,55 @@
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); return;
         case 'ping': out('pong', new W().i32(r.i32())); return;
-        case 'login': if (!joined) { joined = true; status('Joined the world'); } return;
+        case 'login': if (!joined) { joined = true; status('Joined the world'); }
+          if (P === 47 && H) { const eid = r.i32(); r.b(); const dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); }
+          return;
+        case 'respawn': if (P === 47 && H) { sky = r.i32() === 0; H.respawn && H.respawn(); } return;
+        case 'update_time': if (P === 47 && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
+        case 'update_health': if (P === 47 && H && H.health) H.health(r.f32()); return;
+        case 'position': if (P === 47 && H) {
+          const x = r.f64(), y = r.f64(), z = r.f64(), yaw = r.f32(), pitch = r.f32(), fl = r.b();
+          H.position && H.position({ x, y, z, yaw, pitch, flags: fl });
+          // the server's value is final: confirm with our own position
+          const w = new W().f64(H.cur ? H.cur.x : x).f64(H.cur ? H.cur.y : y).f64(H.cur ? H.cur.z : z).f32(yaw).f32(pitch).bool(true); out('position_look', w);
+        } return;
+        case 'map_chunk': if (P === 47 && H && H.chunk) {
+          const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.u16(); r.vi();
+          if (gu && mask === 0) { H.unload && H.unload(x, z); return; }
+          H.chunk(x, z, sections18(r, mask, sky, gu), gu);
+        } return;
+        case 'map_chunk_bulk': if (P === 47 && H && H.chunk) {
+          const sk = r.bool(), n = r.vi(), ms = []; for (let i = 0; i < n; i++) ms.push([r.i32(), r.i32(), r.u16()]);
+          for (const [x, z, mask] of ms) H.chunk(x, z, sections18(r, mask, sk, true), true);
+        } return;
+        case 'block_change': if (P === 47 && H && H.block) {
+          const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
+          const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;
+          H.block(px, py, pz, r.vi());
+        } return;
+        case 'multi_block_change': if (P === 47 && H && H.multi) {
+          const cx = r.i32(), cz = r.i32(), n = r.vi(), l = [];
+          for (let i = 0; i < n; i++) { const hz = r.b(), y = r.b(), st = r.vi(); l.push({ x: cx * 16 + (hz >> 4), y, z: cz * 16 + (hz & 15), state: st }); }
+          H.multi(l);
+        } return;
+        case 'named_entity_spawn': if (P === 47 && H && H.spawn) {
+          const eid = r.vi(), uuid = r.uuid(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, yaw = ang(r.i8()), pitch = ang(r.i8());
+          H.spawn({ eid, kind: 'player', uuid, x, y, z, yaw, pitch });
+        } return;
+        case 'spawn_entity_living': if (P === 47 && H && H.spawn) {
+          const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, yaw = ang(r.i8()), pitch = ang(r.i8());
+          H.spawn({ eid, kind: 'mob', type, x, y, z, yaw, pitch });
+        } return;
+        case 'rel_entity_move': if (P === 47 && H && H.move) { const eid = r.vi(); H.move(eid, r.i8() / 32, r.i8() / 32, r.i8() / 32); } return;
+        case 'entity_look': if (P === 47 && H && H.look) { const eid = r.vi(); H.look(eid, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_move_look': if (P === 47 && H && H.move) { const eid = r.vi(), dx = r.i8() / 32, dy = r.i8() / 32, dz = r.i8() / 32; H.move(eid, dx, dy, dz); H.look && H.look(eid, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_teleport': if (P === 47 && H && H.teleport) { const eid = r.vi(); H.teleport(eid, r.i32() / 32, r.i32() / 32, r.i32() / 32, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_head_rotation': if (P === 47 && H && H.head) { const eid = r.vi(); H.head(eid, ang(r.i8())); } return;
+        case 'entity_destroy': if (P === 47 && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
+        case 'player_info': if (P === 47 && H && H.playerInfo) {
+          const act = r.vi(), n = r.vi();
+          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); for (let k = 0; k < pc; k++) { r.str(); r.str(); if (r.bool()) r.str(); } r.vi(); r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm); } else if (act === 4) H.playerInfo(u, null); else if (act === 1 || act === 2) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
+        } return;
         case 'start_configuration': out('configuration_acknowledged'); state = 'config'; return;
         case 'resource_pack_send': { const u = r.str(), h = r.str(); resourcePack({}, h); return; }
         case 'add_resource_pack': resourcePack({ id: r.uuid() }); return;
@@ -192,7 +261,8 @@
       if (P === 759) w.vi(0).bool(false); else if (P === 760) w.vi(0).bool(false).vi(0).bool(false); else { w.bool(false); ack(w); }
       return out('chat_message', w);
     }
-    return { chat, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
+    const sendPos = (x, y, z, yaw, pitch, ground) => { if (closed || state !== 'play') return false; return out('position_look', new W().f64(x).f64(y).f64(z).f32(yaw).f32(pitch).bool(ground)); };
+    return { chat, sendPos, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }
   g.StrataMC = { connect, comp, setIds: x => { IDS = x; }, W, R };
 })(typeof window !== 'undefined' ? window : globalThis);
