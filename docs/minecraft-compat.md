@@ -43,3 +43,10 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Entities: pig, sheep, cow, chicken, horse, wolf, spider, zombie, skeleton, slime, bat and other players (generic humanoid) are drawn; everything else is skipped at the protocol layer.
 - Our position is sent every 50 ms with Strata's own physics. Not yet: breaking/placing blocks, day/night sync, name tags, inventory, other versions.
 - Test: `tools/mctest/test-world18.mjs` (needs `npm i` in `tools/mctest`) serves real 1.8 chunks and entities to the page, checks decode, meshing, entities, block change, and that disconnect restores the engine.
+
+## Stage 3 (1.8): interaction, inventory, survival
+- Blocks map to Strata's own stairs/slabs/doors/gates/fences/ladders/rails/plates/wool/carpet where equivalent (no duplicate renderers); the rest are compat blocks (ids 8192+).
+- Breaking/placing are server-authoritative: `mineBlock` sends `block_dig` (start+finish) and `tryInteract` sends `block_place`; the world changes only on the server's `block_change`.
+- Window 0 is mirrored into Strata's hotbar/inventory/armor (tools and armor map to Strata items, else generic compat items). Clicking squares sends `window_click`; the UI updates from the server's `set_slot`.
+- Hearts follow `update_health`; game mode follows login/`game_state_change`; auto-respawn on death. Hotbar sits at the bottom in compat mode.
+- Not yet: buttons, signs, trapdoors, levers, attacking entities, tool-speed tuning.

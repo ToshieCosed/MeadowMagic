@@ -15,15 +15,18 @@ function makeChunk(cx, cz) {
     for (let i = 0; i < 16; i++) { c.setBlockType(new Vec3(i, 61, 10), 35); c.setBlockData(new Vec3(i, 61, 10), i); } c.setBlockType(new Vec3(8, 61, 12), 5); c.setBlockType(new Vec3(9, 61, 12), 89); c.setBlockType(new Vec3(10, 61, 12), 20); }
   return c;
 }
-let joined = null; const got = [];
+let joined = null; const got = [], pk = [];
 server.on('login', c => {
-  c.write('login', { entityId: c.id, gameMode: 1, dimension: 0, difficulty: 0, maxPlayers: 5, levelType: 'default', reducedDebugInfo: false });
+  c.write('login', { entityId: c.id, gameMode: 0, dimension: 0, difficulty: 0, maxPlayers: 5, levelType: 'default', reducedDebugInfo: false });
   c.write('position', { x: 40.5, y: 62, z: 40.5, yaw: 0, pitch: 0, flags: 0 });
   for (let cx = 0; cx < 5; cx++) for (let cz = 0; cz < 5; cz++) { const ch = makeChunk(cx, cz); c.write('map_chunk', { x: cx, z: cz, groundUp: true, bitMap: ch.getMask(), chunkData: ch.dump() }); }
   c.write('spawn_entity_living', { entityId: 101, type: 90, x: 44 * 32, y: 61 * 32, z: 44 * 32, yaw: 0, pitch: 0, headPitch: 0, velocity: { x: 0, y: 0, z: 0 }, metadata: [] });
   c.write('spawn_entity_living', { entityId: 102, type: 94, x: 44 * 32, y: 61 * 32, z: 46 * 32, yaw: 0, pitch: 0, headPitch: 0, velocity: { x: 0, y: 0, z: 0 }, metadata: [] });   // squid: must be skipped
   setTimeout(() => { c.write('block_change', { location: { x: 40, y: 61, z: 44 }, type: 57 << 4 }); c.write('entity_teleport', { entityId: 101, x: 46 * 32, y: 61 * 32, z: 44 * 32, yaw: 64, pitch: 0, onGround: true }); }, 4000);
-  c.on('packet', (data, m) => { if (m.name === 'position_look' || m.name === 'position') got.push([data.x, data.y, data.z]); });
+  const sl = (id, count, damage) => ({ blockId: id, itemCount: count, itemDamage: damage, nbtData: undefined });
+  const items = Array(45).fill(null).map(() => ({ blockId: -1 })); items[36] = sl(276, 1, 0); items[37] = sl(53, 20, 0); items[38] = sl(44, 5, 0); items[39] = sl(171, 3, 14); items[5] = sl(310, 1, 0);
+  setTimeout(() => { c.write('window_items', { windowId: 0, items }); c.write('update_health', { health: 14, food: 18, foodSaturation: 2 }); }, 1500);
+  c.on('packet', (data, m) => { if (['block_dig', 'block_place', 'window_click', 'held_item_slot'].includes(m.name)) { pk.push(m.name); if (m.name === 'block_dig' && data.status === 2) c.write('block_change', { location: data.location, type: 0 }); } if (m.name === 'position_look' || m.name === 'position') got.push([data.x, data.y, data.z]); });
 });
 const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: 1000, height: 560 } }); const errs = []; pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|Failed to load resource/.test(m.text())) errs.push('console: ' + m.text().slice(0, 160)); });
 await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html'); await pg.waitForSelector('#mpBtn'); await pg.click('#mpBtn'); await pg.click('[data-mp=minecraft]');
@@ -34,9 +37,12 @@ await wait(5000);
 const info = await pg.evaluate(() => { const w = world; const ch = w && [...w.chunks.values()][0]; let nz = 0; if (ch) for (const v of ch.blocks) if (v) nz++;
   const px = Math.floor(player.x), pz = Math.floor(player.z); const ids = new Set(); if (w) for (const c of w.chunks.values()) { for (let i = 0; i < c.blocks.length; i += 7) if (c.blocks[i]) ids.add(c.blocks[i]); }
   return { mode, chunks: w ? w.chunks.size : 0, meshed: w ? [...w.chunks.values()].filter(c => c.mesh).length : 0, nz, mobs: (window.__cmobs || []).map(m => m.type), mob0: (window.__cmobs || [])[0] && [window.__cmobs[0].x, window.__cmobs[0].z], player: [player.x, player.y, player.z], idsCount: ids.size, hi: [...ids].filter(i => i >= 8192).length, block: w ? w.get(Math.floor(player.x) + 0, 61, Math.floor(player.z) + 4) : null, expectDiamond: 0, size: w && w.size, name: w && w.meta.name }; });
+const inter = await pg.evaluate(async () => { const r = { hp: player.hp, mx: player.maxHp, gm: world.meta.gameMode, s0: inv.slots[0] && ITEMS[inv.slots[0].id].name, s1: inv.slots[1] && ITEMS[inv.slots[1].id].name, s2: inv.slots[2] && ITEMS[inv.slots[2].id].name, s3: inv.slots[3] && ITEMS[inv.slots[3].id].name, ar: inv.armor.map(a => a && ITEMS[a.id].name) };
+  const x = Math.floor(player.x), z = Math.floor(player.z); mineBlock({ hit: [x, 60, z + 3], prev: [x, 61, z + 3] }); selectSlot(2); clickSlot(inv.slots, 1); tryInteract(500, 300); r.hb = getComputedStyle(document.getElementById('hotbar')).display; const hb = document.getElementById('hotbar').getBoundingClientRect(); r.hbY = Math.round(hb.top / innerHeight * 100); return r; });
+await wait(1200); inter.pk = pk;
 await pg.screenshot({ path: '/tmp/world18.png' });
 await pg.click('#mcLeave'); await wait(1500);
 const after = await pg.evaluate(() => ({ active: StrataMCE.active, blocks: BLOCKS.length, mcActive: !!window.__mcActive, cm: window.__cmobs, mob: stepMobs.toString().length > 40, bodyCls: document.body.classList.contains('mc-compat') }));
-const res = { after, ...info, errs: errs.slice(0, 4), serverGotPos: got.length > 2 };
-res.pass = info.mode === 'play' && info.chunks >= 9 && info.meshed >= 4 && info.nz > 1000 && info.mobs.length === 1 && info.mobs[0] === 'pig' && res.serverGotPos && !errs.length && !after.active && after.blocks <= 8192 && !after.mcActive && !after.cm && after.mob && !after.bodyCls;
+const res = { after, inter, ...info, errs: errs.slice(0, 4), serverGotPos: got.length > 2 };
+res.pass = info.mode === 'play' && info.chunks >= 9 && info.meshed >= 4 && info.nz > 1000 && info.mobs.length === 1 && info.mobs[0] === 'pig' && res.serverGotPos && inter.hp === 14 && inter.gm === 'survival' && /sword|Sword/.test(inter.s0 || '') && inter.s1 && inter.s2 && inter.s3 && pk.includes('block_dig') && pk.includes('block_place') && pk.includes('window_click') && pk.includes('held_item_slot') && inter.hb !== 'none' && inter.hbY > 60 && !errs.length && !after.active && after.blocks <= 8192 && !after.mcActive && !after.cm && after.mob && !after.bodyCls;
 console.log(JSON.stringify(res)); await b.close(); server.close(); relay.kill(); process.exit(res.pass ? 0 : 1);

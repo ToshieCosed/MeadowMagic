@@ -88,6 +88,13 @@
     return out;
   }
   const ang = b => b * 360 / 256;
+  function slot18(r) {   // 1.8 item: short id (-1 = empty), byte count, short damage, optional named NBT. raw keeps the bytes for sending back in clicks.
+    const p0 = r.p, id = r.i16(); if (id < 0) return null;
+    const count = r.b(), damage = r.i16(), t = r.b(); if (t !== 0) { r.skip(r.u16()); r.tag(t); }
+    return { id, count, damage, raw: r.u.slice(p0, r.p) };
+  }
+  const pos64 = (x, y, z) => { const v = ((BigInt(x) & 0x3FFFFFFn) << 38n) | ((BigInt(y) & 0xFFFn) << 26n) | (BigInt(z) & 0x3FFFFFFn); const w = []; for (let i = 7; i >= 0; i--) w.push(Number((v >> BigInt(i * 8)) & 0xFFn)); return w; };
+  const slotOut = (w, it) => { if (!it) return w.b(255).b(255); return w.raw(it.raw); };
 
   function connect(o) {
     const P = o.protocol, ids = IDS[P];
@@ -140,11 +147,15 @@
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); return;
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
-          if (P === 47 && H) { const eid = r.i32(); r.b(); const dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); }
+          if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); }
           return;
         case 'respawn': if (P === 47 && H) { sky = r.i32() === 0; H.respawn && H.respawn(); } return;
         case 'update_time': if (P === 47 && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
-        case 'update_health': if (P === 47 && H && H.health) H.health(r.f32()); return;
+        case 'update_health': if (P === 47 && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
+        case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
+        case 'set_slot': if (P === 47 && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
+        case 'window_items': if (P === 47 && H && H.items) { const wid = r.b(), n = r.i16(), l = []; for (let i = 0; i < n; i++) l.push(slot18(r)); H.items(wid, l); } return;
+        case 'game_state_change': if (P === 47 && H && H.gameState) { const rs = r.b(), v = r.f32(); H.gameState(rs, v); } return;
         case 'position': if (P === 47 && H) {
           const x = r.f64(), y = r.f64(), z = r.f64(), yaw = r.f32(), pitch = r.f32(), fl = r.b();
           H.position && H.position({ x, y, z, yaw, pitch, flags: fl });
@@ -262,7 +273,17 @@
       return out('chat_message', w);
     }
     const sendPos = (x, y, z, yaw, pitch, ground) => { if (closed || state !== 'play') return false; return out('position_look', new W().f64(x).f64(y).f64(z).f32(yaw).f32(pitch).bool(ground)); };
-    return { chat, sendPos, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
+    const v47 = f => (...a) => (P === 47 && !closed && state === 'play') ? f(...a) : false;
+    const api = {
+      dig: v47((status, x, y, z, face) => out('block_dig', new W().b(status).raw(pos64(x, y, z)).b(face))),
+      place: v47((x, y, z, face, item, cx, cy, cz) => { const w = new W().raw(pos64(x, y, z)).b(face); slotOut(w, item); return out('block_place', w.b(cx).b(cy).b(cz)); }),
+      select: v47(n => out('held_item_slot', new W().b(n >> 8).b(n))),
+      click: v47((slot, button, action, mode, item, wid) => { const w = new W().b(wid || 0).b(slot >> 8).b(slot).b(button).b(action >> 8).b(action).b(mode); slotOut(w, item); return out('window_click', w); }),
+      swing: v47(() => out('arm_animation')),
+      respawn: v47(() => out('client_command', new W().vi(0))),
+      attack: v47(eid => out('use_entity', new W().vi(eid).vi(1))),
+    };
+    return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }
   g.StrataMC = { connect, comp, setIds: x => { IDS = x; }, W, R };
 })(typeof window !== 'undefined' ? window : globalThis);
