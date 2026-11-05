@@ -10612,10 +10612,10 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
     const raw=$('mcHost').value.trim(); if(!raw){ stat.textContent='Enter a server address.'; return; }
     try{ localStorage.setItem('strata.mchost',raw); }catch(e){}
     let host=raw, port=25565; const m=raw.match(/^(.*):(\d{1,5})$/); if(m&&!/^\[.*\]$/.test(raw)&&m[1].indexOf(':')<0){ host=m[1]; port=+m[2]; }
-    mcLog.textContent=''; sh.hidden=true; gv.hidden=false; mcInfo.textContent='Minecraft '+MP.version+' - '+host+':'+port;
+    mcLog.textContent=''; sh.hidden=true; gv.hidden=false; mcInfo.textContent='Minecraft '+MP.version+' - '+host+':'+port; const baseInfo=mcInfo.textContent; mcInfo.style.whiteSpace='pre-wrap';
     const name=(MP.auth&&MP.auth.name)||('Strata'+Math.floor(1000+Math.random()*9000));
     try{ cur=StrataMCE.start({relay:MP.relay,onWorld:()=>{ gv.style.background='none'; gv.style.pointerEvents='none'; gv.classList.add('inworld'); mcInfo.hidden=true; mcBar.hidden=true; mcChatBtn.hidden=false; },host,port,protocol:MP.protocol,name,uuid:MP.auth&&MP.auth.uuid,
-      onChat:t=>addLine(t), onStatus:t=>addLine(t,true), debug:window.__mcDebug, onClose:w=>{ addLine('Disconnected: '+(w||'connection closed'),true); } }); }
+      onChat:t=>addLine(t), onStatus:t=>{ addLine(t,true); mcInfo.textContent=baseInfo+'\n'+t; }, debug:window.__mcDebug, onClose:w=>{ addLine('Disconnected: '+(w||'connection closed'),true); mcInfo.hidden=false; mcInfo.style.whiteSpace='pre-wrap'; mcInfo.textContent=baseInfo+'\nDisconnected: '+(w||'connection closed'); } }); }
     catch(e){ addLine('Could not start: '+e.message,true); }
   };
   try{ $('mcHost').value=localStorage.getItem('strata.mchost')||''; }catch(e){}
