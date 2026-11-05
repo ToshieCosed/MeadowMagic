@@ -9870,37 +9870,7 @@ setInterval(()=>{ try{ if(!world||world.preview||typeof game!=='function'||!game
   RC(TBK.gdrive,1,['CGC','CBC','CCC'],{C:cu,G:[I.CHIP_ADV],B:[TBK.mlight]}); RC(TBK.pplate,1,['SS'],{S:[B.STONE]}); }
 
 // ---------- the showcase light show: wall, plate, wire ----------
-function buildLightShow(w){ const C=w.gen.C, G=SHOW_G+1, S=[0,0,-1];
-  const put=(x,y,z,v)=>{ const cx=x>>4, cz=z>>4, k=w.key(cx,cz); let e=w.edits.get(k); if(!e){ e=new Map(); w.edits.set(k,e); } e.set((y*CS+(z&15))*CS+(x&15),v); };
-  const tech=(x,y,z,k,f,o)=>{ put(x,y,z,TBK[k]); const t=X.newTech(x,y,z,k,f); Object.assign(t.tech,{inf:1,e:(TECH.TT[k]||{}).cap||20},o||{}); return t; };
-  const stone=B.STONE, BUNDLE=B.BUNDLE, RI2=RI, GI2=GI, BI2=BI;
-  const COLS=8, ROWS=6, PX=5, PY=4, X0=C-18, Y0=G+2, ZS=C+34, CH_C=10, CH_V=30, CH_P=50;
-  const sg=(x,y,z,ch,op,pl,fo,f)=>{ const t=tech(x,y,z,'wterm',4,{role:'rx',ch,op,conv:'level'}); return t; };
-  // ---- the pixel units: three single-colour bundles feed one multicolour light; each colour comes from its own analog block ----
-  for(let j=0;j<ROWS;j++) for(let i=0;i<COLS;i++){ const ox=X0+2+PX*i, oy=Y0+PY*j, oz=ZS;
-    tech(ox,oy,oz,'mlight',5,{mode:'rgb'});
-    put(ox-1,oy,oz,BUNDLE); put(ox+1,oy,oz,BUNDLE); put(ox,oy+1,oz,BUNDLE);                          // red, green, blue bundles around the light
-    put(ox-1,oy-1,oz,stone); WIRE.addSeg(ox-1,oy-1,oz,2,RI2); put(ox+1,oy-1,oz,stone); WIRE.addSeg(ox+1,oy-1,oz,2,GI2); put(ox,oy+2,oz,stone); WIRE.addSeg(ox,oy+2,oz,3,BI2);   // a wire of each colour opens its bundle's channel
-    const mk=(x,y,z,ins)=>{ const fo=['off','off','off','off','off','out']; for(const d of ins) fo[d]='in'; return tech(x,y,z,'srecv',5,{op:'XOR',conv:'level',fo}); };
-    mk(ox-1,oy,oz+1,[4,1]); mk(ox+1,oy,oz+1,[4,0]); mk(ox,oy+1,oz+1,[4,2,0]);
-    sg(ox-1,oy,oz+2,CH_C+i); sg(ox-2,oy,oz+1,CH_P);                                                   // red  = column XOR phase 1
-    sg(ox+1,oy,oz+2,CH_V+j); sg(ox+2,oy,oz+1,CH_P+1);                                                 // green = row XOR phase 2
-    sg(ox,oy+1,oz+2,CH_P+2); sg(ox,oy+2,oz+1,CH_C+i); sg(ox+1,oy+1,oz+1,CH_V+j);                        // blue = phase 3 XOR column XOR row
-  }
-  // ---- control strip: static column and row levels, each a broadcaster switched on by its own lever ----
-  const CZ=ZS-14; const cx0=C-18;
-  for(let i=0;i<COLS;i++){ tech(cx0+2*i,G,CZ,'wterm',4,{role:'tx',ch:CH_C+i,conv:'preset',pl:2*i+1}); tech(cx0+2*i,G+1,CZ,'lever',2,{on:true}); }
-  for(let j=0;j<ROWS;j++){ tech(cx0+2*(COLS+j),G,CZ,'wterm',4,{role:'tx',ch:CH_V+j,conv:'preset',pl:2*j+2}); tech(cx0+2*(COLS+j),G+1,CZ,'lever',2,{on:true}); }
-  // ---- phase generators: four free-running clocks (each twice as slow as the last) feed weighted level blocks that add up on a broadcaster ----
-  const WT=[[1,2,4,8],[8,4,2,1],[2,4,8,1]], DL=6;
-  for(let k=0;k<3;k++){ const px=C-12+12*k, pz=ZS-7; tech(px,G,pz,'wterm',4,{role:'tx',ch:CH_P+k,op:'ADD',conv:'level'});
-    [[1,0],[0,1],[-1,0],[0,-1]].forEach(([dx,dz],b)=>{ const f=dx>0?1:dx<0?0:dz>0?5:4;   // sbcast faces the centre: +x neighbour faces -x (face 1), etc
-      tech(px+dx,G,pz+dz,'sbcast',f,{pl:WT[k][b],conv:'preset'}); tech(px+2*dx,G,pz+2*dz,'gate',f,{g:'CLOCK',dl:DL*(1<<b)}); }); }
-  // ---- signs ----
-  const sign=(x,z,n,text)=>{ put(x,G,z,0); w.decor.push({kind:'sign',c:[x+.5,G+.95,z+.5],n,u:[n[2],0,-n[0]],v:[0,1,0],w:1,h:.6,sup:[x,G-1,z],cell:[x,G,z],post:1,fixU:1,text,frame:'wood',bg:'planks'}); };
-  sign(C-14,CZ-2,S,'ALL-WIRE DISPLAY\n8x6 pixels. Every pixel is\n3 bundles, 3 analog blocks\nand 7 receivers'); sign(C-12,ZS-11,S,'PHASE CLOCKS\n4 clocks per generator,\neach half the speed of\nthe last, weighted and added'); sign(C-14,CZ+2,S,'LEVEL STRIP\nColumn and row levels.\nXOR with the phases\nmakes the plasma'); w.meta.lightshow=2; }
-{ const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildLightShow(world); }catch(e){ console.error('lightshow build',e); } }; }
-window.__v40={PROG,collect,wireRGB,buildLightShow,ST,SCI,DCI};
+window.__v40={PROG,collect,wireRGB,ST,SCI,DCI};
 })();
 
 /* ===== v0.41.0: insulated cables, colour-locked logic blocks, and the multiplexed display ===== */
