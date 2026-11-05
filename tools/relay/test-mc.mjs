@@ -4,11 +4,11 @@ import { spawn } from 'node:child_process'; import { WebSocket } from 'ws'; impo
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const vi = n => { const a = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; a.push(b); } while (n); return Buffer.from(a); };
 const rv = (b, o) => { let v = 0, s = 0, i = o; for (;;) { const x = b[i++]; v |= (x & 0x7f) << s; if (!(x & 0x80)) return { v, len: i - o }; s += 7; } };
-const mock = spawn('node', ['mock-ms.mjs', '19281', '19282'], { stdio: 'inherit' }); await wait(900);
+const mock = spawn('node', ['mock-ms.mjs', '19281', '19282'], { stdio: 'inherit' }); await wait(3000);
 const base = 'http://localhost:19281', EP = { devicecode: base + '/devicecode', token: base + '/token', xbl: base + '/xbl', xsts: base + '/xsts', mclogin: base + '/mclogin', profile: base + '/profile', sessionjoin: base + '/sessionjoin' };
 const store = '/tmp/relay-mc-store.json'; try { fs.unlinkSync(store); } catch {}
 const cmd = (process.env.RELAY_CMD || 'node relay.mjs').split(' ');
-const relay = spawn(cmd[0], cmd.slice(1), { env: { ...process.env, MS_CLIENT_ID: 'test-client', PORT: '19280', RELAY_ENDPOINTS: JSON.stringify(EP), RELAY_STORE: store }, stdio: 'inherit' }); await wait(1500);
+const relay = spawn(cmd[0], cmd.slice(1), { env: { ...process.env, MS_CLIENT_ID: 'test-client', PORT: '19280', RELAY_ENDPOINTS: JSON.stringify(EP), RELAY_STORE: store }, stdio: 'inherit' }); await wait(4000);
 const ws = new WebSocket('ws://localhost:19280/?t=x'); const texts = [], bins = []; ws.on('message', (m, isBin) => isBin ? bins.push(Buffer.from(m)) : texts.push(JSON.parse(m.toString()))); await new Promise(r => ws.on('open', r));
 const until = async (f, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = f(); if (v) return v; await wait(50); } return null; };
 const r = {};

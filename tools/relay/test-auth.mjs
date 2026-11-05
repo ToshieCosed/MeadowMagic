@@ -1,7 +1,7 @@
 // Runs the relay against the mock endpoints and walks the whole login chain. node test-auth.mjs
 import { spawn } from 'node:child_process'; import { WebSocket } from 'ws'; import fs from 'node:fs';
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const mock = spawn('node', ['mock-ms.mjs', '19081'], { stdio: 'inherit' }); await wait(600);
+const mock = spawn('node', ['mock-ms.mjs', '19081'], { stdio: 'inherit' }); await wait(3000);
 const base = 'http://localhost:19081', EP = { devicecode: base + '/devicecode', token: base + '/token', xbl: base + '/xbl', xsts: base + '/xsts', mclogin: base + '/mclogin', profile: base + '/profile' };
 const store = '/tmp/relay-test-store.json'; try { fs.unlinkSync(store); } catch {}
 const relay = spawn('node', ['relay.mjs'], { env: { ...process.env, MS_CLIENT_ID: 'test-client', PORT: '19080', RELAY_ENDPOINTS: JSON.stringify(EP), RELAY_STORE: store }, stdio: 'inherit' }); await wait(800);
