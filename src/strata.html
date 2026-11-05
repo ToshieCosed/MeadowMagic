@@ -9990,4 +9990,23 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
 { const o=window.startWorld; window.startWorld=function(meta,save,preview){ o.apply(this,arguments); if(meta&&meta.gen==='show'&&!save&&!preview) try{ buildLab(world); }catch(e){ console.error('lab build',e); } }; }
 })();
 
+
+/* ===== mineCompatibility branch: multiplayer entry point ===== */
+(function(){
+  const menu=document.getElementById('menu'), forge=document.getElementById('forge'); if(!menu||!forge) return;
+  const MP={mode:null};   // 'minecraft' (Minecraft Java compatibility layer) or 'strata' (this game's own protocol); nothing connects yet
+  const btn=document.createElement('button'); btn.className='primary'; btn.id='mpBtn'; btn.textContent='Multiplayer'; btn.style.background='var(--panel)'; btn.style.color='var(--text)'; btn.style.border='1px solid var(--line)'; btn.style.marginTop='8px';
+  forge.insertAdjacentElement('afterend',btn);
+  const sh=document.createElement('section'); sh.className='sheet'; sh.id='mpMenu'; sh.hidden=true; sh.setAttribute('aria-label','Multiplayer');
+  sh.innerHTML='<div class="brand"><h1>MULTIPLAYER</h1></div><p class="lede">Choose what you are connecting to.</p><div class="stack" role="radiogroup" aria-label="Multiplayer type">'
+   +'<button class="size" data-mp="minecraft"><i>Minecraft Compat</i><b>Java servers</b><em>Join a Minecraft server: its blocks, entities and other players</em></button>'
+   +'<button class="size" data-mp="strata"><i>This Game</i><b>Strata servers</b><em>Play with others in a Strata world</em></button></div>'
+   +'<p class="note" id="mpNote"></p><button class="primary" id="mpBack">Back</button>';
+  document.body.appendChild(sh);
+  const note=sh.querySelector('#mpNote');
+  btn.onclick=()=>{ menu.hidden=true; sh.hidden=false; note.textContent=''; };
+  sh.querySelector('#mpBack').onclick=()=>{ sh.hidden=true; menu.hidden=false; };
+  sh.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{ MP.mode=b.dataset.mp; note.textContent=MP.mode==='minecraft'?'Minecraft Compat is being built: block and entity tables, then protocol, then other players. Not connectable yet.':'Strata multiplayer is not built yet.'; });
+  window.__mp=MP;
+})();
 </script>
