@@ -152,9 +152,10 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 - Showcase logic blocks carry an `inf` flag so they run without an RF supply.
 - Test: `tools/tests/phase18_lightshow.py` (48 lights lit, changing).
 
-## v0.41.0 — insulated cables, colour locks, latch lights, multiplexed display
-- **Insulated cables** (16 tints, craft: bundle + wool). A cable only joins cables of its own tint, and it plugs into a normal wire bundle only with its end cells; mid-run it ignores neighbouring bundles, wires and terminals. Packed trunks of different tints never cross-talk.
-- **Colour lock**: tap a signal broadcaster/receiver/wireless terminal with a coloured wire to lock it to that colour on bundles (tap again to unlock). Lets many blocks share one multi-colour bus.
+## v0.41.0 — insulated cables, latch lights, and the 32x32 scan display
+- **Insulated cables** (16 tints, craft: bundle + wool). A cable only joins cables of its own tint, and plugs into a normal wire bundle only with its end cells; mid-run it ignores neighbouring bundles, wires and terminals, so packed trunks of different tints never cross-talk.
 - **Multicolour light, latch mode** (third tap state): a yellow strobe line samples the red/green/blue lines and the light holds that colour.
-- **Showcase multiplexed display** (new showcase worlds, ~96 blocks south of the centre): 16 latch lights share one RGB bus; a scan counter selects one pixel at a time (EQ block per pixel) and strobes it over its own cable through a packed 4x4 trunk; a slow phase counter shifts the picture each frame.
-- Test: `tools/tests/phase19_mux.py` (steps the simulation directly; checks every pixel samples the colour for its own scan slot, i.e. no cross-talk).
+- **Showcase 32x32 scan display** (new showcase worlds, about 110 blocks south of the centre): a solid 96x96 slab of stone. Every stone carries wires on two faces: the top face has red/green/blue stripes (one colour per stone column, so a pixel = 3 stripes), the north face has one yellow row strobe per 3 rows. A 3x3 latch light on top of each patch reads the stripes beside it plus its row's strobe. A 5-bit counter drives a decoder (16 "nibble == a" lines, 2 "high bit == b" lines, one AND per row); every column has its own analog blocks (colour = column AND shared S level); a phase counter changes the picture once per frame; a CLEAR lever gates all three S levels so the whole screen blanks in one frame.
+- **Fix**: wires whose host chunk is not loaded are no longer dropped as items (the cleanup used to treat unloaded cells as air).
+- Showcase generation keeps trees and plants out of the display's air space.
+- Test: `tools/tests/phase19_ppu.py` steps the simulation directly and checks every pixel of every row against its own column constant and the row's S levels (0 bad pixels = no cross-talk).
