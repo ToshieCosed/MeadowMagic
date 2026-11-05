@@ -55,7 +55,7 @@ public final class Relay implements WsServer.Handler {
 
     /** Per-connection state. */
     private static final class Ctx {
-        WsServer.Conn ws; Socket sock; OutputStream sout; Cipher enc, dec; int compress = -1; boolean login = true; byte[] pending;
+        WsServer.Conn ws; Socket sock; OutputStream sout; volatile Cipher enc, dec; volatile int compress = -1; volatile boolean login = true; volatile byte[] pending;
         byte[] buf = new byte[0]; int len = 0;
     }
 
@@ -243,12 +243,14 @@ public final class Relay implements WsServer.Handler {
                 }
                 ByteArrayOutputStream f = new ByteArrayOutputStream(); putVi(f, data.length); f.write(data, 0, data.length);
                 byte[] frame = f.toByteArray(); if (x.enc != null) frame = x.enc.update(frame);
-                x.sout.write(frame); x.sout.flush();
-                if (x.pending != null) {   // everything after the encryption response is encrypted
+                Cipher ne = null;
+                if (x.pending != null) {   // everything after the encryption response is encrypted; the reader must be ready before the reply can arrive
                     byte[] k = x.pending; x.pending = null;
-                    x.enc = Cipher.getInstance("AES/CFB8/NoPadding"); x.enc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(k, "AES"), new IvParameterSpec(k));
+                    ne = Cipher.getInstance("AES/CFB8/NoPadding"); ne.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(k, "AES"), new IvParameterSpec(k));
                     Cipher d = Cipher.getInstance("AES/CFB8/NoPadding"); d.init(Cipher.DECRYPT_MODE, new SecretKeySpec(k, "AES"), new IvParameterSpec(k)); x.dec = d;
                 }
+                x.sout.write(frame); x.sout.flush();
+                if (ne != null) x.enc = ne;
             } catch (Exception e) { send(x, Json.of("type", "tcp_error", "message", String.valueOf(e.getMessage()))); }
         }
     }
