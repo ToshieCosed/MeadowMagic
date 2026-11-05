@@ -42,6 +42,8 @@ JS='''async()=>{ const W=ms=>new Promise(r=>setTimeout(r,ms)); startWorld({id:'w
    for(let i=0;i<=3;i++) seg(x0+i,G-1,z0,2,red); for(let i=0;i<=4;i++) seg(x0,G-1,z0+i,2,blu); for(let i=0;i<=3;i++) seg(x0,G-1,z0-i,2,yel); seg(x0,G-1,z0,2,yel); WIRE.rebuild();
    let out; for(let i=0;i<4;i++){ sol.tech.e=5000; lr.tech.e=0; lb.tech.e=0; ly.tech.e=39; WIRE.step(); } const rf=c=>+(WIRE.nets().find(n=>n.c===c&&n.segs.some(s=>s.z>=z0-3&&s.z<=z0+4&&s.x>=x0))||{rf:-1}).rf.toFixed(2);
    res.split={red:rf(red),blue:rf(blu),yellow:rf(yel)}; }
+ // 3e. same colour on two faces of one block stays two separate lines
+ { const x=X+8,y=G,z=Z+10; world.set(x,y,z,S); seg(x,y,z,0,red); seg(x,y,z,4,red); WIRE.rebuild(); res.sep=WIRE.nets().filter(n=>n.segs.some(s=>s.x===x&&s.y===y&&s.z===z)).length; }
  // 4. persistence + cleanup
  const save=JSON.stringify([...world.wires.entries()]); res.saved=save.length>10;
  world.set(X+1,G+1,Z+8,B.AIR); await W(1300); res.cleaned=!world.wires.has((X+1)+','+(G+1)+','+(Z+8));
@@ -54,6 +56,6 @@ async def main():
         r=await pg.evaluate(JS.replace('BUNDLE_ID','B.BUNDLE').replace('TECHB.','TECH.TECHB.').replace('TECHB[','TECH.TECHB['))
         await pg.screenshot(path=str(OUT/'wires.png'))
         print(json.dumps(r)); print('errors',errs[:5])
-        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['ground']['cap']>0 and r['two']['redSpeed']>0 and r['two']['blueSpeed']>0 and r['two']['blueMoving']>0 and r['two']['redMoving']>0 and r['two']['cap']>0 and r['two']['blueAfter']>0 and abs(r['split']['yellow']-1)<.2 and abs(r['split']['red']-3.5)<.3 and abs(r['split']['blue']-3.5)<.3 and r['cleaned'] and not errs
+        ok=r['pistonSig']>0 and r['pistonConn'] and r['pistonOff']==0 and r['tjunction']==7 and r['rf']['lamp']>0 and r['rf']['cap']>0 and r['rf']['s1']<500 and r['rf']['s2']<500 and r['ground']['cap']>0 and r['two']['redSpeed']>0 and r['two']['blueSpeed']>0 and r['two']['blueMoving']>0 and r['two']['redMoving']>0 and r['two']['cap']>0 and r['two']['blueAfter']>0 and abs(r['split']['yellow']-1)<.2 and abs(r['split']['red']-3.5)<.3 and abs(r['split']['blue']-3.5)<.3 and r['sep']==2 and r['cleaned'] and not errs
         print('PASS' if ok else 'FAIL'); await b.close(); sys.exit(0 if ok else 1)
 asyncio.run(main())

@@ -119,3 +119,6 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 ### v0.38.5 — flicker + accidental run-fill
 - Wires are a hair slimmer and each colour sits at its own tiny depth, so neighbouring colour lanes no longer z-fight (the flicker).
 - Run-fill (tap a second block to lay the wire between) now only happens while crouching, or when going straight up/down a pole, and only within 8 s of the previous wire. Plain taps lay one wire.
+
+### v0.38.6 — faces stay separate
+- Wires no longer wrap around block corners or join a different face of the same block. A wire only joins a wire of the same colour on the neighbouring block's matching face (or a bundle / machine). Columns up different faces of a tower are separate lines. Test: phase15 (3e).
