@@ -115,3 +115,7 @@ Horse rebuilt from the vanilla part layout (neck 4x12x7, head 6x5x7, mouth 4x5x5
 
 ### v0.38.4 — demand-based sharing across colours
 - RF is now shared globally: each producer's output is divided among every draw it can reach through any colour, capped by what each draw can take, and whatever a full/low-demand device leaves unused goes to the others (8 RF/t, yellow wants 1 → red and blue get 3.5 each). Works along shared channels or separate faces. Batteries still only cover draws producers couldn't. Test in phase15 (3d).
+
+### v0.38.5 — flicker + accidental run-fill
+- Wires are a hair slimmer and each colour sits at its own tiny depth, so neighbouring colour lanes no longer z-fight (the flicker).
+- Run-fill (tap a second block to lay the wire between) now only happens while crouching, or when going straight up/down a pole, and only within 8 s of the previous wire. Plain taps lay one wire.

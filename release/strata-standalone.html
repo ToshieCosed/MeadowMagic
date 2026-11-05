@@ -9743,11 +9743,11 @@ function placeWire(sx,sy,c){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap th
   if(hasSeg(x,y,z,f,c)){ delSeg(x,y,z,f,c); if(!creative()){ if(addItem(WID[c],1)) spawnDrop(x+.5,y+1,z+.5,WID[c],1); invChanged(); } lastW=null; toast(CN[c]+' wire removed'); return; }
   // tap a second block on the same face in a straight line and the run between is laid for you
   const L=lastW; let n=0;
-  if(L&&L.f===f&&L.c===c&&((L.x!==x)+(L.y!==y)+(L.z!==z))===1&&(f>>1)!==(L.x!==x?0:L.y!==y?1:2)){ const ax=L.x!==x?0:L.y!==y?1:2, len=Math.abs([x,y,z][ax]-[L.x,L.y,L.z][ax]), st=Math.sign([x,y,z][ax]-[L.x,L.y,L.z][ax]);
+  if(L&&L.f===f&&L.c===c&&((L.x!==x)+(L.y!==y)+(L.z!==z))===1&&(f>>1)!==(L.x!==x?0:L.y!==y?1:2)&&(player.crouch||L.y!==y)&&performance.now()-L.t<8000){ const ax=L.x!==x?0:L.y!==y?1:2, len=Math.abs([x,y,z][ax]-[L.x,L.y,L.z][ax]), st=Math.sign([x,y,z][ax]-[L.x,L.y,L.z][ax]);
     if(len<=64){ for(let i=1;i<=len&&have()>0;i++){ const p=[L.x,L.y,L.z]; p[ax]+=st*i; const b=world.get(p[0],p[1],p[2]); if(!(b>0)||isW(b)) continue; if(addSeg(p[0],p[1],p[2],f,c)){ n++; useWire(); } } } }
   else if(have()>0&&addSeg(x,y,z,f,c)){ n=1; useWire(); }
   if(!n){ toast(have()>0?'Nothing to lay there':'You are out of '+CN[c].toLowerCase()+' wire'); return; }
-  lastW={x,y,z,f,c}; sfx&&sfx('place',x+.5,y+.5,z+.5,.4,10); }
+  lastW={x,y,z,f,c,t:performance.now()}; sfx&&sfx('place',x+.5,y+.5,z+.5,.4,10); }
 { const _ud=useDecor; useDecor=function(sx,sy){ const s=held(), it=s&&ITEMS[s.id]; if(it&&it.wireC!=null){ placeWire(sx,sy,it.wireC); return true; } return _ud(sx,sy); }; }
 // breaking the block takes its wires with it
 { const _bb=breakBlock; breakBlock=function(){ const r=_bb.apply(this,arguments); cleanT=0; dirty=true; return r; }; }
@@ -9765,13 +9765,13 @@ function placeWire(sx,sy,c){ const r=pick(sx,sy); if(!r||!r.prev){ toast('Tap th
 const PH=new Map(); let lastT=0;
 { const _ed=emitDecor; emitDecor=function(vb){ _ed.apply(this,arguments); if(!geo.length) return; const now=performance.now(), dt=Math.min(.1,Math.max(0,(now-lastT)/1000)); lastT=now;
     for(const n of nets) if(n.speed) PH.set(n.pk,((PH.get(n.pk)||0)+(.5+n.speed*.35)*dt)%1000);
-    const px=player.x, pz=player.z, P=.125, TAU=Math.PI*2, hw=.036; PAT=0; setVL(VL_EMISSIVE);
-    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], n0=s.sf+((s.f&1)?-.034:.004), n1=s.sf+((s.f&1)?-.004:.034), cs=dd<14?1/32:dd<28?1/16:.5;
+    const px=player.x, pz=player.z, P=.125, TAU=Math.PI*2, hw=.029; PAT=0; setVL(VL_EMISSIVE);
+    for(const s of geo){ const dx=s.x-px, dz=s.z-pz, dd=Math.abs(dx)+Math.abs(dz); if(dd>44) continue; const n=s.net, on=!!(n&&n.speed>0), ph=on?(PH.get(n.pk)||0):0, base=hex(CC[s.c]), a=s.f>>1, pl=[0,1,2].filter(i=>i!==a), lane=(s.c+.5)/16, org=[s.x,s.y,s.z], cz=s.c*.0006, n0=s.sf+((s.f&1)?-.034-cz:.004+cz), n1=s.sf+((s.f&1)?-.004-cz:.034+cz), cs=dd<14?1/32:dd<28?1/16:.5;
       const col=(sh,tw)=>{ const g=on?.95+.32*sh:.62+.2*sh; return [Math.min(255,base[0]*g+(on?24:0)),Math.min(255,base[1]*g+(on?24:0)),Math.min(255,base[2]*g+(on?24:0))]; };
       const put=(lo,hi,c)=>{ const mn=[0,0,0], mx=[0,0,0]; mn[a]=org[a]+n0; mx[a]=org[a]+n1; mn[pl[0]]=org[pl[0]]+lo[0]; mx[pl[0]]=org[pl[0]]+hi[0]; mn[pl[1]]=org[pl[1]]+lo[1]; mx[pl[1]]=org[pl[1]]+hi[1]; emitBox(vb,mn,mx,c,IDT); };
       put([lane-hw,lane-hw],[lane+hw,lane+hw],col(.4,0));
       for(let d=0;d<6;d++){ if((d>>1)===a||!s.arm[d]) continue; const pi=pl.indexOf(d>>1), po=1-pi, neg=d&1, t0=neg?0:lane+hw, t1=neg?lane-hw:1, fl=s.fl[d], sd=neg?-1:1, sf=fl===0?1:fl*sd, ax=pl[pi], cnt=Math.max(1,Math.round((t1-t0)/cs));
-        for(let k=0;k<cnt;k++){ const u0=t0+(t1-t0)*k/cnt, u1=t0+(t1-t0)*(k+1)/cnt, wc=org[ax]+(u0+u1)/2, ang=((fl===0?wc:sf*wc-ph)/P)*TAU, sh=Math.sin(ang), tw=cs<.5?Math.cos(ang)*.0065:0, lo=[0,0], hi=[0,0];
+        for(let k=0;k<cnt;k++){ const u0=t0+(t1-t0)*k/cnt, u1=t0+(t1-t0)*(k+1)/cnt, wc=org[ax]+(u0+u1)/2, ang=((fl===0?wc:sf*wc-ph)/P)*TAU, sh=Math.sin(ang), tw=cs<.5?Math.cos(ang)*.0025:0, lo=[0,0], hi=[0,0];
           lo[pi]=u0; hi[pi]=u1; lo[po]=lane-hw+tw; hi[po]=lane+hw+tw; put(lo,hi,col(sh,tw)); } } }
     setVL(sampleLight(player.x,player.y+1.2,player.z)); }; }
 window.__v38={ck,neigh,segBoxes};
