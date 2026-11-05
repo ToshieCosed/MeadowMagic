@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 62: 'slime', 63: 'demon', 64: 'demon', 67: 'spider', 68: 'slime', 97: 'lost', 99: 'zombie', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
@@ -134,6 +134,70 @@
     if (SNDMAP[name]) { sfx(SNDMAP[name], X, y, Z, Math.min(1.5, vol || 1), 40); return; }
     m = /^mob\.(\w+?)\.(say|hurt|death|idle|hit|step|growl|bark|howl)$/.exec(name); if (m) { const t = { creeper: 'zombie', zombiepig: 'zombie', enderman: 'walker', cave: 'spider', witch: 'lost', villager: 'lost', silverfish: 'spider', blaze: 'demon', ghast: 'demon' }[m[1]] || m[1]; const o = sfxOut(X, y, Z, Math.min(1.2, vol || 1), 32); if (o && sfxPackMob(o, t, m[2] === 'say' ? 'idle' : m[2] === 'death' ? 'death' : 'hurt')) return; if (o && m[2] !== 'step') SND.hurt(o, AC.currentTime); }
   }
+
+  // ---- other players: skins, poses, armour, held items, name tags ----
+  async function skinBlob(uuid, info) {
+    const srcs = []; if (info && info.url) srcs.push(info.url); srcs.push('https://crafatar.com/skins/' + String(uuid).replace(/-/g, ''));
+    for (const u of srcs) { try { const r = await fetch(u, { mode: 'cors' }); if (r.ok) return URL.createObjectURL(await r.blob()); } catch (e) { /* try the next source */ } }
+    return null;
+  }
+  async function loadSkinFor(pl) {
+    if (!S || pl.skinReq) return; const info = S.skinInfo.get(pl.uuid); if (!info && !S.names.get(pl.uuid)) return; pl.skinReq = 1;
+    let T = S.skinT.get(pl.uuid); if (!T) { const url = await skinBlob(pl.uuid, info); if (!S) return; if (url) { T = { cv: document.createElement('canvas'), tex: null, slim: false }; T.cv.width = T.cv.height = 64; try { await loadSkin(url, 'p', info && info.slim ? 'slim' : 'auto', T); } catch (e) { T = null; } URL.revokeObjectURL(url); } if (T) S.skinT.set(pl.uuid, T); }
+    if (T && S) pl.T = T;
+  }
+  async function ownSkin(uuid, info) {
+    const url = await skinBlob(uuid, info); if (!url || !S) return;
+    if (!S.skinBak) { const g = SKIN.cv.getContext('2d'); S.skinBak = { d: g.getImageData(0, 0, 64, 64), slim: SKIN.slim, custom: SKIN.custom, name: SKIN.name }; }
+    try { await loadSkin(url, 'Minecraft skin', info && info.slim ? 'slim' : 'auto'); } catch (e) { /* keep default */ } URL.revokeObjectURL(url);
+  }
+  function restoreOwnSkin(b) { if (!b) return; SKIN.cv.getContext('2d').putImageData(b.d, 0, 0); SKIN.slim = b.slim; SKIN.custom = b.custom; SKIN.name = b.name; skinUpload(); }
+  function buildMcPlayers() {
+    const now = performance.now() / 1000;
+    for (const pl of S.players) { pl.n = 0; if (Math.hypot(pl.x - player.x, pl.z - player.z) > 56) continue;
+      pl.amt = lerp(pl.amt, pl.moving ? 1 : 0, .25); const ls = pl.phase, a = pl.amt, crouch = pl.sneak, sw = pl.swingT > 0 ? 1 - pl.swingT / .25 : 0, hs = pl.eq[0] && toStack(pl.eq[0]);
+      const BASE = mc(mT(pl.x, pl.y, pl.z), mY(pl.face), mT(0, .9, 0), mX(pl.sprint && !crouch ? .12 : 0), mT(0, -.9, 0), mS(PX));
+      const part = (piv, xr, yr, zr, off) => mc(BASE, mT(piv[0] + (off ? off[0] : 0), piv[1] + (off ? off[1] : 0), piv[2] + (off ? off[2] : 0)), mZ(zr || 0), mY(yr || 0), mX(xr || 0), mT(-piv[0], -piv[1], -piv[2]));
+      let rArm = Math.cos(ls + Math.PI) * a * .9, lArm = Math.cos(ls) * a * .9, rLeg = Math.cos(ls) * 1.25 * a, lLeg = Math.cos(ls + Math.PI) * 1.25 * a, rArmZ = -(Math.cos(now * 1.8) * .05 + .05), lArmZ = Math.cos(now * 1.8) * .05 + .05;
+      rArm += Math.sin(now * 1.34) * .05; lArm -= Math.sin(now * 1.34) * .05; if (hs) rArm = rArm * .5 - Math.PI / 10; if (sw > 0) rArm -= Math.sin(sw * Math.PI) * 1.6;
+      const cb = crouch ? .5 : 0, cy = crouch ? -3.2 : 0, chy = crouch ? -4.2 : 0, clz = crouch ? -4 : 0; if (crouch) { rArm += .4; lArm += .4; }
+      const SL = pl.T ? pl.T.slim : SKIN.slim, aw = SL ? 3 : 4, body = mc(BASE, mT(0, 24 + cy, 0), mX(cb), mT(0, -24, 0)), head = mc(BASE, mT(0, 24 + chy, 0), mT(0, -24, 0));
+      const rA = part([-5, 22, 0], rArm, 0, rArmZ, [0, cy, 0]), lA = part([5, 22, 0], lArm, 0, lArmZ, [0, cy, 0]), rL = part([-2, 12, 0], rLeg, 0, 0, [0, -.2 * (crouch ? 1 : 0), clz]), lL = part([2, 12, 0], lLeg, 0, 0, [0, -.2 * (crouch ? 1 : 0), clz]);
+      const B = pl.buf; let n = 0;
+      n = skinBox(B, n, head, -4, 24, -4, 8, 8, 8, 0, 0, 0); n = skinBox(B, n, head, -4, 24, -4, 8, 8, 8, 32, 0, .5);
+      n = skinBox(B, n, body, -4, 12, -2, 8, 12, 4, 16, 16, 0); n = skinBox(B, n, body, -4, 12, -2, 8, 12, 4, 16, 32, .25);
+      n = skinBox(B, n, rA, -4 - aw, 12, -2, aw, 12, 4, 40, 16, 0); n = skinBox(B, n, rA, -4 - aw, 12, -2, aw, 12, 4, 40, 32, .25);
+      n = skinBox(B, n, lA, 4, 12, -2, aw, 12, 4, 32, 48, 0); n = skinBox(B, n, lA, 4, 12, -2, aw, 12, 4, 48, 48, .25);
+      n = skinBox(B, n, rL, -4, 0, -2, 4, 12, 4, 0, 16, 0); n = skinBox(B, n, rL, -4, 0, -2, 4, 12, 4, 0, 32, .25);
+      n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 16, 48, 0); n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 0, 48, .25); pl.n = n / 6;
+      setVL(sampleLight(pl.x, pl.y + 1.2, pl.z));
+      const col = i => { const it = pl.eq[i]; if (!it) return null; const st = toStack(it); return st && ITEMS[st.id] && ITEMS[st.id].col; }, ab = (M, mn, mx, c) => emitBox(dynVB, mn, mx, c, (x, y, z) => ap(M, x, y, z));
+      if (col(4)) ab(head, [-4.6, 23.4, -4.6], [4.6, 32.6, 4.6], col(4));
+      if (col(3)) { ab(body, [-4.6, 11.6, -2.6], [4.6, 24.4, 2.6], col(3)); ab(rA, [-4.6 - aw, 17, -2.6], [-3.4, 24.4, 2.6], col(3)); ab(lA, [3.4, 17, -2.6], [4.6 + aw, 24.4, 2.6], col(3)); }
+      if (col(2)) { ab(body, [-4.4, 11.6, -2.4], [4.4, 14.5, 2.4], col(2)); ab(rL, [-4.4, 4, -2.4], [.1, 12.2, 2.4], col(2)); ab(lL, [-.1, 4, -2.4], [4.4, 12.2, 2.4], col(2)); }
+      if (col(1)) { ab(rL, [-4.5, -.1, -2.5], [.2, 4.4, 2.5], col(1)); ab(lL, [-.2, -.1, -2.5], [4.5, 4.4, 2.5], col(1)); }
+      if (hs) { const d = dispOf(hs.id), M = mc(rA, mT(-4 - aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, hs.id, mc(mT(0, 0, 0), M)); } }
+  }
+  function drawMcPlayers() {
+    if (cam.photoHide) return; const keep = SKIN.tex, hurt = player.hurtT; player.hurtT = 9;
+    for (const pl of S.players) if (pl.n > 0) { SKIN.tex = pl.T && pl.T.tex || keep; drawSkinMesh(pl.buf, pl.n, Array.from(sampleLight(pl.x, pl.y + 1.2, pl.z)), 1, false); }
+    SKIN.tex = keep; player.hurtT = hurt;
+  }
+  function tagColor(nm) { let h = 0; for (const c of nm) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `hsl(${h % 360},80%,74%)`; }
+  function tagLoop() {
+    if (!S) return; S.tagRaf = requestAnimationFrame(tagLoop);
+    let box = document.getElementById('mcTags'); if (!box) { box = document.createElement('div'); box.id = 'mcTags'; box.style.cssText = 'position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden'; document.body.appendChild(box); }
+    const show = window.__mcTags !== false && S.world && mode === 'play'; box.style.display = show ? '' : 'none'; if (!show) return;
+    const items = S.players.map(p => ({ k: p.eid, nm: S.names.get(p.uuid) || '', x: p.x, y: p.y, z: p.z }));
+    if (cam.mode !== 'fp' && S.o.name) items.push({ k: 'me', nm: S.o.name, x: player.x, y: player.y, z: player.z });
+    const live = new Set();
+    for (const it of items) { if (!it.nm) continue; live.add(it.k); let el = S.tags.get(it.k);
+      if (!el) { el = document.createElement('div'); el.textContent = it.nm; el.style.cssText = 'position:absolute;left:0;top:0;font:600 11px/1 system-ui,sans-serif;padding:2px 6px;border-radius:9px;background:rgba(10,14,20,.42);white-space:nowrap;text-shadow:0 1px 2px #000a;will-change:transform'; el.style.color = tagColor(it.nm); box.appendChild(el); S.tags.set(it.k, el); }
+      const d = Math.hypot(it.x - player.x, it.z - player.z), p = toScreen(it.x, it.y + 2.3, it.z);
+      if (!(p[2] > 0) || p[0] < -80 || p[1] < -30 || p[0] > innerWidth + 80 || p[1] > innerHeight + 30 || d > 48) { el.style.display = 'none'; continue; }
+      el.style.display = ''; el.style.opacity = d < 24 ? .95 : Math.max(.25, .95 - (d - 24) / 30); el.style.transform = `translate(${Math.round(p[0])}px,${Math.round(p[1])}px) translate(-50%,-100%)`; }
+    for (const [k, el] of S.tags) if (!live.has(k)) { el.remove(); S.tags.delete(k); }
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -186,6 +250,8 @@
       upload(crMesh, crVB, gl.STREAM_DRAW);
     },
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
+    buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
+    drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) drawMcPlayers(); },
     stepHealth(dt) { player.hurtT += dt; },
     stepDecay() {},
     dropHeld(all) { if (!held()) return; S.client.api.dig(all ? 3 : 4, 0, 0, 0, 0); S.client.api.swing(); },
@@ -255,9 +321,15 @@
         e.mcCell = [X, y, Z]; e.text = text; e.frame = 'wood'; e.bg = 'planks'; world.decor.push(e); world.changed = true; },
       block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); },
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
-      playerInfo(u, n) { if (n) S.names.set(u, n); else S.names.delete(u); },
+      playerInfo(u, n, sk) { if (n) { S.names.set(u, n); if (sk) S.skinInfo.set(u, sk); const me = S.o.name && n.toLowerCase() === String(S.o.name).toLowerCase(); if (me) { S.ownUuid = u; ownSkin(u, sk); } for (const pl of S.players) if (pl.uuid === u) loadSkinFor(pl); } else S.names.delete(u); },
+      flags(id, v) { const m = S.ents.get(id); if (m && m.pl) { m.sneak = !!(v & 2); m.sprint = !!(v & 8); } },
+      equip(id, sl, it) { const m = S.ents.get(id); if (m && m.pl && sl >= 0 && sl < 5) m.eq[sl] = it; },
+      anim(id, a) { const m = S.ents.get(id); if (m && m.pl && a === 0) m.swingT = .25; },
       spawn(e) {
-        if (!S.world) return; const type = e.kind === 'player' ? 'lost' : LIVING[e.type]; if (!type) return; if (e.eid === S.eid) return;
+        if (!S.world) return; if (e.eid === S.eid) return;
+        if (e.kind === 'player') { const x = e.x + S.OX, z = e.z + S.OZ, pl = { pl: 1, eid: e.eid, uuid: e.uuid, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, moving: false, phase: 0, amt: 0, swingT: 0, sneak: false, sprint: false, eq: [null, null, null, null, null], buf: new Float32Array(6 * 6 * 6 * 16), n: 0 };
+          S.ents.set(e.eid, pl); S.players.push(pl); loadSkinFor(pl); return; }
+        const type = LIVING[e.type]; if (!type) return;
         const x = e.x + S.OX, z = e.z + S.OZ, m = { eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
@@ -265,7 +337,7 @@
       look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
       teleport(id, x, y, z, yaw) { { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
-      destroy(l) { for (const id of l) { const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
+      destroy(l) { for (const id of l) { const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;
   }
@@ -285,24 +357,27 @@
     if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4; p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
       if (!p.inWater && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
+    for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
+      let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
   }
 
+  MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), dig: null };
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
     MCE.active = true; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
-    S.t1 = setInterval(tick, 33);
+    S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && mode === 'play' && Hd.cur) { const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; cl.sendPos(x, player.y, z, -player.face * 180 / Math.PI, 0, !!player.onGround); } }, 50);
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
-    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
+    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];

@@ -81,3 +81,9 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - More mob types map onto Strata mobs (giant, magma cube, dragon/wither, endermite, guardian, snow golem, iron golem).
 - Strata's wall-climbing is OFF in Minecraft mode (setting: "Wall climbing in Minecraft mode"), and horizontal speed is capped to Minecraft's (walk 4.4, sprint 5.7, sneak 1.4 b/s) with dash disabled, so servers stop rubber-banding sprinting.
 - Not yet: other players' bodies (name tags, armor, held items, poses via `entity_equipment`/metadata), arrows and other projectiles, textured 3D drop/hand items.
+
+## Stage 9 (1.8): other players
+- Players are drawn with Strata's own skin renderer: skin from the `player_info` `textures` property (fetched directly, falling back to crafatar by UUID; if both fail the default Strata skin is used), slim/classic arms, walk/sneak/sprint/swing poses (`entity_metadata` flags, `animation`), armour and held item from `entity_equipment`. Your own skin is taken from your own `player_info` entry and restored on disconnect.
+- Name tags: small DOM labels above every player (and you, in third person), coloured per name, fading with distance. Pause menu: "Player name tags (Minecraft mode)".
+- `loadSkin`/`skinUpload` now take an optional target so any number of skins can exist.
+- Not yet: skin fetching through the relay (if both direct sources are CORS-blocked), capes, other players' crouch-hit boxes, mob models beyond Strata's own archetypes.

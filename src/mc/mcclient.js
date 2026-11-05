@@ -184,7 +184,7 @@
         } return;
         case 'entity_metadata': if (P === 47 && H && H.meta) {
           const eid = r.vi(); for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
-            if (t === 0) r.i8(); else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; }
+            if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); } else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; }
         } return;
         case 'collect': if (P === 47 && H && H.collect) { const a = r.vi(); H.collect(a, r.vi()); } return;
         case 'named_sound_effect': if (P === 47 && H && H.sound) { const nm = r.str(), x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(); H.sound(nm, x, y, z, v, r.b() / 63); } return;
@@ -192,6 +192,8 @@
           const x = r.f32(), y = r.f32(), z = r.f32(), rad = r.f32(), n = r.d.getInt32(r.p); r.p += 4; const rec = []; for (let i = 0; i < n; i++) rec.push([r.i8(), r.i8(), r.i8()]);
           H.explosion(x, y, z, rad, rec, r.f32(), r.f32(), r.f32());
         } return;
+        case 'entity_equipment': if (P === 47 && H && H.equip) { const eid = r.vi(), sl = r.i16(); H.equip(eid, sl, slot18(r)); } return;
+        case 'animation': if (P === 47 && H && H.anim) { const eid = r.vi(); H.anim(eid, r.b()); } return;
         case 'block_change': if (P === 47 && H && H.block) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
           const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;
@@ -218,7 +220,7 @@
         case 'entity_destroy': if (P === 47 && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
         case 'player_info': if (P === 47 && H && H.playerInfo) {
           const act = r.vi(), n = r.vi();
-          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); for (let k = 0; k < pc; k++) { r.str(); r.str(); if (r.bool()) r.str(); } r.vi(); r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm); } else if (act === 4) H.playerInfo(u, null); else if (act === 1 || act === 2) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
+          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } r.vi(); r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm, sk); } else if (act === 4) H.playerInfo(u, null); else if (act === 1 || act === 2) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
         } return;
         case 'start_configuration': out('configuration_acknowledged'); state = 'config'; return;
         case 'resource_pack_send': { const u = r.str(), h = r.str(); resourcePack({}, h); return; }
