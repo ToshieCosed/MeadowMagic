@@ -9279,7 +9279,7 @@ const MODELS={
    P([-1,4,-10],[2,8,2],[9,18],{rot:[['x',tail,12,-9]]})]}; },
  slime:(m)=>{ const sq=m.onGround?.06:-.04; return {k:.125,tex:'slime',sy:1+sq*2,parts:[ P([-3,1,-3],[6,6,6],[0,16]), P([-3.3,4.1,1.5],[2,2,2],[32,0]), P([1.3,4.1,1.5],[2,2,2],[32,4]), P([-.5,3,2.5],[1,1,1],[32,8])],
    outer:[P([-4,0,-4],[8,8,8],[0,0])]}; } };
-const modelFor=m=>{ const f=MODELS[m.type]; if(!f||!PACK.on) return null; const tk=m.type==='wolf'&&m.tame&&ENT.wolf_tame?'wolf_tame':m.type; if(!ENT[tk]&&!ENT[m.type]) return null; return f; };
+const modelFor=m=>{ if(m.type==='mcgeneric'&&ENT.mcgeneric&&MODELS.mcgeneric) return MODELS.mcgeneric; const f=MODELS[m.type]; if(!f||!PACK.on) return null; const tk=m.type==='wolf'&&m.tame&&ENT.wolf_tame?'wolf_tame':m.type; if(!ENT[tk]&&!ENT[m.type]) return null; return f; };
 
 // ---- geometry ----
 function boxQuads(out,pt,xf,tw,th,rw,rh){ const [x0a,y0a,z0a]=pt.p, [w,h,d]=pt.s, g=pt.g||0, x0=x0a-g,y0=y0a-g,z0=z0a-g,x1=x0a+w+g,y1=y0a+h+g,z1=z0a+d+g;
@@ -9297,8 +9297,8 @@ function partsOut(parts,m,K,sy,tex,out,ref){ const e=ENT[tex]; const rw=ref||64,
 // ---- drawing ----
 const skinned=m=>!!modelFor(m);
 { const _em=emitMob; emitMob=function(vb,m){ if(skinned(m)) return; return _em.apply(this,arguments); }; }
-function drawSkins(){ if(!PACK.on||!world||!mobs.length) return; let used=false, wasCull=false; const p=player;
-  for(const m of mobs){ if(Math.hypot(m.x-p.x,m.z-p.z)>56) continue; const f=modelFor(m); if(!f) continue; const M=f(m); const tk=M.tex; if(!ENT[tk]) continue;
+function drawSkins(){ const cm=window.__cmobs, list=cm?(mobs.length?mobs.concat(cm):cm):mobs; if((!PACK.on&&!(cm&&ENT.mcgeneric))||!world||!list.length) return; let used=false, wasCull=false; const p=player;
+  for(const m of list){ if(Math.hypot(m.x-p.x,m.z-p.z)>56) continue; const f=modelFor(m); if(!f) continue; const M=f(m); const tk=M.tex; if(!ENT[tk]) continue;
     if(!used){ used=true; gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform3fv(TU.uFog,FOG); const fr=world.radius*CS; gl.uniform2f(TU.uFocus,cam.tx??player.x,cam.tz??player.z); gl.uniform2f(TU.uFogR,fr-22,fr-6); gl.bindVertexArray(skVAO); wasCull=gl.isEnabled(gl.CULL_FACE); gl.disable(gl.CULL_FACE); }
     const L=sampleLight(m.x,m.y+.6,m.z), hurt=m.hurtT>.18?[1,.45,.45]:m.frozen>0?[.7,.8,1.1]:[1,1,1];
     const lit=[Math.min(1.1,(L[0]/255*SUNV[0]+L[4]/255+.04)),Math.min(1.1,(L[1]/255*SUNV[1]+L[5]/255+.04)),Math.min(1.1,(L[2]/255*SUNV[2]+L[6]/255+.04))];
@@ -10329,7 +10329,7 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
   const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin'];
-  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 62: 'slime', 63: 'demon', 64: 'demon', 67: 'spider', 68: 'slime', 97: 'lost', 99: 'zombie', 50: 'zombie', 58: 'walker', 56: 'demon', 61: 'demon', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
+  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 62: 'slime', 63: 'mcgeneric', 64: 'mcgeneric', 67: 'mcgeneric', 68: 'mcgeneric', 97: 'mcgeneric', 99: 'mcgeneric', 50: 'mcgeneric', 58: 'walker', 56: 'mcgeneric', 61: 'mcgeneric', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
   let S = null;
 
   // ---- late block registration (ids 8192+), removed again on stop ----
@@ -10523,6 +10523,16 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
       el.style.display = ''; el.style.opacity = d < 24 ? .95 : Math.max(.25, .95 - (d - 24) / 30); el.style.transform = `translate(${Math.round(p[0])}px,${Math.round(p[1])}px) translate(-50%,-100%)`; }
     for (const [k, el] of S.tags) if (!live.has(k)) { el.remove(); S.tags.delete(k); }
   }
+  // Strata's own stand-in for server mobs it has no model for: the zombie model with a speckled green skin made here (a resource pack can't replace it)
+  function ensureGeneric() {
+    if (!window.__ENT || __ENT.mcgeneric || !__skins.MODELS.zombie) return;
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), pal = [[62, 142, 64], [46, 114, 54], [92, 172, 86], [32, 92, 44], [74, 156, 70]];
+    const h = (x, y, k) => { let v = (x * 374761393 + y * 668265263 + k * 144665) >>> 0; v = (v ^ (v >>> 13)) * 1274126177 >>> 0; return ((v ^ (v >>> 16)) >>> 0) / 4294967295; };
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const a = h(x >> 1, y >> 1, 1), b = h(x, y, 2), col = pal[Math.min(4, (a * 5) | 0)], d = b > .86 ? 1.25 : b < .14 ? .72 : 1; g.fillStyle = `rgb(${Math.min(255, col[0] * d) | 0},${Math.min(255, col[1] * d) | 0},${Math.min(255, col[2] * d) | 0})`; g.fillRect(x, y, 1, 1); }
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    gl.activeTexture(gl.TEXTURE0); __ENT.mcgeneric = { tex: t, w: 64, h: 64 };
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -10678,7 +10688,7 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
   }
 
   function tick() {   // entity smoothing + our position to the server
-    const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now;
+    const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now; ensureGeneric();
     if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4; p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
       if (!p.inWater && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
@@ -10692,7 +10702,7 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
     S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
-    MCE.active = true; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
+    MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
@@ -10702,7 +10712,7 @@ StrataMC.items18={"1":["stone","Stone",64],"2":["grass","Grass Block",64],"3":["
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
-    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
+    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];

@@ -87,3 +87,6 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 - Name tags: small DOM labels above every player (and you, in third person), coloured per name, fading with distance. Pause menu: "Player name tags (Minecraft mode)".
 - `loadSkin`/`skinUpload` now take an optional target so any number of skins can exist.
 - Not yet: skin fetching through the relay (if both direct sources are CORS-blocked), capes, other players' crouch-hit boxes, mob models beyond Strata's own archetypes.
+
+## Stage 10: generic fallback mob (compat only)
+Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the zombie model with a speckled green texture generated at runtime (`ENT.mcgeneric`). It is removed on disconnect and never exists outside compat mode. Compat mobs are now drawn by `drawSkins` through `window.__cmobs`.
