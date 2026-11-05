@@ -1787,7 +1787,7 @@ class VB{ constructor(){this.alloc(1<<19);this.n=0;}
    • sky light falls straight down until something blocks it, then spreads 1 level per block
    • block light from torches and lit crucibles spreads 2 levels per block
    Coloured glass multiplies the channels passing through it, so sun or torchlight behind red glass comes out red. */
-const LOPQ=new Uint8Array(8192), LATT=new Uint8Array(8192), TINT=[], EMIT=[], WATERY=new Uint8Array(8192), LAVAID=new Uint8Array(8192);
+const LOPQ=new Uint8Array(65536), LATT=new Uint8Array(65536), TINT=[], EMIT=[], WATERY=new Uint8Array(65536), LAVAID=new Uint8Array(65536);   // sized for every possible 16-bit block id (compat ids live above 8191)
 for(const bd of BLOCKS) if(bd){ LOPQ[bd.id]=bd.lightOpaque!==undefined?bd.lightOpaque:(bd.opaque?1:0); LATT[bd.id]=bd.att||0; if(bd.tint)TINT[bd.id]=bd.tint; if(bd.emit)EMIT[bd.id]=bd.emit; if(bd.wl)WATERY[bd.id]=1; if(bd.lava)LAVAID[bd.id]=1; }
 const isW=b=>b>0&&WATERY[b]===1;
 const SKYC=new Uint8Array(16), BLKC=new Uint8Array(16);
@@ -5796,7 +5796,7 @@ function doubleBroken(x,y,z,b){ const d=BLOCKS[b].dbl; if(!d) return; const oy=d
    STAGE 14: Minecraft resource packs. A pack (.zip, Java 1.13+ names, older names mostly work too) is read in the browser,
    only textures for blocks and items this game has are kept, and those are stored per world. Everything else is ignored.
    ===================================================================== */
-var PACK={on:false,name:'',worldId:null,has:new Uint8Array(8192),x:new Uint8Array(8192),tint:new Uint8Array(8192),img:{},spec:[],stats:null,busy:false};
+var PACK={on:false,name:'',worldId:null,has:new Uint8Array(65536),x:new Uint8Array(65536),tint:new Uint8Array(65536),img:{},spec:[],stats:null,busy:false};
 const PACK_SLOTS=new Uint16Array(128*128*4);
 const packTex=gl.createTexture(), slotTex=gl.createTexture();
 gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D_ARRAY,packTex); gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,1,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
@@ -6020,7 +6020,7 @@ function tn(out,t,dur,o){ const c=AC, s=c.createOscillator(); s.type=o.type||'si
   n.connect(out); s.start(t); s.stop(t+dur+.05); }
 /* ---------- block materials ---------- */
 const MATS_S=['stone','grass','dirt','gravel','sand','wood','leaves','metal','glass','wool','snow','slime','plant'];
-const MAT_OF=new Uint8Array(8192);
+const MAT_OF=new Uint8Array(65536);
 for(const bd of BLOCKS) if(bd){ const n=bd.name.toLowerCase(); let m=0;
   if(bd.leaves||bd.wart) m=6; else if(bd.crop||bd.sapling||bd.spr||bd.plant||bd.vine||bd.lily||bd.mush||bd.berry!==undefined||bd.cocoa||bd.kelp||bd.web) m=12;
   else if(/slime|bounce/.test(n)) m=11; else if(/wool|carpet|cushion|elevator|cake/.test(n)) m=9; else if(/glass|^ice|packed ice|lantern|crystal/.test(n)) m=8;
