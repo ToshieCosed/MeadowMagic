@@ -165,6 +165,10 @@
         case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
         case 'set_slot': if (P === 47 && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
         case 'spawn_entity_painting': if (P === 47 && H && H.painting) { const eid = r.vi(), title = r.str(), hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.painting(eid, title, px, py, pz, r.b()); } return;
+        case 'experience': if (P === 47 && H && H.xp) { const bar = r.f32(), lv = r.vi(); H.xp(bar, lv, r.vi()); } return;
+        case 'entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(), id = r.i8(), amp = r.i8(), dur = r.vi(); H.effect(eid, id, amp, dur); } return;
+        case 'remove_entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(); H.effect(eid, r.i8(), 0, 0); } return;
+        case 'attach_entity': if (P === 47 && H && H.attach) { const a = r.i32(), v = r.i32(); H.attach(a, v, r.bool()); } return;
         case 'open_window': if (P === 47 && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
         case 'close_window': if (P === 47 && H && H.closeWin) H.closeWin(r.b()); return;
         case 'craft_progress_bar': if (P === 47 && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;
@@ -321,6 +325,12 @@
       closeWin: v47(wid => out('close_window', new W().b(wid))),
       creative: v47((slot, item) => { const w = new W().b(slot >> 8).b(slot); slotOut(w, item); return out('set_creative_slot', w); }),
       chatCmd: t => chat(t),
+      interact: v47(eid => out('use_entity', new W().vi(eid).vi(0))),
+      look: v47((yaw, pitch, ground) => out('look', new W().f32(yaw).f32(pitch).bool(ground))),
+      steer: v47((side, fwd, flags) => out('steer_vehicle', new W().f32(side).f32(fwd).b(flags))),
+      enchant: v47((wid, i) => out('enchant_item', new W().b(wid).b(i))),
+      rename: v47(t => out('custom_payload', new W().str('MC|ItemName').str(t))),
+      payload: v47((ch, bytes) => out('custom_payload', new W().str(ch).raw(bytes))),
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }

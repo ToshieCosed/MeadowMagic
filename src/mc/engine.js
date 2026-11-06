@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv', 'techDyn'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv', 'techDyn', 'useHeld', 'stepVehicles', 'stepRide'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 54: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 58: 'walker', 120: 'lost',
     50: 'mc_creeper', 56: 'mc_ghast', 57: 'mc_pigman', 59: 'mc_cave_spider', 60: 'mc_silverfish', 61: 'mc_blaze', 62: 'mc_magma_cube', 63: 'mc_dragon', 64: 'mc_wither', 66: 'mc_witch', 67: 'mc_endermite', 68: 'mc_guardian',
     96: 'mc_mooshroom', 97: 'mc_snowman', 98: 'mc_ocelot', 99: 'mc_iron_golem', 101: 'mc_rabbit', 94: null };   // mc_* models exist only in compat mode (see CM below); anything else (fish, phantoms, ...) is skipped
@@ -28,7 +28,7 @@
   const DOORS = { 64: 'oak', 71: 'iron', 193: 'spruce', 194: 'birch', 195: 'jungle', 196: 'acacia', 197: 'dark' };
   const GATES = { 107: 'oak', 183: 'spruce', 184: 'birch', 185: 'jungle', 186: 'dark', 187: 'acacia' };
   const FENCES = { 85: 'oak', 188: 'spruce', 189: 'birch', 190: 'jungle', 192: 'acacia', 191: 'dark' };
-  const SIMPLE = { 4: 'COBBLE', 48: 'MOSSY_COBBLE', 45: 'BRICK', 24: 'SANDSTONE', 179: 'RED_SANDSTONE', 13: 'GRAVEL', 82: 'CLAY', 79: 'ICE', 49: 'OBSIDIAN', 81: 'CACTUS', 60: 'FARMLAND', 58: 'TABLE', 54: 'CHEST_WOOD', 16: 'ORE_COAL', 15: 'ORE_IRON', 14: 'ORE_GOLD', 56: 'ORE_DIAMOND', 86: 'PUMPKIN', 146: 'CHEST_WOOD' };
+  const SIMPLE = { 47: 'SHELF', 30: 'COBWEB', 39: 'MUSH_BR', 40: 'MUSH_R', 84: 'JUKEBOX', 99: 'CAP_BR', 100: 'CAP_R', 101: 'IRON_BARS', 103: 'MELON', 110: 'MYCELIUM', 111: 'LILY', 169: 'SEA_LANTERN', 174: 'PACKED_ICE', 80: 'SNOW', 4: 'COBBLE', 48: 'MOSSY_COBBLE', 45: 'BRICK', 24: 'SANDSTONE', 179: 'RED_SANDSTONE', 13: 'GRAVEL', 82: 'CLAY', 79: 'ICE', 49: 'OBSIDIAN', 81: 'CACTUS', 60: 'FARMLAND', 58: 'TABLE', 54: 'CHEST_WOOD', 16: 'ORE_COAL', 15: 'ORE_IRON', 14: 'ORE_GOLD', 56: 'ORE_DIAMOND', 86: 'PUMPKIN', 146: 'CHEST_WOOD' };
   const isDoorId = id => !!DOORS[id];
   function native(bid, meta, below) {
     const m4 = ['e', 'w', 's', 'n'];
@@ -82,6 +82,15 @@
       return shape('th' + meta, 'Tripwire hook', '#8a6a3a', [plate.concat([[150, 116, 70]]), hook.concat([[150, 150, 155]])], { solid: false }); }
     if (bid === 132) return shape('tw' + (meta & 1), 'Tripwire', '#dddddd', [[0, .06, .48, 1, .08, .52, [220, 220, 220]], [.48, .06, 0, .52, .08, 1, [220, 220, 220]]], { solid: false });
     if (bid === 151 || bid === 178) return shape('ds' + bid, 'Daylight sensor', '#c9b28a', [[0, 0, 0, 1, .375, 1, bid === 151 ? [200, 180, 140] : [90, 110, 150]]], { solid: false });
+    if (bid === 116) return shape('ench', 'Enchantment Table', '#2b1f2e', [[0, 0, 0, 1, .7, 1, [44, 30, 46]], [0, .7, 0, 1, .75, 1, [168, 34, 44]], [.06, .68, .06, .94, .7, .94, [70, 220, 210]]], { solid: true, emit: [3, 1, 4], att: 1 });
+    if (bid === 117) return shape('brew', 'Brewing Stand', '#9a8f7a', [[.4375, 0, .4375, .5625, .875, .5625, [240, 200, 90]], [.0625, 0, .375, .3125, .125, .625, [110, 110, 110]], [.6875, 0, .0625, .9375, .125, .3125, [110, 110, 110]], [.6875, 0, .6875, .9375, .125, .9375, [110, 110, 110]], [.15, .125, .45, .25, .5, .55, [200, 220, 240]], [.75, .125, .15, .85, .5, .25, [200, 220, 240]], [.75, .125, .75, .85, .5, .85, [200, 220, 240]]], { solid: false });
+    if (bid === 145) { const x = meta & 1, dmg = meta >> 2, c = [[70, 70, 74], [80, 76, 72], [92, 82, 74]][dmg] || [70, 70, 74], r = b => x ? [b[2], b[1], b[0], b[5], b[4], b[3]] : b;
+      return shape('anvil' + meta, 'Anvil', '#46464a', [[.125, 0, .125, .875, .25, .875], [.25, .25, .3125, .75, .3125, .6875], [.375, .3125, .3125, .625, .625, .6875], [0, .625, .1875, 1, 1, .8125]].map(b => r(b).concat([c])), { solid: true }); }
+    if (bid === 118) { const lv = meta & 3, c = [58, 58, 64], bx = [[0, 0, 0, 1, .3, 1, c], [0, .3, 0, .125, 1, 1, c], [.875, .3, 0, 1, 1, 1, c], [.125, .3, 0, .875, 1, .125, c], [.125, .3, .875, .875, 1, 1, c]];
+      if (lv) bx.push([.125, .3, .125, .875, .3 + lv * .2, .875, [52, 92, 210]]); return shape('caul' + lv, 'Cauldron', '#3a3a40', bx, { solid: true }); }
+    if (bid === 154) return shape('hop', 'Hopper', '#4a4a4f', [[0, .625, 0, 1, 1, 1, [74, 74, 80]], [.25, .25, .25, .75, .625, .75, [66, 66, 72]], [.375, 0, .375, .625, .25, .625, [60, 60, 66]]], { solid: true });
+    if (bid === 120) return shape('epf' + (meta & 4), 'End Portal Frame', '#7a8a6a', [[0, 0, 0, 1, .8125, 1, [86, 118, 96]]].concat(meta & 4 ? [[.25, .8125, .25, .75, 1, .75, [40, 110, 90]]] : []), { solid: true });
+    if (bid === 122) return shape('egg', 'Dragon Egg', '#180c22', [[.375, 0, .375, .625, .0625, .625], [.25, .0625, .25, .75, .25, .75], [.125, .25, .125, .875, .75, .875], [.25, .75, .25, .75, .9375, .75], [.375, .9375, .375, .625, 1, .625]].map(b => b.concat([[24, 12, 34]])), { solid: true });
     // plants: Strata's own sprites instead of the grass stand-in
     if (bid === 83) return B.SUGAR_CANE || null;
     if (bid === 31) return [B.DEAD_BUSH, B.TALLGRASS, B.FERN][meta & 3] || B.TALLGRASS;
@@ -147,8 +156,8 @@
         const nm = it[1].toLowerCase().replace('cap', 'helmet').replace('tunic', 'chestplate').replace('pants', 'leggings').replace('golden', 'gold'); sid = S.byName.get(nm) || S.byName.get(it[1].toLowerCase()) || 0; }
     }
     if (!sid) { const vr = VARIANT[it[0]], d = mc.damage | 0, vk = vr ? Object.keys(VARIANT).indexOf(it[0]) : -1;
-      sid = vr ? 50000 + vk * 16 + (it[0] === 'potion' ? ((d & 16384) ? 1 : 0) : d & 15) : 30000 + mc.id;   // items whose damage picks a different look get their own entry
-      if (!ITEMS[sid]) { const v = vr && vr(d); ITEMS[sid] = { name: v && v[1] || it[1], stack: it[2] || 64, mcCompat: 1, cat: 'compat', mcTex: v && v[0] || it[3] || it[0], mcName: it[0] }; S.items.push(sid); } }
+      sid = it[0] === 'potion' ? 52000 + (d & 15) + ((d & 16384) ? 16 : 0) : vr ? 50000 + vk * 16 + (d & 15) : 30000 + mc.id;   // items whose damage picks a different look get their own entry
+      if (!ITEMS[sid]) { const v = vr && vr(d); ITEMS[sid] = { name: v && v[1] || it[1], stack: it[2] || 64, mcCompat: 1, cat: 'compat', mcTex: v && v[0] || it[3] || it[0], mcName: it[0] }; if (it[0] === 'potion') { const pe = POTION[d & 15]; ITEMS[sid].potionCol = pe ? pe[1] : '#385dc6'; } S.items.push(sid); } }
     S.itemMap.set(key, sid); return sid;
   }
   const DYES16 = ['black', 'red', 'green', 'brown', 'blue', 'purple', 'cyan', 'silver', 'gray', 'pink', 'lime', 'yellow', 'light_blue', 'magenta', 'orange', 'white'], DYE_NM = ['Ink Sac', 'Rose Red', 'Cactus Green', 'Cocoa Beans', 'Lapis Lazuli', 'Purple Dye', 'Cyan Dye', 'Light Gray Dye', 'Gray Dye', 'Pink Dye', 'Lime Dye', 'Dandelion Yellow', 'Light Blue Dye', 'Magenta Dye', 'Orange Dye', 'Bone Meal'];
@@ -156,7 +165,9 @@
     dye: d => ['dye_powder_' + DYES16[d & 15], DYE_NM[d & 15]], coal: d => d === 1 ? ['charcoal', 'Charcoal'] : ['coal', 'Coal'],
     fish: d => [['fish_cod_raw', 'Raw Fish'], ['fish_salmon_raw', 'Raw Salmon'], ['fish_clownfish_raw', 'Clownfish'], ['fish_pufferfish_raw', 'Pufferfish']][d & 3],
     cooked_fish: d => [['fish_cod_cooked', 'Cooked Fish'], ['fish_salmon_cooked', 'Cooked Salmon']][d & 1] || ['fish_cod_cooked', 'Cooked Fish'],
-    golden_apple: d => ['apple_golden', d === 1 ? 'Enchanted Golden Apple' : 'Golden Apple'], potion: d => (d & 16384) ? ['potion_bottle_splash', 'Splash Potion'] : ['potion_bottle_drinkable', d === 0 ? 'Water Bottle' : 'Potion'] };
+    golden_apple: d => ['apple_golden', d === 1 ? 'Enchanted Golden Apple' : 'Golden Apple'],
+    potion: d => { const pe = POTION[d & 15], sp = (d & 16384) !== 0; return [sp ? 'potion_bottle_splash' : 'potion_bottle_drinkable', d === 0 ? 'Water Bottle' : (sp ? 'Splash ' : '') + (pe ? 'Potion of ' + pe[0] : 'Potion')]; } };
+  const POTION = { 1: ['Regeneration', '#cd5cab'], 2: ['Swiftness', '#7cafc6'], 3: ['Fire Resistance', '#e49a3a'], 4: ['Poison', '#4e9331'], 5: ['Healing', '#f82423'], 6: ['Night Vision', '#1f1fa1'], 8: ['Weakness', '#484d48'], 9: ['Strength', '#932423'], 10: ['Slowness', '#5a6c81'], 11: ['Leaping', '#22ff4c'], 12: ['Harming', '#430a09'], 13: ['Water Breathing', '#2e5299'], 14: ['Invisibility', '#7f8392'] };
   const toStack = mc => { if (!mc) return null; const id = strataItem(mc), t = ITEMS[id]; return { id, n: mc.count, d: t && t.dur ? t.dur : undefined, mc }; };
   function syncInv() {
     if (!S.world) return;
@@ -431,7 +442,8 @@
     window.__cmModel = null; for (const k of s.cmMob || []) delete MOB[k];
     for (const k in __ENT) if (k.startsWith('mcf_')) { try { gl.deleteTexture(__ENT[k].tex); } catch (e) { /* gone */ } delete __ENT[k]; }
     for (let i = arrows.length - 1; i >= 0; i--) if (arrows[i].mc) arrows.splice(i, 1);
-    const hc = document.getElementById('mcHunger'); if (hc) hc.remove();
+    for (let i = vehicles.length - 1; i >= 0; i--) if (vehicles[i].mc) vehicles.splice(i, 1); if (player.mount && player.mount.mc) { player.mount = null; player.sitting = false; }
+    const hc = document.getElementById('mcHunger'); if (hc) hc.remove(); const fx = document.getElementById('mcFx'); if (fx) fx.remove();
   }
   // ---- Minecraft-style inventory and container screens (compat only) -------------------------------------------------
   // Every slot here is the server's: clicks go out as window_click and the screen redraws from window_items/set_slot.
@@ -445,7 +457,7 @@
   const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
   function mcInvEl() {
     let el = document.getElementById('mcInv'); if (el) return el;
-    if (!document.getElementById('mcInvCss')) { const st = document.createElement('style'); st.id = 'mcInvCss'; st.textContent = '#mcInv .mcBody{overflow:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:12px}#mcInv .mcTop{display:flex;gap:16px;align-items:center;flex-wrap:wrap}#mcInv .mcG{display:grid;gap:4px}#mcInv .mcArrow{font-size:22px;color:var(--muted);position:relative}#mcInv .mcBar{display:block;height:5px;border-radius:3px;background:#0005;overflow:hidden;width:46px;margin-top:4px}#mcInv .mcBar i{display:block;height:100%;background:#f0b23a}#mcInv .lbl{font-size:10px;color:var(--muted);text-align:center;line-height:1.1}#mcInv h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}#mcInv .mcCat{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px;max-height:220px;overflow:auto}'; document.head.appendChild(st); }
+    if (!document.getElementById('mcInvCss')) { const st = document.createElement('style'); st.id = 'mcInvCss'; st.textContent = '#mcInv .mcBody{overflow:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:12px}#mcInv .mcTop{display:flex;gap:16px;align-items:center;flex-wrap:wrap}#mcInv .mcTop>.islot,#mcInv .mcG>.islot{width:52px;height:52px;flex:0 0 auto}#mcInv .mcG{display:grid;gap:4px}#mcInv .mcArrow{font-size:22px;color:var(--muted);position:relative}#mcInv .mcBar{display:block;height:5px;border-radius:3px;background:#0005;overflow:hidden;width:46px;margin-top:4px}#mcInv .mcBar i{display:block;height:100%;background:#f0b23a}#mcInv .lbl{font-size:10px;color:var(--muted);text-align:center;line-height:1.1}#mcInv h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}#mcInv .mcCat{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px;max-height:220px;overflow:auto}'; document.head.appendChild(st); }
     el = document.createElement('section'); el.id = 'mcInv'; el.className = 'panel'; el.hidden = true; el.setAttribute('aria-label', 'Inventory');
     el.innerHTML = '<header><h2 id="mcInvTitle">Inventory</h2><span id="mcHold"></span><span class="seg small" id="mcTap" role="radiogroup" aria-label="What a tap does"><button data-t="stack" aria-pressed="true">Tap: whole stack</button><button data-t="one" aria-pressed="false">Tap: one item</button><button data-t="quick" aria-pressed="false">Tap: send across</button></span><button class="ghost" id="mcCre" hidden aria-pressed="false">Creative items</button><button class="primary" id="mcInvDone">Done</button></header><div class="mcBody"><div id="mcCatBox" hidden><h3>Creative items</h3><input type="text" id="mcCatQ" placeholder="Search items" aria-label="Search items" style="margin-bottom:6px"><div class="mcCat" id="mcCat"></div></div><div class="mcTop" id="mcTop"></div><div><h3>Inventory</h3><div class="grid9" id="mcMain"></div></div><div><h3>Hotbar</h3><div class="grid9" id="mcHot"></div></div></div>';
     document.body.appendChild(el);
@@ -480,6 +492,8 @@
       const off = winOff(), inv0 = k >= off ? (k - off < 27 ? 9 + (k - off) : 36 + (k - off - 27)) : (!W && k >= 5 && k <= 8 ? k : -1);
       if (inv0 >= 0) { S.client.api.creative(inv0, withN(S.ccur, S.ccur.count)); if (t === 'one') S.ccur = withN(S.ccur, 1); else S.ccur = null; mcInvRender(); } return; }
     const before = A[k] || null, act = S.action++;
+    if (W && (W.kind === 'anvil' || W.kind === 'trade' || W.kind === 'enchant' || W.kind === 'brew' || W.kind === 'furnace') && outSlots(W).includes(k) && t !== 'quick') {   // outputs with costs/rules we don't model: let the server answer with the whole window
+      S.waitAct = act; clearTimeout(S.waitT); S.waitT = setTimeout(() => onTrans(0, S.waitAct, true), 2500); S.client.api.click(k, t === 'one' ? 1 : 0, act, 0, withN({ id: 1, damage: 0 }, 65), wid); return; }
     if (t === 'quick') {   // shift-click: too many container rules to predict, so the click carries a deliberately different item and the server answers with the whole window
       S.waitAct = act; clearTimeout(S.waitT); S.waitT = setTimeout(() => onTrans(0, S.waitAct, true), 2500); S.client.api.click(k, 0, act, 1, withN({ id: 1, damage: 0 }, 65), wid); return; }
     const button = t === 'one' ? 1 : 0; S.client.api.click(k, button, act, 0, before, wid);
@@ -494,7 +508,7 @@
   const grid = (cols) => { const g = document.createElement('div'); g.className = 'mcG'; g.style.gridTemplateColumns = `repeat(${cols},minmax(0,52px))`; return g; };
   const arrow = (pct) => { const a = document.createElement('span'); a.className = 'mcArrow'; a.textContent = '→'; if (pct != null) { const b = document.createElement('span'); b.className = 'mcBar'; b.innerHTML = `<i style="width:${Math.round(pct * 100)}%"></i>`; a.appendChild(b); } return a; };
   function mcInvRender() {
-    const el = document.getElementById('mcInv'); if (!el || el.hidden) return; const W = S.win, top = el.querySelector('#mcTop'), cre = world.meta.gameMode === 'creative'; top.innerHTML = '';
+    const el = document.getElementById('mcInv'); if (!el || el.hidden) return; if (S.win && S.win.kind === 'anvil' && document.activeElement && document.activeElement.closest && document.activeElement.closest('#mcTop')) S.win.focus = true; const W = S.win, top = el.querySelector('#mcTop'), cre = world.meta.gameMode === 'creative'; top.innerHTML = '';
     el.querySelector('#mcInvTitle').textContent = W ? WTITLE[W.title] || (W.title || 'Container').replace(/^container\./, '') : 'Inventory';
     const cur = S.ccur || S.cursor, cs = cur && toStack(cur); el.querySelector('#mcHold').innerHTML = cs ? `<small class="hint">Holding</small> ${slotHTML({ ...cs, n: 1 }).replace(/<span class="dur".*$/, '')} <small></small>` : '<small class="hint">Tap to pick up, tap again to put down. Hold a slot to move one item.</small>';
     if (cs) el.querySelector('#mcHold small:last-child').textContent = mcName(cur) + (cur.count > 1 ? ' x' + cur.count : '');
@@ -505,8 +519,8 @@
     else if (kind === 'craft3') { const g = grid(3); for (let i = 1; i <= 9; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); }
     else if (kind === 'furnace') { const p = W.prop || {}, g = grid(1); mcSlot(g, 0, { lbl: 'Smelt' }); const fl = document.createElement('span'); fl.className = 'lbl'; fl.textContent = p[1] ? '🔥 ' + Math.round(100 * (p[0] || 0) / p[1]) + '%' : ''; g.appendChild(fl); mcSlot(g, 1, { lbl: 'Fuel' }); top.appendChild(g); top.appendChild(arrow((p[2] || 0) / (p[3] || 200))); mcSlot(top, 2, { cls: 'out' }); }
     else if (kind === 'brew') { const g = grid(3); mcSlot(top, 3, { lbl: 'Ingredient' }); for (let i = 0; i < 3; i++) mcSlot(g, i, { lbl: 'Bottle' }); top.appendChild(arrow(W.prop && W.prop[0] ? 1 - W.prop[0] / 400 : null)); top.appendChild(g); }
-    else if (kind === 'enchant') { mcSlot(top, 0, { lbl: 'Item' }); mcSlot(top, 1, { lbl: 'Lapis' }); }
-    else if (kind === 'anvil') { mcSlot(top, 0, { lbl: 'Item' }); top.appendChild(Object.assign(document.createElement('span'), { className: 'mcArrow', textContent: '+' })); mcSlot(top, 1, { lbl: 'Add' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
+    else if (kind === 'enchant') { const g = grid(1); mcSlot(g, 0, { lbl: 'Item' }); mcSlot(g, 1, { lbl: 'Lapis' }); top.appendChild(g); enchantPanel(top, W); }
+    else if (kind === 'anvil') { mcSlot(top, 0, { lbl: 'Item' }); top.appendChild(Object.assign(document.createElement('span'), { className: 'mcArrow', textContent: '+' })); mcSlot(top, 1, { lbl: 'Add' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); anvilPanel(top, W); }
     else if (kind === 'trade') { mcSlot(top, 0, { lbl: 'Pay' }); mcSlot(top, 1, { lbl: 'Pay' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
     else { const g = grid(kind === 'grid3' ? 3 : Math.min(9, W.n)); for (let i = 0; i < W.n; i++) mcSlot(g, i); top.appendChild(g); }
     const off = winOff(), mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = '';
@@ -563,13 +577,15 @@
       const t = now + o.t0, by = o.y + .55 + Math.sin(t * 2) * .2, M = (s, a) => (x, y2, z) => { const ca = Math.cos(a), sa = Math.sin(a), X2 = x * ca - z * sa, Z2 = x * sa + z * ca, cb = Math.cos(a * .7), sb = Math.sin(a * .7); return [o.x + X2 * s, by + (y2 * cb - Z2 * sb) * s, o.z + (y2 * sb + Z2 * cb) * s]; };
       setVL(sampleLight(o.x, o.y + .5, o.z)); emitBox(vb, [o.x - .5, o.y, o.z - .5], [o.x + .5, o.y + .25, o.z + .5], [40, 40, 44], IDT);
       setVL(VL_EMISSIVE); emitBox(vb, [-.3, -.3, -.3], [.3, .3, .3], [200, 120, 220], M(1, t * 1.6)); emitBox(vb, [-.2, -.2, -.2], [.2, .2, .2], [255, 210, 255], M(1, -t * 2.2)); }
+    for (const o of S.objs.values()) { if (o.kind !== 'bobber') continue; setVL(sampleLight(o.x, o.y, o.z)); emitBox(vb, [o.x - .08, o.y, o.z - .08], [o.x + .08, o.y + .08, o.z + .08], [230, 230, 230], IDT); emitBox(vb, [o.x - .08, o.y + .08, o.z - .08], [o.x + .08, o.y + .16, o.z + .08], [210, 40, 30], IDT);
+      const hx = player.x + Math.sin(player.face) * .3, hy = player.y + 1.3, hz = player.z + Math.cos(player.face) * .3; for (let i = 0; i < 12; i++) { const t = i / 12, sag = Math.sin(t * PI) * .4, x = hx + (o.x - hx) * t, y = hy + (o.y + .16 - hy) * t - sag, z = hz + (o.z - hz) * t; emitBox(vb, [x - .012, y - .012, z - .012], [x + .012, y + .012, z + .012], [40, 40, 40], IDT); } }
     for (const k of S.beacons) { const [x, y, z] = k.split(',').map(Number); if (Math.hypot(x + .5 - p.x, z + .5 - p.z) > 96) continue;
       const below = S.mcb[world.get(x, y - 1, z)]; if (![41, 42, 57, 133].includes(below)) continue;   // vanilla needs a mineral-block base; only the top layer is checked here
       let top = y + 1; while (top < Math.min(256, y + 160) && !BLOCKS[Math.max(0, world.get(x, top, z))].opaque) top++;
       setVL(VL_EMISSIVE); const w = .14 + Math.sin(now * 3) * .015; emitBox(vb, [x + .5 - w, y + 1, z + .5 - w], [x + .5 + w, top, z + .5 + w], [210, 245, 255], IDT); emitBox(vb, [x + .5 - .05, y + 1, z + .5 - .05], [x + .5 + .05, top, z + .5 + .05], [255, 255, 255], IDT); }
   }
-  function scanBeacons(sx, sz, arr) { const id = lookup(138 << 4, 0); for (const k of [...S.beacons]) { const [x, , z] = k.split(','); if (x >> 4 === sx && z >> 4 === sz) S.beacons.delete(k); }
-    if (!id) return; for (let i = 0; i < arr.length; i++) if (arr[i] === id) { const x = sx * 16 + (i & 15), z = sz * 16 + ((i >> 4) & 15), y = i >> 8; S.beacons.add(x + ',' + y + ',' + z); } }
+  function scanBeacons(sx, sz, arr) { const id = lookup(138 << 4, 0), ie = lookup(116 << 4, 0); for (const set of [S.beacons, S.ench]) for (const k of [...set]) { const [x, , z] = k.split(','); if (x >> 4 === sx && z >> 4 === sz) set.delete(k); }
+    for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (v !== id && v !== ie) continue; const x = sx * 16 + (i & 15), z = sz * 16 + ((i >> 4) & 15), y = i >> 8; (v === id ? S.beacons : S.ench).add(x + ',' + y + ',' + z); } }
   // note blocks: the server sends note.<instrument> with a pitch; Strata plays it with a small synth and shows a note above the block
   function playNote(inst, pitch, X, y, Z, vol) {
     try { parts.push({ x: X, y: y + .9, z: Z, vx: 0, vy: 1.1, vz: 0, t: .9, c: hslRgb(((Math.log2(pitch || 1) * 12 + 12) / 24) * 360 % 360), s: .09 }); } catch (e) { /* fx */ }
@@ -580,6 +596,120 @@
     o.connect(g); g.gain.exponentialRampToValueAtTime(.001, t + (inst === 'harp' ? 1.1 : .3)); o.start(t); o.stop(t + 1.2);
   }
   const hslRgb = h => { const f = n => { const k = (n + h / 30) % 12; return Math.round(255 * (.5 - .5 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; };
+  // ---- potion effects, XP, enchanting table, enchant and anvil screens (compat only) ----
+  // 1.8 effect id -> [name, colour, icon column, icon row] (icons from the pack's gui/container/inventory.png at x*18, 198+y*18)
+  const EFFECT = { 1: ['Speed', '#7cafc6', 0, 0], 2: ['Slowness', '#5a6c81', 1, 0], 3: ['Haste', '#d9c043', 2, 0], 4: ['Mining Fatigue', '#4a4217', 3, 0], 5: ['Strength', '#932423', 4, 0], 8: ['Jump Boost', '#22ff4c', 2, 1],
+    9: ['Nausea', '#551d4a', 3, 1], 10: ['Regeneration', '#cd5cab', 7, 0], 11: ['Resistance', '#99453a', 6, 1], 12: ['Fire Resistance', '#e49a3a', 7, 1], 13: ['Water Breathing', '#2e5299', 0, 2], 14: ['Invisibility', '#7f8392', 0, 1],
+    15: ['Blindness', '#1f1f23', 5, 1], 16: ['Night Vision', '#1f1fa1', 4, 1], 17: ['Hunger', '#587653', 1, 1], 18: ['Weakness', '#484d48', 5, 0], 19: ['Poison', '#4e9331', 6, 0], 20: ['Wither', '#352a27', 1, 2],
+    21: ['Health Boost', '#f87d23', 7, 2], 22: ['Absorption', '#2552a5', 2, 2], 23: ['Saturation', '#f82423', -1, 0], 6: ['Instant Health', '#f82423', -1, 0], 7: ['Instant Damage', '#430a09', -1, 0] };
+  const ROMAN18 = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  function effectHud() {   // a column of effect icons with time left, like Strata's buff column, for the server's effects on you
+    let col = document.getElementById('mcFx'); if (!col) { col = document.createElement('div'); col.id = 'mcFx'; col.style.cssText = 'position:fixed;z-index:5;right:max(8px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);display:flex;flex-direction:column;gap:6px;pointer-events:none;align-items:flex-end'; document.body.appendChild(col); }
+    col.innerHTML = ''; const now = Date.now(), atlas = PACK && PACK.on && PACK.img && PACK.img['g/inv'];
+    for (const id in S.fx) { const e = S.fx[id], left = Math.max(0, e.end - now) / 1000; if (left <= 0 && e.dur < 32767) { delete S.fx[id]; continue; } const d = EFFECT[id] || ['Effect ' + id, '#888', -1, 0];
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:6px;background:rgba(16,21,27,.7);border:1px solid #fff2;border-radius:10px;padding:3px 8px 3px 4px;color:#e8ecf2;font:12px system-ui;text-shadow:0 1px 2px #000';
+      const ic = document.createElement('canvas'); ic.width = ic.height = 18; ic.style.cssText = 'width:24px;height:24px;image-rendering:pixelated'; const g = ic.getContext('2d');
+      if (atlas && d[2] >= 0) { const k = atlas.width / 256; g.imageSmoothingEnabled = false; g.drawImage(atlas, d[2] * 18 * k, (198 + d[3] * 18) * k, 18 * k, 18 * k, 0, 0, 18, 18); } else { g.fillStyle = d[1]; g.beginPath(); g.arc(9, 9, 8, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText(d[0][0], 9, 12); }
+      const t = e.dur >= 32767 ? '**:**' : Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0');
+      row.appendChild(ic); row.appendChild(Object.assign(document.createElement('span'), { textContent: d[0] + (e.amp > 0 ? ' ' + (ROMAN18[e.amp + 1] || e.amp + 1) : '') + ' · ' + t })); col.appendChild(row); }
+  }
+  // the enchanting table: a book floating and turning towards you, and glyphs drifting in from nearby bookshelves
+  function enchantDyn(vb) {
+    const now = performance.now() / 1000, p = player;
+    for (const k of S.ench) { const [x, y, z] = k.split(',').map(Number); const d = Math.hypot(x + .5 - p.x, z + .5 - p.z); if (d > 40) continue;
+      const near = d < 4, open = near ? Math.min(1, (S.encOpen = (S.encOpen || 0) * .9 + .1)) : 0, by = y + 1.05 + Math.sin(now * 1.6) * .06, yaw = Math.atan2(p.x - x - .5, p.z - z - .5), a = .25 + open * .9;
+      const T = (side) => (lx, ly, lz) => { const ca = Math.cos(side * a), sa = Math.sin(side * a), X0 = lx * ca, Y0 = lx * sa * side + ly; const c = Math.cos(yaw), s2 = Math.sin(yaw); return [x + .5 + X0 * c + lz * s2, by + Y0, z + .5 - X0 * s2 + lz * c]; };
+      setVL(sampleLight(x + .5, y + 1.2, z + .5)); for (const sd of [-1, 1]) { emitBox(vb, sd < 0 ? [-.32, 0, -.2] : [0, 0, -.2], sd < 0 ? [0, .03, .2] : [.32, .03, .2], [92, 56, 30], T(sd)); emitBox(vb, sd < 0 ? [-.3, .03, -.18] : [0, .03, -.18], sd < 0 ? [0, .05, .18] : [.3, .05, .18], [236, 226, 200], T(sd)); }
+      if (Math.random() < .25) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue; if (Math.random() > .04) continue; for (const dy of [0, 1]) { if (S.mcb[world.get(x + dx, y + dy, z + dz)] !== 47) continue;
+        parts.push({ x: x + dx + .5, y: y + dy + .8, z: z + dz + .5, vx: -dx * .9, vy: .35, vz: -dz * .9, t: 1.1, c: [235, 235, 255], s: .055 }); } } }
+  }
+  function enchantPanel(top, W) {   // three choices with their costs and the clue the server sent
+    const p = W.prop || {}, lap = (W.slots[1] && W.slots[1].count) || 0, lv = S.level || 0, box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1';
+    for (let i = 0; i < 3; i++) { const cost = p[i] || 0, clue = p[4 + i], en = clue != null && clue >= 0 ? (ENCH18[clue & 255] || 'Enchantment') + ' ' + (ROMAN18[clue >> 8] || '') + '…' : '', ok = cost > 0 && (world.meta.gameMode === 'creative' || (lv >= cost && lap >= i + 1));
+      const b = document.createElement('button'); b.className = ok ? 'primary' : 'ghost'; b.disabled = !ok; b.style.cssText = 'text-align:left;padding:8px 10px;width:100%';
+      b.innerHTML = cost > 0 ? `<b>${i + 1} lapis · level ${cost}</b><br><small>${en || 'Unknown enchantment'}</small>` : '<small>—</small>'; b.addEventListener('click', () => { S.client.api.enchant(W.id, i); });
+      box.appendChild(b); }
+    const xp = document.createElement('small'); xp.className = 'hint'; xp.textContent = 'Your level: ' + lv; box.appendChild(xp); top.appendChild(box);
+  }
+  const ENCH18 = { 0: 'Protection', 1: 'Fire Protection', 2: 'Feather Falling', 3: 'Blast Protection', 4: 'Projectile Protection', 5: 'Respiration', 6: 'Aqua Affinity', 7: 'Thorns', 8: 'Depth Strider', 16: 'Sharpness', 17: 'Smite', 18: 'Bane of Arthropods', 19: 'Knockback', 20: 'Fire Aspect', 21: 'Looting', 32: 'Efficiency', 33: 'Silk Touch', 34: 'Unbreaking', 35: 'Fortune', 48: 'Power', 49: 'Punch', 50: 'Flame', 51: 'Infinity', 61: 'Luck of the Sea', 62: 'Lure' };
+  function anvilPanel(top, W) {   // rename field and the level cost (window property 0)
+    const box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:200px;flex:1';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 30; inp.placeholder = 'Rename (optional)'; inp.value = W.name || ''; inp.setAttribute('aria-label', 'New name');
+    inp.addEventListener('keydown', e => e.stopPropagation()); inp.addEventListener('input', () => { W.name = inp.value; clearTimeout(W.nt); W.nt = setTimeout(() => S.client.api.rename(inp.value), 250); });
+    const cost = (W.prop || {})[0] || 0, c = document.createElement('small'); c.className = 'hint'; c.style.color = cost && cost > (S.level || 0) && world.meta.gameMode !== 'creative' ? '#ff8a7a' : ''; c.textContent = cost >= 40 && world.meta.gameMode !== 'creative' ? 'Too expensive!' : cost ? 'Enchantment cost: ' + cost + ' levels (you have ' + (S.level || 0) + ')' : 'Put an item in the first slot';
+    box.appendChild(inp); box.appendChild(c); top.appendChild(box); if (W.focus) { inp.focus(); W.focus = false; }
+  }
+  // ---- books (compat only): 1.8 book & quill / written books open in Strata's ForgeWrite editor ----
+  // pages travel as plain text with § colour/format codes (written books: JSON text), and go back as MC|BEdit / MC|BSign
+  function nbtRead(u, o) {   // minimal named-binary-tag reader: returns [value, nextOffset] for a root compound
+    const dv = new DataView(u.buffer, u.byteOffset, u.byteLength), td = new TextDecoder();
+    const str = p => { const n = dv.getUint16(p); return [td.decode(u.subarray(p + 2, p + 2 + n)), p + 2 + n]; };
+    const pay = (t, p) => { switch (t) { case 1: return [dv.getInt8(p), p + 1]; case 2: return [dv.getInt16(p), p + 2]; case 3: return [dv.getInt32(p), p + 4]; case 4: return [Number(dv.getBigInt64(p)), p + 8]; case 5: return [dv.getFloat32(p), p + 4]; case 6: return [dv.getFloat64(p), p + 8];
+      case 7: { const n = dv.getInt32(p); return [u.subarray(p + 4, p + 4 + n), p + 4 + n]; } case 8: return str(p);
+      case 9: { const et = u[p], n = dv.getInt32(p + 1); let q = p + 5; const a = []; for (let i = 0; i < n; i++) { const [v, q2] = pay(et, q); a.push(v); q = q2; } return [a, q]; }
+      case 10: { const ob = {}; let q = p; for (;;) { const tt = u[q++]; if (!tt) break; const [nm, q2] = str(q); const [v, q3] = pay(tt, q2); ob[nm] = v; q = q3; } return [ob, q]; }
+      case 11: { const n = dv.getInt32(p), a = []; for (let i = 0; i < n; i++) a.push(dv.getInt32(p + 4 + i * 4)); return [a, p + 4 + n * 4]; } } throw new Error('nbt ' + t); };
+    if (u[o] !== 10) return [null, o + 1]; const [, p2] = str(o + 1); return pay(10, p2);
+  }
+  const itemTag = it => { try { return it && it.raw && it.raw.length > 6 ? nbtRead(it.raw, 5)[0] : null; } catch (e) { return null; } };
+  function bookItem(id, tag) {   // item bytes: id, count, damage, then a compound with pages (and title/author)
+    const te = new TextEncoder(), out = [(id >> 8) & 255, id & 255, 1, 0, 0, 10, 0, 0], s = t => { const b = te.encode(t); out.push((b.length >> 8) & 255, b.length & 255, ...b); };
+    out.push(9); s('pages'); out.push(8); const n = tag.pages.length; out.push((n >>> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255); for (const p of tag.pages) s(p);
+    for (const k of ['title', 'author']) if (tag[k] != null) { out.push(8); s(k); s(tag[k]); } out.push(0); return new Uint8Array(out);
+  }
+  const MCC = ['#000000', '#0000aa', '#00aa00', '#00aaaa', '#aa0000', '#aa00aa', '#ffaa00', '#aaaaaa', '#555555', '#5555ff', '#55ff55', '#55ffff', '#ff5555', '#ff55ff', '#ffff55', '#ffffff'];
+  const MCN = { black: 0, dark_blue: 1, dark_green: 2, dark_aqua: 3, dark_red: 4, dark_purple: 5, gold: 6, gray: 7, dark_gray: 8, blue: 9, green: 10, aqua: 11, red: 12, light_purple: 13, yellow: 14, white: 15 };
+  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  function secToHTML(t) {   // "§cRed §lbold" -> spans with styles
+    let h = '', st = {}; const open = () => { const c = []; if (st.c != null) c.push('color:' + MCC[st.c]); if (st.l) c.push('font-weight:700'); if (st.o) c.push('font-style:italic'); const d = [st.n && 'underline', st.m && 'line-through'].filter(Boolean); if (d.length) c.push('text-decoration:' + d.join(' ')); return c.length ? `<span style="${c.join(';')}">` : '<span>'; };
+    for (const part of String(t).split('§')) { if (h === '' && !t.startsWith('§') && !st.started) { st.started = 1; h += open() + esc(part) + '</span>'; continue; } const k = part[0], rest = part.slice(1);
+      if (k !== undefined) { const ci = '0123456789abcdef'.indexOf(k.toLowerCase()); if (ci >= 0) st = { c: ci, started: 1 }; else if (k === 'r') st = { started: 1 }; else if ('lomn'.includes(k)) st[k] = 1; }
+      h += open() + esc(rest) + '</span>'; }
+    return h;
+  }
+  function jsonToSec(j) {   // written-book page (JSON text) -> § text
+    let o; try { o = typeof j === 'string' ? JSON.parse(j) : j; } catch (e) { return String(j); } if (typeof o === 'string') return o; if (Array.isArray(o)) return o.map(jsonToSec).join('');
+    let p = ''; if (o.color && MCN[o.color] != null) p += '§' + '0123456789abcdef'[MCN[o.color]]; if (o.bold) p += '§l'; if (o.italic) p += '§o'; if (o.underlined) p += '§n'; if (o.strikethrough) p += '§m';
+    return p + (o.text || '') + (o.extra ? o.extra.map(e => jsonToSec(e)).join('') : '') + (p ? '§r' : '');
+  }
+  function htmlToSec(html) {   // ForgeWrite HTML -> § text (colours snap to the nearest of Minecraft's 16)
+    const box = document.createElement('div'); box.innerHTML = html; let out = '', cur = '';
+    const near = css => { const m = /rgb\((\d+),\s*(\d+),\s*(\d+)/.exec(css) || /#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(css); if (!m) return null; const v = m[0][0] === '#' ? [1, 2, 3].map(i => parseInt(m[i], 16)) : [1, 2, 3].map(i => +m[i]); let b = 0, bd = 1e9; MCC.forEach((h, i) => { const c = [1, 3, 5].map(k => parseInt(h.substr(k, 2), 16)), d = (c[0] - v[0]) ** 2 + (c[1] - v[1]) ** 2 + (c[2] - v[2]) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
+    const walk = (n, st) => { for (const c of n.childNodes) { if (c.nodeType === 3) { const code = (st.c != null && st.c !== 0 ? '§' + '0123456789abcdef'[st.c] : '') + (st.l ? '§l' : '') + (st.o ? '§o' : '') + (st.n ? '§n' : '') + (st.m ? '§m' : ''); if (code !== cur) { out += (cur ? '§r' : '') + code; cur = code; } out += c.textContent; continue; }
+        if (c.nodeType !== 1) continue; const t = c.tagName, s2 = { ...st }, css = (c.getAttribute('style') || '') + ';'; const col = c.getAttribute('color') || (/(?:^|;)\s*color:\s*([^;]+)/i.exec(css) || [])[1]; if (col) { const k = near(col); if (k != null) s2.c = k; }
+        if (t === 'B' || t === 'STRONG' || /font-weight:\s*(bold|[6-9]00)/i.test(css)) s2.l = 1; if (t === 'I' || t === 'EM' || /font-style:\s*italic/i.test(css)) s2.o = 1; if (t === 'U' || /underline/i.test(css)) s2.n = 1; if (t === 'S' || t === 'STRIKE' || /line-through/i.test(css)) s2.m = 1;
+        if (t === 'BR') { out += '\n'; continue; } if ((t === 'DIV' || t === 'P') && out && !out.endsWith('\n')) out += '\n'; walk(c, s2); } };
+    walk(box, {}); return out.slice(0, 256);
+  }
+  function openMcBook(h) {
+    const mc = h.mc, written = mc.id === 387, tag = itemTag(mc) || {}, pages = (tag.pages || ['']).map(p => secToHTML(written ? jsonToSec(p) : p));
+    const s = { id: written ? I.FORGEWRITE_SIGNED : I.FORGEWRITE, n: 1, x: { pages: pages.length ? pages : [''], paper: 'parchment', title: tag.title, author: tag.author }, mcBook: { slot: inv.sel, mc } };
+    fwSt = { s, page: 0, ro: written }; mode = 'ui'; mining = null; document.getElementById('fwUI').hidden = false; document.getElementById('fwSignBox').hidden = true; buildFwBar(); showFwPage(); return true;
+  }
+  function bookSend(sign) {   // called (capture phase) before ForgeWrite's own Done / Sign handlers
+    if (!fwSt || !fwSt.s.mcBook || fwSt.ro) return; saveFwPage(); const pages = fwSt.s.x.pages.map(htmlToSec).slice(0, 50), tag = { pages };
+    if (sign) { const t = document.getElementById('fwTitle').value.trim().slice(0, 16); if (!t) return; tag.title = t; tag.author = S.o.name || ''; }
+    const raw = bookItem(386, tag); S.client.api.payload(sign ? 'MC|BSign' : 'MC|BEdit', raw);
+    const k = 36 + fwSt.s.mcBook.slot; S.slots[k] = sign ? { id: 387, count: 1, damage: 0, raw: (() => { const r2 = bookItem(387, { pages: pages.map(p => JSON.stringify({ text: p })), title: tag.title, author: tag.author }); return r2; })() } : { id: 386, count: 1, damage: 0, raw }; setTimeout(syncInv, 0);
+  }
+  const bookHooks = { done: () => bookSend(false), sign: () => bookSend(true) };
+  const FOOD18 = new Set([260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 335, 373, 368, 332, 344, 384, 346, 261, 438]);
+  // ---- boats, minecarts and fishing floats (compat only) ----
+  // boats/carts are Strata vehicles drawn by Strata's renderer but moved only by the server; riding sends steer_vehicle + look like 1.8
+  function vehSpawn(eid, type, x, y, z, yaw) {
+    if (!S.world) return; const X = x + S.OX, Z = z + S.OZ;
+    if (type === 1 || type === 10) { const v = type === 1 ? { kind: 'boat', id: I.BOAT, x: X, y, z: Z, yaw: 0, vx: 0, vz: 0 } : { kind: 'cart', id: I.CART_WOOD || I.BOAT, x: X, y, z: Z, yaw: 0, col: [118, 118, 126], vx: 0, vz: 0 };
+      Object.assign(v, { mc: eid, sx: X, sy: y, sz: Z, syaw: -yaw * PI / 180 }); v.yaw = v.syaw; vehicles.push(v); S.veh.set(eid, v); }
+    if (type === 90) S.objs.set(eid, { kind: 'bobber', x: X, y, z: Z, sx: X, sy: y, sz: Z });
+  }
+  function vehMoved(id, a, b, c, abs, yaw) { const v = S.veh.get(id) || (S.objs.get(id) && S.objs.get(id).kind === 'bobber' && S.objs.get(id)); if (!v) return false;
+    if (abs) { v.sx = a + S.OX; v.sy = b; v.sz = c + S.OZ; } else { v.sx += a; v.sy += b; v.sz += c; } if (yaw != null && v.kind) v.syaw = -yaw * PI / 180; return true; }
+  function vehGone(id) { const v = S.veh.get(id); if (!v) return; S.veh.delete(id); const i = vehicles.indexOf(v); if (i >= 0) vehicles.splice(i, 1); if (player.mount === v) { player.mount = null; S.riding = null; } }
+  function rideTick() {   // every 50 ms while riding: look + steering (1.8 sends no positions while in a vehicle)
+    const v = S.riding, a = S.client.api; if (!v) return false; const mag = Math.min(1, input.mag || 0); let yaw = -player.face * 180 / PI;
+    if (mag > .15) yaw = -Math.atan2(input.mx, input.mz) * 180 / PI;   // boats go where the rider looks
+    a.look(yaw, 0, false); a.steer(0, mag > .15 ? .98 : 0, input.jump ? 1 : 0); return true;
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -591,8 +721,11 @@
   const iconKind = n => /beef|steak|porkchop|mutton|chicken|rabbit|flesh|fish|cod|salmon/.test(n) ? 'meat' : /redstone|glowstone|gunpowder|sulphur|sugar|powder|dust|bone ?meal|dye|rose red|cactus green|lapis|cocoa|ink sac|dandelion/.test(n) ? 'dust' : /potion|bottle/.test(n) ? 'bottle' : /book/.test(n) ? 'book' : /record|disc/.test(n) ? 'disc'
     : /ball|pearl|eye of|cream|charge|egg|snowball|slime/.test(n) ? 'ball' : /rod|stick|bone|arrow/.test(n) ? 'rod' : /string|lead|web/.test(n) ? 'string' : /seeds|wart/.test(n) ? 'seeds' : 'gem';
   window.__mcIcon = it => { const c = document.createElement('canvas'); c.width = c.height = 60; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-    const img = PACK && PACK.on && PACK.img && [it.mcTex, it.mcName].map(k => k && PACK.img['i/' + k]).find(Boolean); if (img) { const w = img.width; g.drawImage(img, 0, 0, w, w, 2, 2, 56, 56); return c; }
-    const n = it.name.toLowerCase(), col = (ICON_COL.find(e => e[0].test(n)) || [0, null])[1] || (() => { let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360},50%,50%)`; })();
+    const img = PACK && PACK.on && PACK.img && [it.mcTex, it.mcName].map(k => k && PACK.img['i/' + k]).find(Boolean);
+    if (img && it.potionCol && PACK.img['i/potion_overlay']) { const ov = PACK.img['i/potion_overlay'], t = document.createElement('canvas'); t.width = t.height = 56; const tg = t.getContext('2d'); tg.imageSmoothingEnabled = false; tg.drawImage(ov, 0, 0, ov.width, ov.width, 0, 0, 56, 56); tg.globalCompositeOperation = 'multiply'; tg.fillStyle = it.potionCol; tg.fillRect(0, 0, 56, 56); tg.globalCompositeOperation = 'destination-in'; tg.drawImage(ov, 0, 0, ov.width, ov.width, 0, 0, 56, 56);
+      g.drawImage(t, 2, 2); const w = img.width; g.drawImage(img, 0, 0, w, w, 2, 2, 56, 56); return c; }
+    if (img) { const w = img.width; g.drawImage(img, 0, 0, w, w, 2, 2, 56, 56); return c; }
+    const n = it.name.toLowerCase(), col = it.potionCol || (ICON_COL.find(e => e[0].test(n)) || [0, null])[1] || (() => { let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360},50%,50%)`; })();
     const P = (x, y, w, h, f) => { g.fillStyle = f; g.fillRect(4 + x * 3.25, 4 + y * 3.25, w * 3.25 + .3, h * 3.25 + .3); }, dk = 'rgba(0,0,0,.38)', lt = 'rgba(255,255,255,.4)', k = iconKind(n);
     if (k === 'meat') { P(4, 3, 8, 7, col); P(3, 5, 1, 4, col); P(12, 5, 1, 3, col); P(5, 4, 3, 2, lt); P(4, 9, 8, 1, dk); P(2, 10, 4, 2, '#efe6d6'); P(1, 11, 2, 3, '#efe6d6'); }
     else if (k === 'dust') { for (const [x, y, w] of [[6, 4, 3], [4, 6, 7], [3, 8, 10], [2, 10, 12], [3, 12, 10]]) P(x, y, w, 2, col); P(6, 6, 2, 2, lt); P(9, 9, 2, 1, lt); P(3, 13, 10, 1, dk); }
@@ -638,7 +771,8 @@
     pickEntity(sx, sy) { const [o, d] = camRay(sx, sy); let best = null, bt = Infinity;
       for (const m of S.mobs) { const { hw, h } = mobBox(m); if (Math.hypot(m.x - player.x, m.z - player.z) > 40) continue; const t = rayBox(o, d, [m.x - hw - .1, m.y, m.z - hw - .1], [m.x + hw + .1, m.y + h, m.z + hw + .1]); if (t < bt) { bt = t; best = { mob: m }; } }
       if (!best) return null; const r = pick(sx, sy); if (r) { const c = [r.hit[0] + .5, r.hit[1] + .5, r.hit[2] + .5], tb = (c[0] - o[0]) * d[0] + (c[1] - o[1]) * d[1] + (c[2] - o[2]) * d[2]; if (tb < bt - .6) return null; } return best; },
-    tapEntity(sx, sy) { const e = IMPL.pickEntity(sx, sy); if (!e) return false; const m = e.mob; if (Math.hypot(m.x - player.x, m.z - player.z) > 4.2) { toast('Too far away'); return true; }
+    tapEntity(sx, sy) { { const [o, d] = camRay(sx, sy); for (const v of S.veh.values()) { if (Math.hypot(v.x - player.x, v.z - player.z) > 4.5) continue; if (rayBox(o, d, [v.x - .7, v.y, v.z - .7], [v.x + .7, v.y + .8, v.z + .7]) < Infinity) { S.client.api.interact(v.mc); return true; } } }
+      const e = IMPL.pickEntity(sx, sy); if (!e) return false; const m = e.mob; if (Math.hypot(m.x - player.x, m.z - player.z) > 4.2) { toast('Too far away'); return true; }
       if ((player.atkCd || 0) > 0) return true; player.atkCd = .4; player.swingT = .25; S.client.api.attack(m.eid); S.client.api.swing(); m.hurtT = .3; return true; },
     buildCracks() {   // Minecraft's own destroy_stage_0..9 (from the resource pack when present, a built-in set otherwise) laid over every face
       crVB.n = 0; PAT = 0; CB = 0; if (!mining || !mining.target || mining.prog <= 0) { crMesh.n = 0; return; }
@@ -652,9 +786,17 @@
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
     stepArrows() {},
+    stepVehicles(dt) { const k = 1 - Math.exp(-12 * dt); for (const v of S.veh.values()) { v.x += (v.sx - v.x) * k; v.y += (v.sy - v.y) * k; v.z += (v.sz - v.z) * k; let d = v.syaw - v.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw += d * k; }
+      for (const o of S.objs.values()) if (o.kind === 'bobber') { o.x += (o.sx - o.x) * k; o.y += (o.sy - o.y) * k; o.z += (o.sz - o.z) * k; } },
+    stepRide(dt) { const v = player.mount; if (!v || !v.mc) return S.saved.stepRide(dt);
+      player.x = v.x; player.y = v.y + (v.kind === 'boat' ? .1 : .35); player.z = v.z; player.vx = player.vy = player.vz = 0; player.fallTop = player.y; player.onGround = true;
+      if (input.crouchToggle) { input.crouchToggle = false; S.client.api.steer(0, 0, 2); } },   // 2 = unmount; the server answers with attach_entity -1
+    useHeld() {   // tapping the air: open books, otherwise use the item like a right click (eat, drink, throw, bow, rod)
+      const h = held(), mc = h && h.mc; if (!mc) return false; if (mc.id === 386 || mc.id === 387) return openMcBook(h);
+      if (!FOOD18.has(mc.id)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
 
     openInv() { if (mode === 'play') mcInvOpen(); },
-    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
+    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
     closeInv() { mcInvClose(true); },   // the only arrows in a compat world are the server's, moved by stepProj
     emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
@@ -674,7 +816,7 @@
   function ensureWorld(ax, az) {
     if (S.world) return;
     S.OX = 1024 - Math.floor(ax / 16) * 16; S.OZ = 1024 - Math.floor(az / 16) * 16;
-    for (const n of OVR) { S.saved[n] = window[n]; window[n] = IMPL[n] ? IMPL[n] : function () {}; }
+    for (const n of new Set(OVR)) { S.saved[n] = window[n]; window[n] = IMPL[n] ? IMPL[n] : function () {}; }
     window.__mcActive = true; window.__cmobs = S.mobs; window.__mcTimeCmd = w => { S.client.chat('/time set ' + w); toast('Asked the server to set the time to ' + w); };
     const meta = { id: 'mcompat', name: S.o.host, seedNum: 1, size: SIZE, height: HGT, gen: 'mcompat', sea: 63, gameMode: S.gm === 1 ? 'creative' : 'survival', mc: 1 };
     enterPlay(meta, null); S.world = true;
@@ -700,6 +842,8 @@
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
       trans(wid, act, ok) { onTrans(wid, act, ok); },
+      xp(bar, lv, total) { S.level = lv; player.xp = (lv + bar) * XPL; hudDirty = true; mcInvRender(); },
+      effect(eid, id, amp, dur) { if (eid !== S.eid) return; S.fx = S.fx || {}; if (dur > 0) S.fx[id] = { amp, dur, end: Date.now() + dur * 50 }; else delete S.fx[id]; effectHud(); },
       closeWin(wid) { if (S.win && S.win.id === wid) mcInvClose(false); },
       winProp(wid, k, v) { if (S.win && S.win.id === wid) { S.win.prop[k] = v; mcInvRender(); } },
       slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); }
@@ -738,7 +882,7 @@
         if (nb.length === 1 && !sol(X, y - 1, Z)) { const n = [-nb[0][0], 0, -nb[0][1]]; e = { kind: 'sign', c: [X + .5 - n[0] * .47, y + .5, Z + .5 - n[2] * .47], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, mode: 0, cell: [X, y, Z], sup: [X - n[0], y, Z - n[2]], fixU: 1 }; }
         else { const n = [0, 0, 1]; e = { kind: 'sign', c: [X + .5, y + .95, Z + .5], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, sup: [X, y - 1, Z], cell: [X, y, Z], post: 1, fixU: 1, mode: 0 }; }
         e.mcCell = [X, y, Z]; e.text = text; e.frame = 'wood'; e.bg = 'planks'; world.decor.push(e); world.changed = true; },
-      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); const bk = X + ',' + y + ',' + Z; if (st >> 4 === 138) S.beacons.add(bk); else S.beacons.delete(bk); },
+      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); const bk = X + ',' + y + ',' + Z; if (st >> 4 === 138) S.beacons.add(bk); else S.beacons.delete(bk); if (st >> 4 === 116) S.ench.add(bk); else S.ench.delete(bk); },
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n, sk) { if (n) { S.names.set(u, n); if (sk) S.skinInfo.set(u, sk); const me = S.o.name && n.toLowerCase() === String(S.o.name).toLowerCase(); if (me) { S.ownUuid = u; ownSkin(u, sk); } for (const pl of S.players) if (pl.uuid === u) loadSkinFor(pl); } else S.names.delete(u); },
       flags(id, v) { const m = S.ents.get(id); if (m && m.pl) { m.sneak = !!(v & 2); m.sprint = !!(v & 8); } },
@@ -748,7 +892,8 @@
         if (idx === 12) m.baby = v < 0 || (v === 1 && (m.type === 'zombie' || m.type === 'mc_pigman'));
         else if (idx === 13 && (m.type === 'skeleton' || m.type === 'mc_wither_skeleton')) { m.type = v === 1 ? 'mc_wither_skeleton' : 'skeleton'; m.size = v === 1 ? CM.mc_wither_skeleton.size : 0; }
         else if (idx === 16 && (m.type === 'slime' || m.type === 'mc_magma_cube') && v > 0) m.size = v; },
-      objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) { projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch); objSpawn2(eid, type, x, y, z); },
+      objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) { projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch); objSpawn2(eid, type, x, y, z); vehSpawn(eid, type, x, y, z, yaw); },
+      attach(a, v) { if (a !== S.eid) return; const veh = v >= 0 && S.veh.get(v); if (veh) { S.riding = veh; player.mount = veh; player.sitting = true; veh.rider = true; toast('Tap Crouch to get off'); } else { if (S.riding) S.riding.rider = false; S.riding = null; player.mount = null; player.sitting = false; } },
       painting(eid, title, x, y, z, dir) { paintingSpawn(eid, title, x, y, z, dir); },
       anim(id, a) { const m = S.ents.get(id); if (m && m.pl && a === 0) m.swingT = .25; },
       spawn(e) {
@@ -759,11 +904,11 @@
         const d = CM[type], x = e.x + S.OX, z = e.z + S.OZ, m = { mc: 1, eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' || type === 'mc_magma_cube' ? 2 : e.type === 53 ? 12 : d && d.size || 0, flee: 0, magma: d && d.magma || 0, eq: null };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
-      move(id, dx, dy, dz) { if (projMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
-      look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
+      move(id, dx, dy, dz) { if (projMoved(id, dx, dy, dz)) return; if (vehMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
+      look(id, yaw) { { const v = S.veh.get(id); if (v) { v.syaw = -yaw * PI / 180; return; } } const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
-      teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; { const o = S.objs.get(id); if (o) { o.x = x + S.OX; o.y = y; o.z = z + S.OZ; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
-      destroy(l) { for (const id of l) { projGone(id); S.objs.delete(id); { const e = S.paint.get(id); if (e) { S.paint.delete(id); const i = (world.decor || []).indexOf(e); if (i >= 0) world.decor.splice(i, 1); } } const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
+      teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; if (vehMoved(id, x, y, z, true, yaw)) return; { const o = S.objs.get(id); if (o) { o.x = x + S.OX; o.y = y; o.z = z + S.OZ; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
+      destroy(l) { for (const id of l) { projGone(id); vehGone(id); S.objs.delete(id); { const e = S.paint.get(id); if (e) { S.paint.delete(id); const i = (world.decor || []).indexOf(e); if (i >= 0) world.decor.splice(i, 1); } } const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;
   }
@@ -785,6 +930,7 @@
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
     for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
+    if (S.world && S.fx && Object.keys(S.fx).length && (S.fxT = (S.fxT || 0) + dt) > 1) { S.fxT = 0; effectHud(); }
     if (S.world) { stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
@@ -793,22 +939,24 @@
   MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), objs: new Map(), paint: new Map(), beacons: new Set(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), objs: new Map(), veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.addEventListener('click', bookHooks.done, true); if (g) g.addEventListener('click', bookHooks.sign, true); }
     MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
-    S.t2 = setInterval(() => { if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
+    S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
       const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; cl.sendPos(x, player.y, z, -player.face * 180 / Math.PI, 0, !!player.onGround); } }, 50);
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
+    { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.removeEventListener('click', bookHooks.done, true); if (g) g.removeEventListener('click', bookHooks.sign, true); }
     if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
-      for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];
+      for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
       document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null; window.__mcTimeCmd = null;
       for (const id of s.regs) { BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;

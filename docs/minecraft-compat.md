@@ -132,3 +132,16 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - Tap modes: "whole stack", "one item", "send across"; press and hold any slot for one item. Labels and the Holding line use Minecraft's own item names.
 - The bag/inventory buttons were bound to Strata's original inventory at load time, which showed Strata recipes in Minecraft mode; they now call whichever inventory is active.
 - Test harness note: under SwiftShader the page is too slow to answer the test server's keep-alives in time, so that server kicks after ~30 s; keep-alive replies themselves are correct.
+
+## Stage 16: Strata inventory taps; 1.8 enchanting, potions, books, boats (compat)
+- Strata's inventory (panel, chest, crucible) gets the same tap modes as Minecraft mode — whole stack / one item (pick up half, put down one) / send across (hotbar ↔ backpack ↔ chest) — and press-and-hold for one item. The split layout has ½ and ⇄ tool toggles (its own hold-to-drag stays).
+- Enchantment shimmer on slots (Strata enchantments and grimoires, and Minecraft items whose NBT has `ench`/`StoredEnchantments`).
+- Potions: one compat item per effect and splash, named ("Potion of Swiftness"), tinted from the pack's potion_overlay (or a drawn bottle in the effect colour).
+- More 1.8 blocks use Strata's own: bookshelf, cobweb, mushrooms and mushroom blocks, jukebox, iron bars, melon, mycelium, lily pad, sea lantern, packed ice, snow block. Compat shapes: enchanting table, brewing stand, anvil (by facing/damage), cauldron (water level), hopper, end portal frame, dragon egg.
+- Enchanting table: a floating book that opens when you are near and glyph particles drifting in from bookshelves two blocks away. Enchant screen: three choices with lapis/level cost and the server's clue (`enchant_item`). Anvil screen: rename field (`MC|ItemName`) and the level cost. XP level comes from `experience` (Strata's XP bar shows it). Anvil/villager/enchant/brewing/furnace outputs resync from the server.
+- Potion effects on you (`entity_effect`/`remove_entity_effect`) show as a column of icons (from the pack's gui/container/inventory.png when imported, else coloured badges) with time left.
+- Books: tapping the air with a book & quill or written book opens Strata's ForgeWrite. § colour/format codes become colours, bold, italic, underline, strike; on Done/Sign the pages go back as § text (colours snapped to Minecraft's 16) via `MC|BEdit`/`MC|BSign`.
+- Using items in the air (eat, drink, throw pearls/snowballs/eggs/bottles, bow, fishing rod) sends the 1.8 use-item packet.
+- Boats and minecarts (objects 1/10) are Strata vehicles moved only by the server; tap one to ride (`use_entity` interact). While riding, look + `steer_vehicle` go out instead of positions; Crouch gets off. Fishing floats (90) are drawn with a line from your hand.
+- Ice and packed ice are slippery in Minecraft mode; prone swimming (a 1.13 feature) is off there.
+- Fix: `OVR` listed some functions twice, so the second save overwrote the original with the compat version and leaving a server left tapEntity/stepHealth/stepDecay broken until reload. Saves and restores now use each name once.
