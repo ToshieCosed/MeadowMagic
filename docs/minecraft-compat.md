@@ -145,3 +145,21 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - Boats and minecarts (objects 1/10) are Strata vehicles moved only by the server; tap one to ride (`use_entity` interact). While riding, look + `steer_vehicle` go out instead of positions; Crouch gets off. Fishing floats (90) are drawn with a line from your hand.
 - Ice and packed ice are slippery in Minecraft mode; prone swimming (a 1.13 feature) is off there.
 - Fix: `OVR` listed some functions twice, so the second save overwrote the original with the compat version and leaving a server left tapEntity/stepHealth/stepDecay broken until reload. Saves and restores now use each name once.
+
+## Stage 17 (1.8): textures, armour, variants, objects, effects, HUD
+- Resource-pack textures on compat blocks: the pack slot table covers every id (128x1024), every block texture in a pack is imported, and `blocks18.json` carries 1.8 texture names (side/top/bottom resolved from minecraft-assets models, colour variants). Compat shapes name their textures; boxes with an 8th value keep their colour.
+- Rails: powered (lit when on), detector (plate) and activator rails use Strata's rail shape and connections with their own colours.
+- Redstone dust joins up with neighbouring dust, torches, repeaters and levers, and climbs block sides.
+- Beacons check the full pyramid (levels 1-4 of iron/gold/diamond/emerald).
+- Moon phases follow the server's day (8 phases).
+- Enchantment glint on held items (first and third person), other players' and mobs' items, and dropped items.
+- Armour: other players wear the pack's `models/armor/<mat>_layer_N.png` (or generated textures, leather dye colours) on the skin renderer; mobs with a pack get armour layers over zombie-shaped geometry; without a pack, coloured armour boxes.
+- Variants from metadata: sheep colour/shorn, wolf sitting/tame, horse colours and donkey/mule/zombie/skeleton horses, villager professions, rabbit types, ocelot/cat types, zombie villagers (textures from the pack).
+- Objects: item frames (with the item, rotated), armour stands (with armour and held item), falling blocks, primed TNT (flashing), XP orbs, lightning (flash + bolt), thrown snowballs/eggs/pearls/eyes/potions/XP bottles/fireworks/skulls.
+- Combat: mobs fall over when they die and leave a puff; critical-hit sparks; hurt flashes from `animation`.
+- Server particles (`world_particles`) and world events (block-break dust and sound, smoke, potion splash, spawner flames, bonemeal, door/click/anvil sounds); other players' digging cracks (`block_break_animation`).
+- Sounds: any 1.8 sound name plays from the pack's own files when it has them (decoded on first use, kept compressed, up to 40 MB); note blocks prefer the pack's note sounds; jukebox records toast "Now playing" and play the pack's record if it has one.
+- Signs: placing a sign opens a 4-line editor and sends `update_sign`.
+- Chat: colours, bold/italic/underline/strike, § codes and clickable http(s) links; action bar text above the hotbar.
+- HUD: 👥 player list with ping bars and the server's header/footer; scoreboard sidebar; titles and subtitles.
+- Dimensions: the Nether uses Strata's Underworld sky/fog/roof, the End uses the Dusk look; no sun or moon there.

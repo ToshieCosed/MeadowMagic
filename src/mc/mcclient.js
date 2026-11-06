@@ -73,6 +73,25 @@
     if (x.extra) s += comp(x.extra);
     return s.replace(/§./g, '');
   }
+  // the same text as HTML, with Minecraft's colours and styles, § codes, and clickable links (only https/http urls)
+  const MCOL = { black: '#000000', dark_blue: '#0000aa', dark_green: '#00aa00', dark_aqua: '#00aaaa', dark_red: '#aa0000', dark_purple: '#aa00aa', gold: '#ffaa00', gray: '#aaaaaa', dark_gray: '#555555', blue: '#5555ff', green: '#55ff55', aqua: '#55ffff', red: '#ff5555', light_purple: '#ff55ff', yellow: '#ffff55', white: '#ffffff' };
+  const SEC = '0123456789abcdef', SECN = Object.keys(MCOL);
+  const escH = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  function secHTML(t, st) {   // legacy § codes inside a text run
+    let out = '', cur = Object.assign({}, st); const span = (txt, c) => { if (!txt) return ''; const css = []; if (c.color) css.push('color:' + (MCOL[c.color] || c.color)); if (c.bold) css.push('font-weight:700'); if (c.italic) css.push('font-style:italic'); const d = [c.underlined && 'underline', c.strikethrough && 'line-through'].filter(Boolean); if (d.length) css.push('text-decoration:' + d.join(' ')); if (c.obfuscated) css.push('filter:blur(1.5px)');
+      let h = escH(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">$1</a>'); if (c.link) h = `<a href="${escH(c.link)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">${h}</a>`; return css.length ? `<span style="${css.join(';')}">${h}</span>` : h; };
+    const parts = String(t).split('§'); out += span(parts[0], cur);
+    for (let i = 1; i < parts.length; i++) { const k = (parts[i][0] || '').toLowerCase(), rest = parts[i].slice(1), ci = SEC.indexOf(k);
+      if (ci >= 0) cur = { color: SECN[ci], link: cur.link }; else if (k === 'r') cur = Object.assign({}, st); else if (k === 'l') cur.bold = 1; else if (k === 'o') cur.italic = 1; else if (k === 'n') cur.underlined = 1; else if (k === 'm') cur.strikethrough = 1; else if (k === 'k') cur.obfuscated = 1; out += span(rest, cur); }
+    return out; }
+  function compHTML(x, st) {
+    st = st || {}; if (x == null) return ''; if (typeof x === 'string') { const t = x.trim(); if (t[0] === '{' || t[0] === '[' || t[0] === '"') { try { return compHTML(JSON.parse(t), st); } catch (e) { /* plain */ } } return secHTML(x, st); }
+    if (typeof x === 'number' || typeof x === 'boolean') return escH(String(x)); if (Array.isArray(x)) { if (!x.length) return ''; const [h, ...rest] = x; return compHTML(h, st) + rest.map(e => compHTML(e, st)).join(''); }
+    const s2 = Object.assign({}, st); for (const k of ['color', 'bold', 'italic', 'underlined', 'strikethrough', 'obfuscated']) if (x[k] != null) s2[k] = x[k] === 'false' ? false : x[k];
+    if (x.clickEvent && x.clickEvent.action === 'open_url' && /^https?:\/\//i.test(x.clickEvent.value || '')) s2.link = x.clickEvent.value;
+    let h = ''; if (x.text != null) h += secHTML(String(x.text), s2); else if (x.translate != null) { const w = (x.with || []).map(e => compHTML(e, s2)); let i = 0; const f = TR[x.translate];
+      h += f ? secHTML(f, s2).replace(/%(\d+\$)?s/g, (m, n) => n ? (w[parseInt(n) - 1] || '') : (w[i++] || '')) : escH(x.translate) + (w.length ? ' ' + w.join(' ') : ''); } else if (x.selector != null) h += escH(x.selector);
+    if (x.extra) h += x.extra.map(e => compHTML(e, s2)).join(''); return h; }
   const hex = u => Array.from(u, x => x.toString(16).padStart(2, '0')).join('');
   const b64 = u => { let s = ''; for (const x of u) s += String.fromCharCode(x); return btoa(s); };
   const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -102,7 +121,7 @@
     const rev = {}; for (const k of ['lc', 'cc', 'pc']) { rev[k] = {}; for (const n in (ids[k] || {})) rev[k][ids[k][n]] = n; }
     let state = 'login', ws, pend = 0, closed = false, joined = false, sky = true, posT = null;
     const H = o.world || null;
-    const say = t => { try { o.onChat && o.onChat(t); } catch (e) { /* ui */ } };
+    const say = (t, html) => { try { o.onChat && o.onChat(t, html); } catch (e) { /* ui */ } };
     const status = t => { try { o.onStatus && o.onStatus(t); } catch (e) { /* ui */ } };
     // connection diagnostics: when a drop gives no reason, say how long we were in, when the server last spoke, and whether the app was in the background
     const T0 = Date.now(); let lastRx = T0, lastKA = 0, hidT = 0, hidMax = 0;
@@ -150,7 +169,7 @@
     function onPlay(name, r, body, idLen) {
       // 1.8 entity metadata: flags (idx 0) and small bytes (baby, skeleton type, slime size) go to H.flags/H.bmeta, item slots to H.meta
       const meta18 = eid => { for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
-        if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v); } else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
+        if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v, 0); } else if (t === 1) { const v = r.i16(); if (H.bmeta) H.bmeta(eid, idx, v, 1); } else if (t === 2) { const v = r.i32(); if (H.bmeta) H.bmeta(eid, idx, v, 2); } else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); return;
@@ -159,7 +178,7 @@
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
           if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
           return;
-        case 'respawn': if (P === 47 && H) { sky = r.i32() === 0; H.respawn && H.respawn(); } return;
+        case 'respawn': if (P === 47 && H) { const dim = r.i32(); sky = dim === 0; H.respawn && H.respawn(dim); } return;
         case 'update_time': if (P === 47 && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
         case 'update_health': if (P === 47 && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
         case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
@@ -169,6 +188,17 @@
         case 'entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(), id = r.i8(), amp = r.i8(), dur = r.vi(); H.effect(eid, id, amp, dur); } return;
         case 'remove_entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(); H.effect(eid, r.i8(), 0, 0); } return;
         case 'attach_entity': if (P === 47 && H && H.attach) { const a = r.i32(), v = r.i32(); H.attach(a, v, r.bool()); } return;
+        case 'spawn_entity_experience_orb': if (P === 47 && H && H.orb) { const eid = r.vi(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32; H.orb(eid, x, y, z, r.i16()); } return;
+        case 'spawn_entity_weather': if (P === 47 && H && H.bolt) { const eid = r.vi(), t = r.i8(); H.bolt(eid, t, r.i32() / 32, r.i32() / 32, r.i32() / 32); } return;
+        case 'world_particles': if (P === 47 && H && H.particles) { const id = r.i32(); r.bool(); const x = r.f32(), y = r.f32(), z = r.f32(), ox = r.f32(), oy = r.f32(), oz = r.f32(), sp = r.f32(), n = r.i32(), dt = []; const k = id === 36 ? 2 : id === 37 || id === 38 ? 1 : 0; for (let i = 0; i < k; i++) dt.push(r.vi()); H.particles(id, x, y, z, ox, oy, oz, sp, n, dt); } return;
+        case 'world_event': if (P === 47 && H && H.event) { const id = r.i32(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.event(id, px, py, pz, r.i32(), r.bool()); } return;
+        case 'open_sign_entity': if (P === 47 && H && H.signEdit) { const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.signEdit(px, py, pz); } return;
+        case 'block_break_animation': if (P === 47 && H && H.crack) { const eid = r.vi(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.crack(eid, px, py, pz, r.i8()); } return;
+        case 'scoreboard_objective': if (P === 47 && H && H.objective) { const nm = r.str(), a = r.i8(); let txt = null; if (a === 0 || a === 2) { txt = r.str(); r.str(); } H.objective(nm, a, txt); } return;
+        case 'scoreboard_score': if (P === 47 && H && H.score) { const it = r.str(), a = r.i8(), obj = r.str(); H.score(it, a, obj, a === 1 ? 0 : r.vi()); } return;
+        case 'scoreboard_display_objective': if (P === 47 && H && H.showObjective) { const pos2 = r.i8(); H.showObjective(pos2, r.str()); } return;
+        case 'title': if (P === 47 && H && H.title) { const a = r.vi(); if (a === 0 || a === 1) H.title(a, r.str()); else if (a === 2) H.title(2, [r.i32(), r.i32(), r.i32()]); else H.title(a); } return;
+        case 'playerlist_header': if (P === 47 && H && H.tabHeader) { const h = r.str(); H.tabHeader(h, r.str()); } return;
         case 'open_window': if (P === 47 && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
         case 'close_window': if (P === 47 && H && H.closeWin) H.closeWin(r.b()); return;
         case 'craft_progress_bar': if (P === 47 && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;
@@ -237,14 +267,14 @@
         case 'entity_destroy': if (P === 47 && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
         case 'player_info': if (P === 47 && H && H.playerInfo) {
           const act = r.vi(), n = r.vi();
-          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } r.vi(); r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm, sk); } else if (act === 4) H.playerInfo(u, null); else if (act === 1 || act === 2) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
+          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } const gm = r.vi(), ping = r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm, sk, ping, gm); } else if (act === 4) H.playerInfo(u, null); else if (act === 2) { const ping = r.vi(); H.ping && H.ping(u, ping); } else if (act === 1) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
         } return;
         case 'start_configuration': out('configuration_acknowledged'); state = 'config'; return;
         case 'resource_pack_send': { const u = r.str(), h = r.str(); resourcePack({}, h); return; }
         case 'add_resource_pack': resourcePack({ id: r.uuid() }); return;
         case 'cookie_request': out('cookie_response', new W().str(r.str()).bool(false)); return;
         case 'chat': {
-          if (P < 759) { const t = comp(r.str()), pos = r.b(); if (pos !== 2 && t) say(t); }
+          if (P < 759) { const raw = r.str(), t = comp(raw), pos = r.b(); if (pos === 2) { if (o.onActionBar) try { o.onActionBar(t, compHTML(raw)); } catch (e) { /* ui */ } } else if (t) say(t, compHTML(raw)); }
           return;
         }
         case 'system_chat': {
@@ -325,6 +355,7 @@
       closeWin: v47(wid => out('close_window', new W().b(wid))),
       creative: v47((slot, item) => { const w = new W().b(slot >> 8).b(slot); slotOut(w, item); return out('set_creative_slot', w); }),
       chatCmd: t => chat(t),
+      sign: v47((x, y, z, lines) => { const w = new W().raw(pos64(x, y, z)); for (const l of lines) w.str(JSON.stringify({ text: l })); return out('update_sign', w); }),
       interact: v47(eid => out('use_entity', new W().vi(eid).vi(0))),
       look: v47((yaw, pitch, ground) => out('look', new W().f32(yaw).f32(pitch).bool(ground))),
       steer: v47((side, fwd, flags) => out('steer_vehicle', new W().f32(side).f32(fwd).b(flags))),
@@ -334,5 +365,5 @@
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }
-  g.StrataMC = { connect, comp, setIds: x => { IDS = x; }, W, R };
+  g.StrataMC = { connect, comp, compHTML, setIds: x => { IDS = x; }, W, R };
 })(typeof window !== 'undefined' ? window : globalThis);
