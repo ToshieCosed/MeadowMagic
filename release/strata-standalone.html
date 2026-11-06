@@ -2480,7 +2480,7 @@ function wallAt(nx,nz,dy){ // solid block directly against the player's side fac
 const input={mx:0,mz:0,mag:0,run:false,jump:false,jumpEdge:false,dashEdge:false,crouchToggle:false};
 function stepPlayer(dt){
   const p=player;
-  p.atkCd=Math.max(0,(p.atkCd||0)-dt); p.eatCd=Math.max(0,(p.eatCd||0)-dt); p.swingT=Math.max(0,(p.swingT||0)-dt);
+  p.atkCd=Math.max(0,(p.atkCd||0)-dt); p.eatCd=Math.max(0,(p.eatCd||0)-dt); stepEating(dt); p.swingT=Math.max(0,(p.swingT||0)-dt);
   if(p.mount){ stepRide(dt); return; }
   p.sitting=false;
   if(hook&&hook.state==='pull'){ reelPlayer(dt); input.jumpEdge=input.dashEdge=false; return; }
@@ -2778,7 +2778,7 @@ function buildViewModel(){ PAT=0; CB=0;
   setVL(sampleLight(P[0],P[1],P[2]));
   let swing=0; if(mining&&mining.target) swing=(now*3.2)%1; else if(p.swingT>0) swing=1-p.swingT/.25; else if(p.shotT>0) swing=1-p.shotT/.25;
   const bob=p.onGround?p.speed/7:0, bx=Math.sin(p.phase)*.025*bob, by=-Math.abs(Math.cos(p.phase))*.035*bob;
-  const drawing=!!bowDraw, eating=p.eatCd>.3;
+  const drawing=!!bowDraw, eating=!!p.eating||p.eatCd>.3;
   let ox=.42+bx, oy=-.46+by, oz=.5, pitch=.28-Math.sin(swing*Math.PI)*1.15, yaw=-.12, roll=0;
   if(drawing){ ox=.18; oy=-.32; oz=.55; pitch=.05; yaw=-.05; }
   if(eating){ ox=.2; oy=-.3+Math.abs(Math.sin(now*14))*.04; pitch=.6; }
@@ -4336,9 +4336,20 @@ function pickWater(sx,sy){ const [o,d]=camRay(sx,sy); for(let t=0;t<300;t+=.25){
     if(y<0) return null; const b=world.get(x,y,z); if(isW(b)) return [x,y,z]; if(b>0&&BLOCKS[b].solid) return null; } return null; }
 
 /* ---------- eating & armor ---------- */
+// eating takes 1.6 s like Minecraft: hand at the mouth, crumbs and munching, then the food counts (switching slots stops it)
 function eat(){ const s=held(), it=ITEMS[s.id]; if(player.hp>=player.maxHp){ toast('You are already at full health'); return; }
-  if(player.eatCd>0) return; player.eatCd=.8; player.hp=Math.min(player.maxHp,player.hp+it.food); hudDirty=true;
-  s.n--; if(!s.n) inv.slots[inv.sel]=null; if(it.bowl&&addItem(I.BOWL,1)) spawnDrop(player.x,player.y+1,player.z,I.BOWL,1); invChanged(); toast(`Ate ${it.name.toLowerCase()} · +${it.food/2} hearts`); burst(player.x,player.y+1.6,player.z,[200,120,80],5,1.5); }
+  if(player.eating||player.eatCd>0) return; startEating(s.id,null); }
+function startEating(id,done,drink){ const p=player; p.eating={t:1.6,id,slot:inv.sel,done,drink,tick:0}; p.eatCd=1.6; }
+function eatFinish(){ const s=held(), it=s&&ITEMS[s.id]; if(!it||!it.food) return; player.hp=Math.min(player.maxHp,player.hp+it.food); hudDirty=true;
+  s.n--; if(!s.n) inv.slots[inv.sel]=null; if(it.bowl&&addItem(I.BOWL,1)) spawnDrop(player.x,player.y+1,player.z,I.BOWL,1); invChanged(); toast(`Ate ${it.name.toLowerCase()} · +${it.food/2} hearts`); }
+const eatCol=id=>{ const it=ITEMS[id], c=it&&(it.col||it.color); return Array.isArray(c)?c:typeof c==='string'&&c[0]==='#'?hex(c):[200,130,80]; };
+function eatCrumbs(x,y,z,face,id,drink){ const mx=x+Math.sin(face)*.32, mz=z+Math.cos(face)*.32, c=eatCol(id);
+  if(drink){ burst(mx,y+1.45,mz,[120,170,255],2,.6); return; } for(let i=0;i<3;i++){ const k=.7+Math.random()*.5; parts.push({x:mx,y:y+1.45,z:mz,vx:(Math.random()-.5)*1.2+Math.sin(face)*.8,vy:Math.random()*1.4+.4,vz:(Math.random()-.5)*1.2+Math.cos(face)*.8,t:.45+Math.random()*.25,c:c.map(v=>Math.min(255,v*k|0)),s:.05+Math.random()*.03}); } }
+function stepEating(dt){ const p=player, e=p.eating; if(!e) return; const s=held();
+  if(inv.sel!==e.slot||!s||s.id!==e.id){ p.eating=null; p.eatCd=0; return; }
+  e.t-=dt; e.tick-=dt; p.eatCd=Math.max(p.eatCd,.4);
+  if(e.tick<=0&&e.t>.1){ e.tick=.2; eatCrumbs(p.x,p.y,p.z,p.face,e.id,e.drink); try{ sfx(e.drink?'splash':'eat',null,null,null,.35+Math.random()*.2); }catch(x){} }
+  if(e.t<=0){ p.eating=null; p.eatCd=0; try{ sfx('burp',null,null,null,.45); }catch(x){} if(e.done) e.done(); else eatFinish(); } }
 const armorTotal=()=>inv.armor.reduce((a,s)=>a+(s?ITEMS[s.id].def+ench(s,'armor')*2:0),0);
 const armorCut=()=>Math.min(.8,armorTotal()*.02);
 
@@ -6288,7 +6299,7 @@ function dripLand(q,y){ const lava=q.drip===2; sfx(lava?'sizzle':'plink',q.x,y,q
   W('placeSurv',o=>function(){ const f0=flash, r=o.apply(this,arguments); if(flash&&flash!==f0&&flash.place){ const [x,y,z]=flash.c; sfxBlock(world.get(x,y,z),'place',x,y,z); } return r; });
   W('fellTree',o=>function(x,y,z){ const k=world.get(x,y,z), n=o.apply(this,arguments); if(n>1){ sfx('treeFall',x+.5,y+3,z+.5,1,30); const lf=WOODS.find(w=>w.log===k); if(lf) burst(x+.5,y+4,z+.5,BLOCKS[lf.leaves].top,24,4); } else if(n===1) sfxBlock(k,'break',x,y,z); return n; });
   W('shoot',o=>function(){ const n=arrows.length, r=o.apply(this,arguments); if(arrows.length>n) sfx('bowShoot',null,null,null,.8); return r; });
-  W('eat',o=>function(){ const c=player.eatCd, r=o.apply(this,arguments); if(player.eatCd!==c&&player.eatCd>0){ sfx('eat',null,null,null,.7); setTimeout(()=>sfx('burp',null,null,null,.45),800); } return r; });
+  W('eat',o=>function(){ const c=player.eatCd, r=o.apply(this,arguments); return r; });   // eating sounds come from stepEating
   W('drinkMilk',o=>function(){ sfx('drink',null,null,null,.7); return o.apply(this,arguments); });
   W('hurt',o=>function(n){ const h=player.hp, r=o.apply(this,arguments); if(player.hp<h) sfx('hurt',null,null,null,.8); return r; });
   W('feed',o=>function(){ sfx('pop',null,null,null,.35); return o.apply(this,arguments); });
@@ -6473,7 +6484,7 @@ function buildPlayerSkin(){ const p=player; SKV.tpN=0; if(cam.mode==='fp'||!worl
   if(sk>.3){ const c=now*3.2; rArm=-2.7+Math.sin(c)*.9; lArm=-2.7-Math.sin(c)*.9; rLeg=Math.sin(now*7)*.35; lLeg=-rLeg; }
   else if(p.inWater&&!p.onGround){ rArm=-1.1+Math.sin(ls*2+1)*.6; lArm=-1.1-Math.sin(ls*2+1)*.6; }
   if(p.gliding){ rArm=lArm=-2.9; rArmZ=-.4; lArmZ=.4; }
-  if(p.eatCd>.3){ rArm=-1.3+Math.abs(Math.sin(now*14))*.15; rArmY=.45; }
+  if(p.eating||p.eatCd>.3){ rArm=-1.3+Math.abs(Math.sin(now*14))*.15; rArmY=.45; }
   if(bowDraw||p.shotT>0){ rArm=-Math.PI/2; lArm=-Math.PI/2; rArmY=.1; lArmY=-.5; rArmZ=lArmZ=0; }
   if(s>0){ bodyY=-Math.sin(Math.sqrt(s)*Math.PI*2)*.2; let f=1-s; f*=f; f*=f; f=1-f; const f1=Math.sin(f*Math.PI), f2=Math.sin(s*Math.PI)*.7*.75;
     rArm-=f1*1.2+f2; rArmY+=bodyY*2; rArmZ+=Math.sin(s*Math.PI)*.4; lArmY+=bodyY; }
@@ -6521,7 +6532,7 @@ function buildViewModel2(){ PAT=0; CB=0; vmVB.n=0; SKV.fpN=0; if(cam.mode!=='fp'
   const CAM=[R[0],Uc[0],-F[0],P[0], R[1],Uc[1],-F[1],P[1], R[2],Uc[2],-F[2],P[2]];
   const id=s?s.id:0; if(id!==PL.eqId){ PL.eqId=id; PL.eqT=0; } const tnow=performance.now(); PL.eqT=Math.min(1,PL.eqT+Math.min(.1,(tnow-(PL.lt||tnow))/1000)*6); PL.lt=tnow; const eq=(1-PL.eqT);
   const sw=playerSwing(), bob=p.onGround?Math.min(1,(p.speed||0)/6):0, bx=Math.sin(p.phase||0)*.02*bob, by=-Math.abs(Math.cos(p.phase||0))*.03*bob;
-  const drawing=!!bowDraw, eating=p.eatCd>.3, kx=Math.min(1,(cam.tanX||1.2)/1.24), ks=.62+.38*kx; PL.ks=ks;
+  const drawing=!!bowDraw, eating=!!p.eating||p.eatCd>.3, kx=Math.min(1,(cam.tanX||1.2)/1.24), ks=.62+.38*kx; PL.ks=ks;
   setVL(sampleLight(P[0],P[1],P[2]));
   // the arm
   const f1=Math.sqrt(sw), f2=-.3*Math.sin(f1*Math.PI), f3=.4*Math.sin(f1*Math.PI*2), f4=-.4*Math.sin(sw*Math.PI), f5=Math.sin(sw*sw*Math.PI), f6=Math.sin(f1*Math.PI);
@@ -11936,7 +11947,11 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     if (!p.gliding) return; const f = input.mag > .1 ? Math.atan2(input.mx, input.mz) : p.face; p.face = angLerp(p.face, f, 1 - Math.exp(-3 * dt));
     const boost = S.boostT > performance.now(), sp = boost ? 22 : 11, k = 1 - Math.exp(-(boost ? 3 : 1.4) * dt);
     p.vx = lerp(p.vx, Math.sin(p.face) * sp, k); p.vz = lerp(p.vz, Math.cos(p.face) * sp, k); if (boost) p.vy = lerp(p.vy, 3, 1 - Math.exp(-3 * dt)); p.fallTop = p.y; };
+  const EDIBLE = new Set([260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 432, 434, 436]), DRINK = new Set([373, 335]), ANYTIME = new Set([322, 432, 335, 373]);
   { const uh = IMPL.useHeld; IMPL.useHeld = function () { const h = held(), mc = h && h.mc, a = S.client.api;
+      if (mc && (EDIBLE.has(mc.id) || DRINK.has(mc.id))) { if (player.eating) return true;   // the server eats over 32 ticks; Strata shows it the same way
+        if (!ANYTIME.has(mc.id) && S.food >= 20 && world.meta.gameMode !== 'creative') { toast("You're not hungry"); return true; }
+        a.place(-1, -1, -1, 255, mc, 0, 0, 0); startEating(h.id, () => {}, DRINK.has(mc.id)); return true; }
       if (mc && mc.id === 401 && player.gliding) { a.place(-1, -1, -1, 255, mc, 0, 0, 0); S.boostT = performance.now() + 1400; return true; }   // firework boost
       const off = V9() && S.slots[45], shMain = mc && mc.id === 442, shOff = !shMain && off && off.id === 442 && !(mc && (FOOD18.has(mc.id) || mc.id === 386 || mc.id === 387));
       if (V9() && (shMain || shOff)) { if (S.block) { a.dig(5, 0, 0, 0, 0); S.block = false; toast('Shield lowered'); } else { a.useItem(shMain ? 0 : 1); S.block = true; toast('Shield raised - tap again to lower'); } return true; }
@@ -11944,7 +11959,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   // ---- other players: gliding, blocking / drawing a bow, sleeping; elytra wings and shields ----
   function poseArms(pl, A) { if (pl.glide) { A.rArm = A.lArm = 0; A.rArmZ = -.35; A.lArmZ = .35; A.rLeg = A.lLeg = 0; }
     const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null;
-    if (it && it.id === 442) { if (u & 2) A.lArm = -.95; else A.rArm = -.95; } else if (it && it.id === 261) { A.rArm = -PI / 2; A.lArm = -PI / 2 - .2; }
+    if (it && (EDIBLE.has(it.id) || DRINK.has(it.id))) { const b = -1.3 + Math.abs(Math.sin(performance.now() / 1000 * 14)) * .15; if (u & 2) A.lArm = b; else A.rArm = b; }
+    else if (it && it.id === 442) { if (u & 2) A.lArm = -.95; else A.rArm = -.95; } else if (it && it.id === 261) { A.rArm = -PI / 2; A.lArm = -PI / 2 - .2; }
     if (pl.sleep) A.rArm = A.lArm = A.rLeg = A.lLeg = 0; }
   function sleepBase(pl, PX) { const s = pl.sleep; return mc(mT(s[0], s[1], s[2]), mY(s[3]), mX(-PI / 2), mS(PX)); }
   function shieldOn(arm, x0) { const T = (a, b, c) => ap(arm, a, b, c); emitBox(dynVB, [x0 - 6, 2, 2], [x0 + 6, 20, 3.5], [150, 112, 70], T); emitBox(dynVB, [x0 - 1, 9, 3.5], [x0 + 1, 13, 4], [120, 120, 126], T); return true; }
@@ -11954,6 +11970,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
     m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
   function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+      for (const pl of S.players) { const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null; if (it && (EDIBLE.has(it.id) || DRINK.has(it.id)) && (pl.crumbT = (pl.crumbT || 0) - 1) <= 0) { pl.crumbT = 6; const st = toStack(it); eatCrumbs(pl.x, pl.y, pl.z, pl.face, st && st.id, DRINK.has(it.id)); } }
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
   // ---- skulls and player heads (block 144): drawn from the block entity, with the owner's skin for player heads ----

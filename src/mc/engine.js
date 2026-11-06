@@ -1393,7 +1393,11 @@
     if (!p.gliding) return; const f = input.mag > .1 ? Math.atan2(input.mx, input.mz) : p.face; p.face = angLerp(p.face, f, 1 - Math.exp(-3 * dt));
     const boost = S.boostT > performance.now(), sp = boost ? 22 : 11, k = 1 - Math.exp(-(boost ? 3 : 1.4) * dt);
     p.vx = lerp(p.vx, Math.sin(p.face) * sp, k); p.vz = lerp(p.vz, Math.cos(p.face) * sp, k); if (boost) p.vy = lerp(p.vy, 3, 1 - Math.exp(-3 * dt)); p.fallTop = p.y; };
+  const EDIBLE = new Set([260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 432, 434, 436]), DRINK = new Set([373, 335]), ANYTIME = new Set([322, 432, 335, 373]);
   { const uh = IMPL.useHeld; IMPL.useHeld = function () { const h = held(), mc = h && h.mc, a = S.client.api;
+      if (mc && (EDIBLE.has(mc.id) || DRINK.has(mc.id))) { if (player.eating) return true;   // the server eats over 32 ticks; Strata shows it the same way
+        if (!ANYTIME.has(mc.id) && S.food >= 20 && world.meta.gameMode !== 'creative') { toast("You're not hungry"); return true; }
+        a.place(-1, -1, -1, 255, mc, 0, 0, 0); startEating(h.id, () => {}, DRINK.has(mc.id)); return true; }
       if (mc && mc.id === 401 && player.gliding) { a.place(-1, -1, -1, 255, mc, 0, 0, 0); S.boostT = performance.now() + 1400; return true; }   // firework boost
       const off = V9() && S.slots[45], shMain = mc && mc.id === 442, shOff = !shMain && off && off.id === 442 && !(mc && (FOOD18.has(mc.id) || mc.id === 386 || mc.id === 387));
       if (V9() && (shMain || shOff)) { if (S.block) { a.dig(5, 0, 0, 0, 0); S.block = false; toast('Shield lowered'); } else { a.useItem(shMain ? 0 : 1); S.block = true; toast('Shield raised - tap again to lower'); } return true; }
@@ -1401,7 +1405,8 @@
   // ---- other players: gliding, blocking / drawing a bow, sleeping; elytra wings and shields ----
   function poseArms(pl, A) { if (pl.glide) { A.rArm = A.lArm = 0; A.rArmZ = -.35; A.lArmZ = .35; A.rLeg = A.lLeg = 0; }
     const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null;
-    if (it && it.id === 442) { if (u & 2) A.lArm = -.95; else A.rArm = -.95; } else if (it && it.id === 261) { A.rArm = -PI / 2; A.lArm = -PI / 2 - .2; }
+    if (it && (EDIBLE.has(it.id) || DRINK.has(it.id))) { const b = -1.3 + Math.abs(Math.sin(performance.now() / 1000 * 14)) * .15; if (u & 2) A.lArm = b; else A.rArm = b; }
+    else if (it && it.id === 442) { if (u & 2) A.lArm = -.95; else A.rArm = -.95; } else if (it && it.id === 261) { A.rArm = -PI / 2; A.lArm = -PI / 2 - .2; }
     if (pl.sleep) A.rArm = A.lArm = A.rLeg = A.lLeg = 0; }
   function sleepBase(pl, PX) { const s = pl.sleep; return mc(mT(s[0], s[1], s[2]), mY(s[3]), mX(-PI / 2), mS(PX)); }
   function shieldOn(arm, x0) { const T = (a, b, c) => ap(arm, a, b, c); emitBox(dynVB, [x0 - 6, 2, 2], [x0 + 6, 20, 3.5], [150, 112, 70], T); emitBox(dynVB, [x0 - 1, 9, 3.5], [x0 + 1, 13, 4], [120, 120, 126], T); return true; }
@@ -1411,6 +1416,7 @@
   function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
     m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
   function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+      for (const pl of S.players) { const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null; if (it && (EDIBLE.has(it.id) || DRINK.has(it.id)) && (pl.crumbT = (pl.crumbT || 0) - 1) <= 0) { pl.crumbT = 6; const st = toStack(it); eatCrumbs(pl.x, pl.y, pl.z, pl.face, st && st.id, DRINK.has(it.id)); } }
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
   // ---- skulls and player heads (block 144): drawn from the block entity, with the owner's skin for player heads ----
