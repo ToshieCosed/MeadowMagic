@@ -163,3 +163,8 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - Chat: colours, bold/italic/underline/strike, § codes and clickable http(s) links; action bar text above the hotbar.
 - HUD: 👥 player list with ping bars and the server's header/footer; scoreboard sidebar; titles and subtitles.
 - Dimensions: the Nether uses Strata's Underworld sky/fog/roof, the End uses the Dusk look; no sun or moon there.
+
+## Minor versions (2026-11-06)
+- The version menu lists every release by name (1.8, 1.8.1 … 1.8.9, 1.9, 1.9.1, 1.9.2 … 26.1). Releases that share a protocol number behave identically on the wire (all of 1.8.x is protocol 47; 1.10.x is 210; 1.11.1/1.11.2 are 316; and so on), so each one maps to its protocol.
+- Packet tables now cover 48 protocols, including the in-between ones (107, 108, 109, 315, 335, 338, 393, 401, 477, 480, 485, 490, 573, 575, 735, 736, 751, 753, 755, 757). `node test-mcproto.mjs` logs in and chats on all of them.
+- The world view (blocks, entities, inventory) is still 1.8 only; other versions get login + chat until their world code lands.

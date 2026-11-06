@@ -41,7 +41,7 @@ server.on('login', c => {
 });
 const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: 420, height: 900 } }); const errs = []; pg.on('pageerror', e => errs.push(e.message + ' @ ' + (e.stack || '').split('\n').slice(1, 3).join('|'))); pg.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|Failed to load resource/.test(m.text())) errs.push('console: ' + m.text().slice(0, 160)); });
 await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html'); await pg.waitForSelector('#mpBtn'); await pg.click('#mpBtn'); await pg.click('[data-mp=minecraft]');
-await pg.selectOption('#mcVer', { label: '1.8 - 1.8.9 (protocol 47)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:25592'); await pg.dispatchEvent('#mcRelay', 'change');
+await pg.selectOption('#mcVer', { label: '1.8.9 (protocol 47)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:25592'); await pg.dispatchEvent('#mcRelay', 'change');
 await pg.fill('#mcHost', '127.0.0.1:25778'); await pg.click('#mcGo');
 await pg.waitForFunction(() => typeof mode !== 'undefined' && mode === 'play', null, { timeout: 90000 }).catch(() => {});
 await wait(5000);
