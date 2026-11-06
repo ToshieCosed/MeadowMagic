@@ -164,6 +164,9 @@
         case 'update_health': if (P === 47 && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
         case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
         case 'set_slot': if (P === 47 && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
+        case 'open_window': if (P === 47 && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
+        case 'close_window': if (P === 47 && H && H.closeWin) H.closeWin(r.b()); return;
+        case 'craft_progress_bar': if (P === 47 && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;
         case 'window_items': if (P === 47 && H && H.items) { const wid = r.b(), n = r.i16(), l = []; for (let i = 0; i < n; i++) l.push(slot18(r)); H.items(wid, l); } return;
         case 'game_state_change': if (P === 47 && H && H.gameState) { const rs = r.b(), v = r.f32(); H.gameState(rs, v); } return;
         case 'position': if (P === 47 && H) {
@@ -314,6 +317,9 @@
       swing: v47(() => out('arm_animation')),
       respawn: v47(() => out('client_command', new W().vi(0))),
       attack: v47(eid => out('use_entity', new W().vi(eid).vi(1))),
+      closeWin: v47(wid => out('close_window', new W().b(wid))),
+      creative: v47((slot, item) => { const w = new W().b(slot >> 8).b(slot); slotOut(w, item); return out('set_creative_slot', w); }),
+      chatCmd: t => chat(t),
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }

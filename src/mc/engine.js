@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 54: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 58: 'walker', 120: 'lost',
     50: 'mc_creeper', 56: 'mc_ghast', 57: 'mc_pigman', 59: 'mc_cave_spider', 60: 'mc_silverfish', 61: 'mc_blaze', 62: 'mc_magma_cube', 63: 'mc_dragon', 64: 'mc_wither', 66: 'mc_witch', 67: 'mc_endermite', 68: 'mc_guardian',
     96: 'mc_mooshroom', 97: 'mc_snowman', 98: 'mc_ocelot', 99: 'mc_iron_golem', 101: 'mc_rabbit', 94: null };   // mc_* models exist only in compat mode (see CM below); anything else (fish, phantoms, ...) is skipped
@@ -119,6 +119,7 @@
       const m = /^(wooden|stone|iron|golden|diamond)_(pickaxe|axe|shovel|sword|hoe)$/.exec(it[0]);
       if (m) sid = GEN[TOOLS[m[1]] + ':' + TT[m[2]]] || 0;
       if (!sid && it[0] === 'bow') sid = GEN['wood:bow'] || 0;
+      if (!sid && it[0] === 'reeds' && ITEMS[B.SUGAR_CANE]) sid = B.SUGAR_CANE;   // the sugar cane item is Strata's placeable cane, not a sugar-looking compat item
       if (!sid) { if (!S.byName) { S.byName = new Map(); for (let i = 0; i < ITEMS.length; i++) if (ITEMS[i] && ITEMS[i].name && !ITEMS[i].mcCompat) S.byName.set(ITEMS[i].name.toLowerCase(), i); }
         const nm = it[1].toLowerCase().replace('cap', 'helmet').replace('tunic', 'chestplate').replace('pants', 'leggings').replace('golden', 'gold'); sid = S.byName.get(nm) || S.byName.get(it[1].toLowerCase()) || 0; }
     }
@@ -139,7 +140,7 @@
     for (let i = 0; i < 9; i++) inv.slots[i] = toStack(S.slots[36 + i]);
     for (let i = 9; i < 36; i++) inv.slots[i] = toStack(S.slots[i]);
     for (let k = 0; k < 4; k++) inv.armor[k] = toStack(S.slots[5 + k]);
-    inv.cursor = toStack(S.cursor); invChanged(); if (mode === 'inv') renderInv();
+    inv.cursor = toStack(S.cursor); invChanged(); if (mode === 'inv') mcInvRender();
   }
   const faceOf = r => { const h = r.hit, p = r.prev; if (!p) return 1; const d = [p[0] - h[0], p[1] - h[1], p[2] - h[2]]; return d[1] < 0 ? 0 : d[1] > 0 ? 1 : d[2] < 0 ? 2 : d[2] > 0 ? 3 : d[0] < 0 ? 4 : 5; };
 
@@ -408,6 +409,83 @@
     for (let i = arrows.length - 1; i >= 0; i--) if (arrows[i].mc) arrows.splice(i, 1);
     const hc = document.getElementById('mcHunger'); if (hc) hc.remove();
   }
+  // ---- Minecraft-style inventory and container screens (compat only) -------------------------------------------------
+  // Every slot here is the server's: clicks go out as window_click and the screen redraws from window_items/set_slot.
+  // Strata's own crafting grid, recipe book and item catalog are never shown in compat mode.
+  const WINS = {   // 1.8 window type -> container slot count (when the packet says 0) and layout
+    'minecraft:crafting_table': { n: 10, kind: 'craft3' }, 'minecraft:furnace': { n: 3, kind: 'furnace' }, 'minecraft:enchanting_table': { n: 2, kind: 'enchant' },
+    'minecraft:anvil': { n: 3, kind: 'anvil' }, 'minecraft:brewing_stand': { n: 4, kind: 'brew' }, 'minecraft:beacon': { n: 1, kind: 'beacon' }, 'minecraft:villager': { n: 3, kind: 'trade' },
+    'minecraft:dispenser': { kind: 'grid3' }, 'minecraft:dropper': { kind: 'grid3' }, 'minecraft:hopper': { kind: 'row' } };
+  const WTITLE = { 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chest': 'Chest', 'container.chestDouble': 'Large Chest', 'container.enchant': 'Enchant', 'container.brewing': 'Brewing Stand', 'container.dispenser': 'Dispenser', 'container.dropper': 'Dropper', 'container.hopper': 'Item Hopper', 'container.repair': 'Repair & Name', 'container.beacon': 'Beacon', 'container.enderchest': 'Ender Chest' };
+  const winOff = () => S.win ? S.win.n : 9;                 // where the player's main inventory starts in the open window
+  const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
+  function mcInvEl() {
+    let el = document.getElementById('mcInv'); if (el) return el;
+    if (!document.getElementById('mcInvCss')) { const st = document.createElement('style'); st.id = 'mcInvCss'; st.textContent = '#mcInv .mcBody{overflow:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:12px}#mcInv .mcTop{display:flex;gap:16px;align-items:center;flex-wrap:wrap}#mcInv .mcG{display:grid;gap:4px}#mcInv .mcArrow{font-size:22px;color:var(--muted);position:relative}#mcInv .mcBar{display:block;height:5px;border-radius:3px;background:#0005;overflow:hidden;width:46px;margin-top:4px}#mcInv .mcBar i{display:block;height:100%;background:#f0b23a}#mcInv .lbl{font-size:10px;color:var(--muted);text-align:center;line-height:1.1}#mcInv h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}#mcInv .mcCat{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px;max-height:220px;overflow:auto}'; document.head.appendChild(st); }
+    el = document.createElement('section'); el.id = 'mcInv'; el.className = 'panel'; el.hidden = true; el.setAttribute('aria-label', 'Inventory');
+    el.innerHTML = '<header><h2 id="mcInvTitle">Inventory</h2><span id="mcHold"></span><button class="ghost" id="mcOne" aria-pressed="false">Place 1</button><button class="ghost" id="mcShift" aria-pressed="false">Quick move</button><button class="ghost" id="mcCre" hidden aria-pressed="false">Creative items</button><button class="primary" id="mcInvDone">Done</button></header><div class="mcBody"><div id="mcCatBox" hidden><h3>Creative items</h3><input type="text" id="mcCatQ" placeholder="Search items" aria-label="Search items" style="margin-bottom:6px"><div class="mcCat" id="mcCat"></div></div><div class="mcTop" id="mcTop"></div><div><h3>Inventory</h3><div class="grid9" id="mcMain"></div></div><div><h3>Hotbar</h3><div class="grid9" id="mcHot"></div></div></div>';
+    document.body.appendChild(el);
+    const tog = (id, k) => el.querySelector(id).addEventListener('click', e => { S[k] = !S[k]; e.currentTarget.setAttribute('aria-pressed', S[k]); if (k === 'cre') mcInvRender(); });
+    tog('#mcOne', 'one'); tog('#mcShift', 'shift'); tog('#mcCre', 'cre'); el.querySelector('#mcInvDone').addEventListener('click', () => closeInv());
+    el.querySelector('#mcCatQ').addEventListener('input', () => mcCatRender());
+    return el;
+  }
+  function mcSlot(parent, k, opts) {   // one window slot (k in the open window's numbering)
+    const o = opts || {}, it = o.item !== undefined ? o.item : slotOf(S.win, k), st = it ? toStack(it) : null, b = document.createElement('button');
+    b.className = 'islot' + (o.cls ? ' ' + o.cls : '') + (!st && o.lbl ? ' ghostslot' : ''); b.innerHTML = st ? slotHTML(st) : o.lbl ? `<span class="lbl">${o.lbl}</span>` : '';
+    b.setAttribute('aria-label', (o.lbl ? o.lbl + ': ' : '') + (st ? slotLabel(st) : 'empty'));
+    b.addEventListener('click', () => mcClick(k)); parent.appendChild(b); return b;
+  }
+  function mcClick(k) {
+    const W = S.win, wid = W ? W.id : 0, cre = world.meta.gameMode === 'creative';
+    if (cre && S.ccur) {   // a creative item in hand: set the slot directly (player inventory only)
+      const off = winOff(), inv0 = k >= off ? (k - off < 27 ? 9 + (k - off) : 36 + (k - off - 27)) : (!W && k >= 5 && k <= 8 ? k : -1);
+      if (inv0 >= 0) { S.client.api.creative(inv0, S.ccur); if (!S.one) S.ccur = null; mcInvRender(); } return; }
+    S.client.api.click(k, S.one ? 1 : 0, S.action++, S.shift ? 1 : 0, slotOf(W, k), wid);
+  }
+  const grid = (cols) => { const g = document.createElement('div'); g.className = 'mcG'; g.style.gridTemplateColumns = `repeat(${cols},minmax(0,52px))`; return g; };
+  const arrow = (pct) => { const a = document.createElement('span'); a.className = 'mcArrow'; a.textContent = '→'; if (pct != null) { const b = document.createElement('span'); b.className = 'mcBar'; b.innerHTML = `<i style="width:${Math.round(pct * 100)}%"></i>`; a.appendChild(b); } return a; };
+  function mcInvRender() {
+    const el = document.getElementById('mcInv'); if (!el || el.hidden) return; const W = S.win, top = el.querySelector('#mcTop'), cre = world.meta.gameMode === 'creative'; top.innerHTML = '';
+    el.querySelector('#mcInvTitle').textContent = W ? WTITLE[W.title] || (W.title || 'Container').replace(/^container\./, '') : 'Inventory';
+    const cur = S.ccur || S.cursor, cs = cur && toStack(cur); el.querySelector('#mcHold').innerHTML = cs ? `<small class="hint">Holding</small> ${slotHTML({ ...cs, n: 1 }).replace(/<span class="dur".*$/, '')} <small></small>` : '<small class="hint">Tap a slot to pick up, tap another to put down</small>';
+    if (cs) el.querySelector('#mcHold small:last-child').textContent = slotLabel(cs);
+    el.querySelector('#mcCre').hidden = !cre; el.querySelector('#mcCatBox').hidden = !(cre && S.cre); if (cre && S.cre) mcCatRender();
+    const kind = W ? W.kind : 'player';
+    if (kind === 'player') { const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); top.appendChild(arm);
+      const g = grid(2); for (let i = 1; i <= 4; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); }
+    else if (kind === 'craft3') { const g = grid(3); for (let i = 1; i <= 9; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); }
+    else if (kind === 'furnace') { const p = W.prop || {}, g = grid(1); mcSlot(g, 0, { lbl: 'Smelt' }); const fl = document.createElement('span'); fl.className = 'lbl'; fl.textContent = p[1] ? '🔥 ' + Math.round(100 * (p[0] || 0) / p[1]) + '%' : ''; g.appendChild(fl); mcSlot(g, 1, { lbl: 'Fuel' }); top.appendChild(g); top.appendChild(arrow((p[2] || 0) / (p[3] || 200))); mcSlot(top, 2, { cls: 'out' }); }
+    else if (kind === 'brew') { const g = grid(3); mcSlot(top, 3, { lbl: 'Ingredient' }); for (let i = 0; i < 3; i++) mcSlot(g, i, { lbl: 'Bottle' }); top.appendChild(arrow(W.prop && W.prop[0] ? 1 - W.prop[0] / 400 : null)); top.appendChild(g); }
+    else if (kind === 'enchant') { mcSlot(top, 0, { lbl: 'Item' }); mcSlot(top, 1, { lbl: 'Lapis' }); }
+    else if (kind === 'anvil') { mcSlot(top, 0, { lbl: 'Item' }); top.appendChild(Object.assign(document.createElement('span'), { className: 'mcArrow', textContent: '+' })); mcSlot(top, 1, { lbl: 'Add' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
+    else if (kind === 'trade') { mcSlot(top, 0, { lbl: 'Pay' }); mcSlot(top, 1, { lbl: 'Pay' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
+    else { const g = grid(kind === 'grid3' ? 3 : Math.min(9, W.n)); for (let i = 0; i < W.n; i++) mcSlot(g, i); top.appendChild(g); }
+    const off = winOff(), mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = '';
+    for (let i = 0; i < 27; i++) mcSlot(mn, off + i); for (let i = 0; i < 9; i++) mcSlot(ht, off + 27 + i, { cls: i === inv.sel ? 'sel' : '' });
+  }
+  function mcCatList() {   // every 1.8 item (and the colour variants of wool, dye, clay, glass) for the creative screen
+    if (S.cat) return S.cat; const L = [], it = StrataMC.items18;
+    for (const k in it) { const id = +k; if (id === 0) continue; if ([35, 159, 160, 171, 95, 351].includes(id)) for (let d = 0; d < 16; d++) L.push({ id, d }); else L.push({ id, d: 0 }); }
+    return (S.cat = L);
+  }
+  function mcCatRender() {
+    const box = document.getElementById('mcCat'); if (!box) return; const q = (document.getElementById('mcCatQ').value || '').trim().toLowerCase(); box.innerHTML = ''; let n = 0;
+    for (const e of mcCatList()) { const mcIt = { id: e.id, count: 1, damage: e.d, raw: new Uint8Array([(e.id >> 8) & 255, e.id & 255, 1, (e.d >> 8) & 255, e.d & 255, 0]) }, st = toStack(mcIt), nm = st && ITEMS[st.id] ? ITEMS[st.id].name : '';
+      if (q && !nm.toLowerCase().includes(q)) continue; if (++n > 400) break;
+      const b = document.createElement('button'); b.className = 'islot'; b.innerHTML = slotHTML({ ...st, n: 1 }); b.title = nm; b.setAttribute('aria-label', 'Take ' + nm);
+      b.addEventListener('click', () => { const stack = S.one ? 1 : Math.max(1, (StrataMC.items18[e.id] || [])[2] || 64); S.ccur = { ...mcIt, count: stack, raw: new Uint8Array([(e.id >> 8) & 255, e.id & 255, stack, (e.d >> 8) & 255, e.d & 255, 0]) }; mcInvRender(); });
+      box.appendChild(b); }
+  }
+  function mcInvOpen() { const el = mcInvEl(); mining = null; mode = 'inv'; el.hidden = false; document.getElementById('hud').style.visibility = 'hidden'; mcInvRender(); }
+  function mcInvClose(send) {
+    const el = document.getElementById('mcInv'); if (send && S.client) S.client.api.closeWin(S.win ? S.win.id : 0);   // the server returns crafting-grid items
+    S.win = null; S.ccur = null; if (el) el.hidden = true; document.getElementById('hud').style.visibility = ''; if (mode === 'inv') mode = 'play'; try { renderHotbar(); } catch (e) { /* ui */ }
+  }
+  function mcWinOpen(wid, type, title, n) {
+    const w = WINS[type] || {}, size = w.n != null ? w.n : n; let t = title; try { const j = JSON.parse(title); t = typeof j === 'string' ? j : t; } catch (e) { /* plain */ }
+    S.win = { id: wid, type, title: t, n: size, kind: w.kind || 'grid', slots: new Array(size + 36).fill(null), prop: {} }; mcInvOpen();
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -479,7 +557,10 @@
     },
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
-    stepArrows() {},   // the only arrows in a compat world are the server's, moved by stepProj
+    stepArrows() {},
+
+    openInv() { if (mode === 'play') mcInvOpen(); },
+    closeInv() { mcInvClose(true); },   // the only arrows in a compat world are the server's, moved by stepProj
     emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
       if (m.mc) { try { mobExtras(vb, m); } catch (e) { if (!S.exErr) { S.exErr = 1; console.error('mob extras', e); } } } },
@@ -499,7 +580,7 @@
     if (S.world) return;
     S.OX = 1024 - Math.floor(ax / 16) * 16; S.OZ = 1024 - Math.floor(az / 16) * 16;
     for (const n of OVR) { S.saved[n] = window[n]; window[n] = IMPL[n] ? IMPL[n] : function () {}; }
-    window.__mcActive = true; window.__cmobs = S.mobs;
+    window.__mcActive = true; window.__cmobs = S.mobs; window.__mcTimeCmd = w => { S.client.chat('/time set ' + w); toast('Asked the server to set the time to ' + w); };
     const meta = { id: 'mcompat', name: S.o.host, seedNum: 1, size: SIZE, height: HGT, gen: 'mcompat', sea: 63, gameMode: S.gm === 1 ? 'creative' : 'survival', mc: 1 };
     enterPlay(meta, null); S.world = true;
     world.radius = 8; world.ready = () => true; player.maxHp = 20; player.hp = S.hp != null ? S.hp : 20; syncInv();
@@ -513,12 +594,21 @@
     const Hd = {
       cur: null,
       login(p) { S.gm = p.gamemode; S.eid = p.eid; }, respawn() { for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); },
-      time() {},
+      time(age, tod) {   // the server's clock drives Strata's day/night: 24000 ticks, day = 0..12000 (sunrise at 0), 10 min day + 10 min night
+        S.tod = tod; if (!S.world) return; world.dayLen = world.nightLen = 600; const fixed = tod < 0, t = Math.abs(tod), d = ((t % 24000) + 24000) % 24000, T = 1200;
+        world.time = Math.floor(t / 24000) * T + (d < 12000 ? d / 12000 * 600 : 600 + (d - 12000) / 12000 * 600); S.timeFixed = fixed; try { syncSkip(); } catch (e) { /* ui */ } },
       health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (S.lastHp != null && hp < S.lastHp) hurtFx(); S.lastHp = hp; player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
-      items(wid, l) { if (wid === 0) { S.slots = l.slice(0, 45); while (S.slots.length < 45) S.slots.push(null); syncInv(); } },
-      slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); } },
+      items(wid, l) { if (wid === 0) { S.slots = l.slice(0, 45); while (S.slots.length < 45) S.slots.push(null); syncInv(); }
+        else if (S.win && wid === S.win.id) { S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
+        mcInvRender(); },
+      openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
+      closeWin(wid) { if (S.win && S.win.id === wid) mcInvClose(false); },
+      winProp(wid, k, v) { if (S.win && S.win.id === wid) { S.win.prop[k] = v; mcInvRender(); } },
+      slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); }
+        else if (S.win && wid === S.win.id && sl >= 0) { S.win.slots[sl] = it; const o = S.win.n, j = sl - o; if (j >= 0 && j < 27) S.slots[9 + j] = it; else if (j >= 27 && j < 36) S.slots[36 + j - 27] = it; syncInv(); }
+        mcInvRender(); },
       position(p) {
         const c = Hd.cur || { x: 0, y: 0, z: 0 }, x = (p.flags & 1 ? c.x : 0) + p.x, y = (p.flags & 2 ? c.y : 0) + p.y, z = (p.flags & 4 ? c.z : 0) + p.z;
         ensureWorld(x, z); Hd.cur = { x, y, z };
@@ -618,11 +708,11 @@
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
-    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
+    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];
-      document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null;
+      document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null; window.__mcTimeCmd = null;
       for (const id of s.regs) { BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;
       document.getElementById('menu').hidden = true; startPreview();
