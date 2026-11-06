@@ -125,3 +125,10 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - Note blocks: the server's `note.*` sounds play through a small synth (harp, bass, drum, snare, hat) with a coloured note particle by pitch.
 - Moon: at night (server time) a pale moon crosses the sky in first-person/close views, hidden by blocks like the sun.
 - Not in 1.8: shulker boxes (1.11) come with later protocol versions.
+
+## Stage 15 (1.8): inventory that keeps up
+- In 1.8 the server does not send back the slots a normal click changes (the client is expected to apply the click itself). The compat screen now applies every pickup/put-down/swap/merge/split locally the moment you tap, exactly like `Container.slotClick` mode 0, and sends the click with the item that was in the slot so the server accepts it. Taking from a crafting output also uses up one of each grid item locally; the server sends the next result.
+- "Send across" (shift-click) is too rule-heavy to predict, so it goes out with a deliberately different item: the server does the move, rejects the guess and resends the whole window. Further taps wait for that answer (max 2.5 s) so none are lost.
+- Tap modes: "whole stack", "one item", "send across"; press and hold any slot for one item. Labels and the Holding line use Minecraft's own item names.
+- The bag/inventory buttons were bound to Strata's original inventory at load time, which showed Strata recipes in Minecraft mode; they now call whichever inventory is active.
+- Test harness note: under SwiftShader the page is too slow to answer the test server's keep-alives in time, so that server kicks after ~30 s; keep-alive replies themselves are correct.

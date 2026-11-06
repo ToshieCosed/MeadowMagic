@@ -10,6 +10,10 @@ function makeChunk() { const c = new C(); for (let x = 0; x < 16; x++) for (let 
 const TYPES = (process.env.TYPES || '54,51,57,50,58,52,59,60,67,61,56,62,55,66,97,99,98,101,96,92,90,91,93,95,100,65,94,120,68,53,64,63').split(',').map(Number);
 const sl = (id, count, damage) => ({ blockId: id, itemCount: count, itemDamage: damage, nbtData: undefined });
 server.on('login', c => {
+  if (process.env.KA) { c.on('packet', (d, m) => { if (m.name === 'keep_alive') console.error('ka-reply', JSON.stringify(d)); }); const kw = c.write.bind(c); c.write = (n, d) => { if (n === 'keep_alive') console.error('ka-sent', JSON.stringify(d)); return kw(n, d); }; }
+  if (process.env.INV2) { let grid = 0; c.on('packet', (d, m) => { if (m.name !== 'window_click') return; console.error('click', JSON.stringify({ slot: d.slot, b: d.mouseButton, mode: d.mode, item: d.item && d.item.blockId, n: d.item && d.item.itemCount }));
+    if (d.slot >= 1 && d.slot <= 4 && ++grid === 4) c.write('set_slot', { windowId: 0, slot: 0, item: { blockId: 58, itemCount: 1, itemDamage: 0 } });   // like the server: the crafting result arrives
+    if (d.mode === 1) { c.write('transaction', { windowId: 0, action: d.action, accepted: false }); } }); }
   c.write('login', { entityId: c.id, gameMode: +(process.env.GM || 0), dimension: 0, difficulty: 0, maxPlayers: 5, levelType: 'default', reducedDebugInfo: false });
   c.write('position', { x: 40.5, y: 61, z: 40.5, yaw: 0, pitch: 0, flags: 0 });
   for (let cx = 0; cx < 6; cx++) for (let cz = 0; cz < 6; cz++) { const ch = makeChunk(); c.write('map_chunk', { x: cx, z: cz, groundUp: true, bitMap: ch.getMask(), chunkData: ch.dump() }); }
@@ -43,6 +47,7 @@ await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html
 if (process.env.PACK) { const zip = req('child_process').execFileSync('python3', [process.cwd() + '/make-entity-pack.py']); await pg.evaluate(async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); window.__testPack = await importPack(new File([bin], 'testpack.zip')); }, zip.toString('base64')); }
 await pg.$eval('#mpBtn', e => e.click()); await pg.$eval('[data-mp=minecraft]', e => e.click());
 await pg.selectOption('#mcVer', { label: '1.8 - 1.8.9 (protocol 47)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:25593'); await pg.dispatchEvent('#mcRelay', 'change');
+if (process.env.KA) await pg.evaluate(() => { const os = WebSocket.prototype.send; window.__out = {}; WebSocket.prototype.send = function (d) { if (typeof d !== 'string') { const u = new Uint8Array(d.buffer ? d.buffer : d); const k = u[0] + ':' + u.length; window.__out[k] = (window.__out[k] || 0) + 1; } else window.__out[d.slice(0, 40)] = 1; return os.call(this, d); }; window.__kad = []; window.__mcDebug = t => { if (window.__kad.length < 400) window.__kad.push(t); }; });
 await pg.fill('#mcHost', '127.0.0.1:25779'); await pg.$eval('#mcGo', e => e.click());
 await pg.waitForFunction(() => typeof mode !== 'undefined' && mode === 'play', null, { timeout: +(process.env.PLAYWAIT || 120000) }).catch(() => {}); console.error('mode', await pg.evaluate(() => { const S = StrataMCE.dbg(); return JSON.stringify({ mode, w: S && S.world, st: S && S.store.size, ch: world && world.chunks.size, p: [player.x, player.y, player.z], mobs: S && S.mobs.length, log: (document.getElementById('mcLog') || {}).innerText }); }));
 if (process.env.PACK) await pg.evaluate(async () => { await applyPack(window.__testPack);
@@ -70,6 +75,15 @@ if (process.env.B2) { await pg.evaluate(() => { const S = StrataMCE.dbg(); playe
   await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 42.5 + S.OX; player.z = 46 + S.OZ; cam.mode = 'fp'; cam.fpYaw = Math.PI; cam.fpPitch = .05; }); await wait(2500); await pg.screenshot({ path: '/tmp/b2-fp.png' });
   if (process.env.NIGHT) { await pg.evaluate(() => { const d = moonDir() || [0, 1, 0]; cam.fpYaw = Math.atan2(d[0], d[2]); cam.fpPitch = Math.asin(d[1]); }); await wait(2000); await pg.screenshot({ path: '/tmp/b2-moon.png' }); }
   console.error('b2', await pg.evaluate(() => { const S = StrataMCE.dbg(); return JSON.stringify({ beacons: [...S.beacons], objs: S.objs.size, paint: S.paint.size, t: world.time, dl: world.dayLen }); })); }
+if (process.env.KA) { for (let i = 0; i < 8; i++) { await wait(10000); console.error('ka', i, await pg.evaluate(() => JSON.stringify(window.__out)), await pg.evaluate(() => JSON.stringify(window.__kad.filter(t => !/map_chunk|entity|rel_|block_change|spawn|sound|time/.test(t)).slice(-12)))); } }
+if (process.env.INV2) { const r = await pg.evaluate(async () => { const W = ms => new Promise(r => setTimeout(r, ms)), S = StrataMCE.dbg(), out = [];
+    S.slots[36] = { id: 5, count: 4, damage: 0, raw: new Uint8Array([0, 5, 4, 0, 0, 0]) }; S.slots.fill(null, 37, 45); openInv(); await W(300);
+    const nm = () => [S.cursor && S.cursor.count, [1, 2, 3, 4].map(i => S.slots[i] && S.slots[i].count).join(','), S.slots[36] && S.slots[36].count, S.slots[0] && S.slots[0].id];
+    const btn = k => document.querySelectorAll('#mcHot .islot')[k - 36] || null; btn(36).click(); out.push(['pick', ...nm()]);
+    for (const g of [1, 2, 3, 4]) { const el = [...document.querySelectorAll('#mcTop .islot')].find((b, i) => i === 4 + g - 1); S.tap = 'one'; el.click(); } S.tap = 'stack'; out.push(['grid', ...nm(), document.getElementById('mcHold').textContent.trim()]);
+    await W(1500); out.push(['result', ...nm()]); [...document.querySelectorAll('#mcTop .islot')].find(b => b.classList.contains('out')).click(); out.push(['take', ...nm(), document.getElementById('mcHold').textContent.trim()]);
+    S.tap = 'quick'; btn(36).click(); out.push(['quickWait', S.waitAct != null]); await W(1500); out.push(['quickDone', S.waitAct == null]); return out; });
+  console.error('inv2', JSON.stringify(r)); await pg.screenshot({ path: '/tmp/mcinv2.png' }); await pg.evaluate(() => closeInv()); }
 const info = await pg.evaluate(() => { const S = StrataMCE.dbg(); return { hot: inv.slots.slice(0, 9).map(s => s && ITEMS[s.id] && ITEMS[s.id].name), cane: world.get(40 + S.OX, 61, 44 + S.OZ) === B.SUGAR_CANE, mobs: (window.__cmobs || []).map(m => m.type), proj: arrows.filter(a => a.mc).length, food: S.food, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, armed: (window.__cmobs || []).filter(m => m.eq && m.eq[0]).length }; });
 await pg.$eval('#mcLeave', e => e.click()).catch(() => {}); await wait(1200);
 const after = await pg.evaluate(() => ({ active: StrataMCE.active, models: Object.keys(__skins.MODELS).filter(k => k.startsWith('mc')), arrows: arrows.length, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, mobT: Object.keys(MOB).filter(k => k.startsWith('mc')) }));

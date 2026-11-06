@@ -154,7 +154,7 @@
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); return;
-        case 'transaction': if (P === 47) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
+        case 'transaction': if (P === 47) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); if (H && H.trans) H.trans(wid, act, ok); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
           if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand

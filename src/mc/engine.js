@@ -447,33 +447,57 @@
     let el = document.getElementById('mcInv'); if (el) return el;
     if (!document.getElementById('mcInvCss')) { const st = document.createElement('style'); st.id = 'mcInvCss'; st.textContent = '#mcInv .mcBody{overflow:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:12px}#mcInv .mcTop{display:flex;gap:16px;align-items:center;flex-wrap:wrap}#mcInv .mcG{display:grid;gap:4px}#mcInv .mcArrow{font-size:22px;color:var(--muted);position:relative}#mcInv .mcBar{display:block;height:5px;border-radius:3px;background:#0005;overflow:hidden;width:46px;margin-top:4px}#mcInv .mcBar i{display:block;height:100%;background:#f0b23a}#mcInv .lbl{font-size:10px;color:var(--muted);text-align:center;line-height:1.1}#mcInv h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}#mcInv .mcCat{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px;max-height:220px;overflow:auto}'; document.head.appendChild(st); }
     el = document.createElement('section'); el.id = 'mcInv'; el.className = 'panel'; el.hidden = true; el.setAttribute('aria-label', 'Inventory');
-    el.innerHTML = '<header><h2 id="mcInvTitle">Inventory</h2><span id="mcHold"></span><button class="ghost" id="mcOne" aria-pressed="false">Place 1</button><button class="ghost" id="mcShift" aria-pressed="false">Quick move</button><button class="ghost" id="mcCre" hidden aria-pressed="false">Creative items</button><button class="primary" id="mcInvDone">Done</button></header><div class="mcBody"><div id="mcCatBox" hidden><h3>Creative items</h3><input type="text" id="mcCatQ" placeholder="Search items" aria-label="Search items" style="margin-bottom:6px"><div class="mcCat" id="mcCat"></div></div><div class="mcTop" id="mcTop"></div><div><h3>Inventory</h3><div class="grid9" id="mcMain"></div></div><div><h3>Hotbar</h3><div class="grid9" id="mcHot"></div></div></div>';
+    el.innerHTML = '<header><h2 id="mcInvTitle">Inventory</h2><span id="mcHold"></span><span class="seg small" id="mcTap" role="radiogroup" aria-label="What a tap does"><button data-t="stack" aria-pressed="true">Tap: whole stack</button><button data-t="one" aria-pressed="false">Tap: one item</button><button data-t="quick" aria-pressed="false">Tap: send across</button></span><button class="ghost" id="mcCre" hidden aria-pressed="false">Creative items</button><button class="primary" id="mcInvDone">Done</button></header><div class="mcBody"><div id="mcCatBox" hidden><h3>Creative items</h3><input type="text" id="mcCatQ" placeholder="Search items" aria-label="Search items" style="margin-bottom:6px"><div class="mcCat" id="mcCat"></div></div><div class="mcTop" id="mcTop"></div><div><h3>Inventory</h3><div class="grid9" id="mcMain"></div></div><div><h3>Hotbar</h3><div class="grid9" id="mcHot"></div></div></div>';
     document.body.appendChild(el);
     const tog = (id, k) => el.querySelector(id).addEventListener('click', e => { S[k] = !S[k]; e.currentTarget.setAttribute('aria-pressed', S[k]); if (k === 'cre') mcInvRender(); });
-    tog('#mcOne', 'one'); tog('#mcShift', 'shift'); tog('#mcCre', 'cre'); el.querySelector('#mcInvDone').addEventListener('click', () => closeInv());
+    tog('#mcCre', 'cre'); S.tap = 'stack';
+    el.querySelectorAll('#mcTap button').forEach(b => b.addEventListener('click', () => { S.tap = b.dataset.t; el.querySelectorAll('#mcTap button').forEach(x => x.setAttribute('aria-pressed', x === b)); })); el.querySelector('#mcInvDone').addEventListener('click', () => closeInv());
     el.querySelector('#mcCatQ').addEventListener('input', () => mcCatRender());
     return el;
   }
   function mcSlot(parent, k, opts) {   // one window slot (k in the open window's numbering)
     const o = opts || {}, it = o.item !== undefined ? o.item : slotOf(S.win, k), st = it ? toStack(it) : null, b = document.createElement('button');
     b.className = 'islot' + (o.cls ? ' ' + o.cls : '') + (!st && o.lbl ? ' ghostslot' : ''); b.innerHTML = st ? slotHTML(st) : o.lbl ? `<span class="lbl">${o.lbl}</span>` : '';
-    b.setAttribute('aria-label', (o.lbl ? o.lbl + ': ' : '') + (st ? slotLabel(st) : 'empty'));
-    b.addEventListener('click', () => mcClick(k)); parent.appendChild(b); return b;
+    b.setAttribute('aria-label', (o.lbl ? o.lbl + ': ' : '') + (it ? mcName(it) + (it.count > 1 ? ' x' + it.count : '') : 'empty')); if (it) b.title = mcName(it);
+    let lt = null, longed = false;   // press and hold = one item (Minecraft's right click), whatever the tap mode is
+    b.addEventListener('pointerdown', () => { longed = false; clearTimeout(lt); lt = setTimeout(() => { longed = true; mcClick(k, 'one'); }, 380); });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearTimeout(lt));
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.addEventListener('click', () => { if (longed) { longed = false; return; } mcClick(k); }); parent.appendChild(b); return b;
   }
-  function mcClick(k) {
-    const W = S.win, wid = W ? W.id : 0, cre = world.meta.gameMode === 'creative';
+  // Minecraft's own name for an item (Strata items stand in for many of them, but the labels should say what the server says)
+  const mcName = it => { const e = StrataMC.items18[it.id]; const v = VARIANT[e && e[0]]; return (v && v(it.damage | 0)[1]) || (e && e[1]) || (ITEMS[toStack(it).id] || {}).name || 'Item'; };
+  const maxOf = it => ((StrataMC.items18[it.id] || [])[2]) || 64;
+  const same = (a, b) => !!(a && b && a.id === b.id && (a.damage | 0) === (b.damage | 0) && (a.raw ? a.raw.length : 0) === (b.raw ? b.raw.length : 0) && (!a.raw || a.raw.slice(5).every((v, i) => v === b.raw[5 + i])));
+  const withN = (it, n) => { if (!it || n <= 0) return null; const raw = it.raw ? new Uint8Array(it.raw) : new Uint8Array([(it.id >> 8) & 255, it.id & 255, n, ((it.damage | 0) >> 8) & 255, (it.damage | 0) & 255, 0]); raw[2] = n; return Object.assign({}, it, { count: n, raw }); };
+  function outSlots(W) { const k = W ? W.kind : 'player'; return k === 'player' || k === 'craft3' ? [0] : k === 'furnace' || k === 'anvil' || k === 'trade' ? [2] : []; }
+  function gridSlots(W) { const k = W ? W.kind : 'player'; return k === 'player' ? [1, 2, 3, 4] : k === 'craft3' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : []; }
+  function mirror() { const W = S.win; if (!W) return; const o = W.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = W.slots[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = W.slots[o + 27 + i] || null; }
+  function mcClick(k, how) {
+    if (S.waitAct != null) { (S.clickQ = S.clickQ || []).push([k, how]); return; }   // a resync is on its way: queue until the server answers
+    const W = S.win, wid = W ? W.id : 0, cre = world.meta.gameMode === 'creative', A = W ? W.slots : S.slots, t = how || S.tap || 'stack';
     if (cre && S.ccur) {   // a creative item in hand: set the slot directly (player inventory only)
       const off = winOff(), inv0 = k >= off ? (k - off < 27 ? 9 + (k - off) : 36 + (k - off - 27)) : (!W && k >= 5 && k <= 8 ? k : -1);
-      if (inv0 >= 0) { S.client.api.creative(inv0, S.ccur); if (!S.one) S.ccur = null; mcInvRender(); } return; }
-    S.client.api.click(k, S.one ? 1 : 0, S.action++, S.shift ? 1 : 0, slotOf(W, k), wid);
+      if (inv0 >= 0) { S.client.api.creative(inv0, withN(S.ccur, S.ccur.count)); if (t === 'one') S.ccur = withN(S.ccur, 1); else S.ccur = null; mcInvRender(); } return; }
+    const before = A[k] || null, act = S.action++;
+    if (t === 'quick') {   // shift-click: too many container rules to predict, so the click carries a deliberately different item and the server answers with the whole window
+      S.waitAct = act; clearTimeout(S.waitT); S.waitT = setTimeout(() => onTrans(0, S.waitAct, true), 2500); S.client.api.click(k, 0, act, 1, withN({ id: 1, damage: 0 }, 65), wid); return; }
+    const button = t === 'one' ? 1 : 0; S.client.api.click(k, button, act, 0, before, wid);
+    // the same change the vanilla client makes locally (Container.slotClick, mode 0)
+    let cur = S.cursor || null, sl = before;
+    if (outSlots(W).includes(k)) { if (sl && (!cur || (same(cur, sl) && cur.count + sl.count <= maxOf(sl)))) { cur = cur ? withN(cur, cur.count + sl.count) : sl; A[k] = null; for (const g of gridSlots(W)) if (A[g]) A[g] = withN(A[g], A[g].count - 1); } }
+    else if (button === 0) { if (!cur && sl) { cur = sl; A[k] = null; } else if (cur && !sl) { A[k] = cur; cur = null; } else if (cur && sl) { if (same(cur, sl)) { const m = Math.min(cur.count, maxOf(sl) - sl.count); A[k] = withN(sl, sl.count + m); cur = withN(cur, cur.count - m); } else { A[k] = cur; cur = sl; } } }
+    else { if (!cur && sl) { const h = Math.ceil(sl.count / 2); cur = withN(sl, h); A[k] = withN(sl, sl.count - h); } else if (cur && (!sl || (same(cur, sl) && sl.count < maxOf(sl)))) { A[k] = sl ? withN(sl, sl.count + 1) : withN(cur, 1); cur = withN(cur, cur.count - 1); } else if (cur && sl && !same(cur, sl)) { A[k] = cur; cur = sl; } }
+    S.cursor = cur; if (W) mirror(); syncInv();
   }
+  function onTrans(wid, act, ok) { if (act !== S.waitAct) return; S.waitAct = null; clearTimeout(S.waitT); const q = S.clickQ || []; S.clickQ = []; for (const [k, h] of q) mcClick(k, h); }
   const grid = (cols) => { const g = document.createElement('div'); g.className = 'mcG'; g.style.gridTemplateColumns = `repeat(${cols},minmax(0,52px))`; return g; };
   const arrow = (pct) => { const a = document.createElement('span'); a.className = 'mcArrow'; a.textContent = '→'; if (pct != null) { const b = document.createElement('span'); b.className = 'mcBar'; b.innerHTML = `<i style="width:${Math.round(pct * 100)}%"></i>`; a.appendChild(b); } return a; };
   function mcInvRender() {
     const el = document.getElementById('mcInv'); if (!el || el.hidden) return; const W = S.win, top = el.querySelector('#mcTop'), cre = world.meta.gameMode === 'creative'; top.innerHTML = '';
     el.querySelector('#mcInvTitle').textContent = W ? WTITLE[W.title] || (W.title || 'Container').replace(/^container\./, '') : 'Inventory';
-    const cur = S.ccur || S.cursor, cs = cur && toStack(cur); el.querySelector('#mcHold').innerHTML = cs ? `<small class="hint">Holding</small> ${slotHTML({ ...cs, n: 1 }).replace(/<span class="dur".*$/, '')} <small></small>` : '<small class="hint">Tap a slot to pick up, tap another to put down</small>';
-    if (cs) el.querySelector('#mcHold small:last-child').textContent = slotLabel(cs);
+    const cur = S.ccur || S.cursor, cs = cur && toStack(cur); el.querySelector('#mcHold').innerHTML = cs ? `<small class="hint">Holding</small> ${slotHTML({ ...cs, n: 1 }).replace(/<span class="dur".*$/, '')} <small></small>` : '<small class="hint">Tap to pick up, tap again to put down. Hold a slot to move one item.</small>';
+    if (cs) el.querySelector('#mcHold small:last-child').textContent = mcName(cur) + (cur.count > 1 ? ' x' + cur.count : '');
     el.querySelector('#mcCre').hidden = !cre; el.querySelector('#mcCatBox').hidden = !(cre && S.cre); if (cre && S.cre) mcCatRender();
     const kind = W ? W.kind : 'player';
     if (kind === 'player') { const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); top.appendChild(arm);
@@ -504,7 +528,8 @@
   function mcInvOpen() { const el = mcInvEl(); mining = null; mode = 'inv'; el.hidden = false; document.getElementById('hud').style.visibility = 'hidden'; mcInvRender(); }
   function mcInvClose(send) {
     const el = document.getElementById('mcInv'); if (send && S.client) S.client.api.closeWin(S.win ? S.win.id : 0);   // the server returns crafting-grid items
-    S.win = null; S.ccur = null; if (el) el.hidden = true; document.getElementById('hud').style.visibility = ''; if (mode === 'inv') mode = 'play'; try { renderHotbar(); } catch (e) { /* ui */ }
+    if (send) { if (!S.win) for (let i = 0; i <= 4; i++) S.slots[i] = null; S.cursor = null; syncInv(); }   // the server drops what was left in the grid or on the cursor
+    S.win = null; S.ccur = null; S.waitAct = null; S.clickQ = []; if (el) el.hidden = true; document.getElementById('hud').style.visibility = ''; if (mode === 'inv') mode = 'play'; try { renderHotbar(); } catch (e) { /* ui */ }
   }
   function mcWinOpen(wid, type, title, n) {
     const w = WINS[type] || {}, size = w.n != null ? w.n : n; let t = title; try { const j = JSON.parse(title); t = typeof j === 'string' ? j : t; } catch (e) { /* plain */ }
@@ -674,6 +699,7 @@
         else if (S.win && wid === S.win.id) { S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
+      trans(wid, act, ok) { onTrans(wid, act, ok); },
       closeWin(wid) { if (S.win && S.win.id === wid) mcInvClose(false); },
       winProp(wid, k, v) { if (S.win && S.win.id === wid) { S.win.prop[k] = v; mcInvRender(); } },
       slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); }
