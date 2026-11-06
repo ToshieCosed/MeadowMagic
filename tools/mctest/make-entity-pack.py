@@ -18,4 +18,10 @@ sk = Image.new('RGBA', (64, 32), (0, 0, 0, 0)); d = ImageDraw.Draw(sk); box(d, 0
 f.writestr('assets/minecraft/textures/entity/skeleton/skeleton.png', png(sk));
 for nm, col in [('rotten_flesh', (120, 160, 60)), ('beef_raw', (230, 60, 90))]:   # two item textures: hotbar icons must come from the pack
     im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im); d.ellipse((2, 2, 13, 13), fill=col + (255,)); d.rectangle((6, 6, 9, 9), fill=(255, 255, 255, 255)); f.writestr('assets/minecraft/textures/items/' + nm + '.png', png(im))
+def blk(nm, col, pat=0):   # block textures for Minecraft-mode blocks: a checker or cross so it's obvious they come from the pack
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0) if pat == 2 else col + (255,)); d = ImageDraw.Draw(im)
+    if pat == 0: [d.rectangle((x, y, x + 3, y + 3), fill=tuple(int(c * .6) for c in col) + (255,)) for x in range(0, 16, 8) for y in range(0, 16, 8)]
+    if pat == 2: d.rectangle((6, 0, 9, 15), fill=(200, 200, 200, 255)); d.rectangle((0, 6, 15, 9), fill=(200, 200, 200, 255))
+    f.writestr('assets/minecraft/textures/blocks/' + nm + '.png', png(im))
+for nm, col, pat in [('tnt_side', (200, 40, 30), 0), ('tnt_top', (220, 220, 200), 0), ('tnt_bottom', (120, 120, 120), 0), ('redstone_dust_cross', (0, 0, 0), 2), ('repeater_off', (170, 160, 160), 0), ('enchanting_table_top', (150, 20, 30), 0), ('enchanting_table_side', (40, 20, 60), 0), ('enchanting_table_bottom', (20, 20, 20), 0), ('anvil_base', (60, 60, 70), 0), ('anvil_top_damaged_0', (90, 90, 100), 0), ('noteblock', (110, 70, 40), 0), ('redstone_lamp_off', (120, 80, 40), 0)]: blk(nm, col, pat)
 f.close(); sys.stdout.buffer.write(z.getvalue())

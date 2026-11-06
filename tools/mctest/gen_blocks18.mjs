@@ -18,6 +18,18 @@ const SKIP = /^(air|bed|golden_rail|detector_rail|activator_rail|rail|piston_ext
 const STAIRS = { 53: 'planks:0', 67: 'cobblestone', 108: 'brick_block', 109: 'stonebrick:0', 114: 'nether_brick', 128: 'sandstone', 134: 'planks:1', 135: 'planks:2', 136: 'planks:3', 156: 'quartz_block', 163: 'planks:4', 164: 'planks:5', 180: 'red_sandstone' };
 const FENCE = { 85: PLANK[0], 188: PLANK[1], 189: PLANK[2], 190: PLANK[3], 192: PLANK[4], 191: PLANK[5], 113: '#2d151a', 139: '#7a7a7a' };
 const cube = (t, s, b, e) => { const o = { k: 'cube', t }; if (s && s !== t) o.s = s; if (b && b !== t) o.b = b; if (e) o.e = e; return o; };
+let BT = {}, BM = {};
+try { const A = 'node_modules/minecraft-assets/minecraft-assets/data/1.8.8/'; for (const e of JSON.parse(fs.readFileSync(A + 'blocks_textures.json', 'utf8'))) BT[e.name] = e; BM = JSON.parse(fs.readFileSync(A + 'blocks_models.json', 'utf8')); } catch (e) { console.log('npm i --no-save minecraft-assets for pack texture names'); }
+const strip = t => t && t.replace(/^(minecraft:)?blocks\//, '');
+function modelTex(m) { const tx = {}; for (let k = 0, cur = m; cur && k < 8; k++) { const md = BM[cur.replace(/^block\//, '')]; if (!md) break; for (const [a, v] of Object.entries(md.textures || {})) if (!(a in tx)) tx[a] = v; cur = md.parent; }
+  const res = v => { for (let k = 0; v && v[0] === '#' && k < 8; k++) v = tx[v.slice(1)]; return v && v[0] !== '#' ? strip(v) : null; }; const o = {}; for (const a in tx) o[a] = res(tx[a]); return o; }
+function texOf(n) { const e = BT[n]; if (!e || !e.model) return e && e.texture ? Array(3).fill(strip(e.texture)) : null; const t = modelTex(e.model);
+  const side = t.side || t.all || t.north || t.front || t.texture || t.particle || t.end, top = t.top || t.end || t.up || t.all || t.particle || side, bot = t.bottom || t.end || t.down || t.all || top;
+  return side || top ? [side || top, top || side, bot || top] : null; }
+const COL16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+const VARTEX = { stained_hardened_clay: m => Array(3).fill('hardened_clay_stained_' + COL16[m & 15]), stained_glass: m => Array(3).fill('glass_' + COL16[m & 15]), stained_glass_pane: m => Array(3).fill('glass_' + COL16[m & 15]),
+  stonebrick: m => Array(3).fill(['stonebrick', 'stonebrick_mossy', 'stonebrick_cracked', 'stonebrick_carved'][m & 3]), prismarine: m => Array(3).fill(['prismarine_rough', 'prismarine_bricks', 'prismarine_dark'][m % 3]),
+  dirt: m => m === 1 ? Array(3).fill('coarse_dirt') : m === 2 ? ['dirt_podzol_side', 'dirt_podzol_top', 'dirt'] : null, sand: m => m === 1 ? Array(3).fill('red_sand') : null };
 const out = [];
 for (let id = 0; id < 256; id++) {
   const b = byId[id]; if (!b) { out.push(0); continue; }
@@ -48,6 +60,8 @@ for (let id = 0; id < 256; id++) {
   else if (b.boundingBox === 'empty') e = { k: 'skip' };
   else e = cube('#8a8a8a');
   if (EMIT[n] && e.k === 'cube' && !e.e) e.e = EMIT[n];
+  // resource-pack texture names (side, top, bottom) for compat blocks, from minecraft-assets' 1.8.8 models (names only)
+  if (e && e.k !== 'strata' && e.k !== 'skip') { const x = texOf(n); if (x) e.x = x; const vf = VARTEX[n]; if (vf && e.v) for (const m in e.v) { const t = vf(+m); if (t) e.v[m].x = t; } }
   if (e && b.hardness != null) { e.h = b.hardness; const m = b.material || ''; e.tl = /rock|iron|anvil/.test(m) ? 'pick' : m === 'wood' ? 'axe' : /dirt|sand|snow|clay|grass/.test(m) ? 'shovel' : /leaves/.test(m) ? 'knife' : ''; }
   out.push(e);
 }

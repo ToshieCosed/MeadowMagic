@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv', 'techDyn', 'useHeld', 'stepVehicles', 'stepRide'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv', 'techDyn', 'useHeld', 'stepVehicles', 'stepRide', 'applyPack'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 54: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 58: 'walker', 120: 'lost',
     50: 'mc_creeper', 56: 'mc_ghast', 57: 'mc_pigman', 59: 'mc_cave_spider', 60: 'mc_silverfish', 61: 'mc_blaze', 62: 'mc_magma_cube', 63: 'mc_dragon', 64: 'mc_wither', 66: 'mc_witch', 67: 'mc_endermite', 68: 'mc_guardian',
     96: 'mc_mooshroom', 97: 'mc_snowman', 98: 'mc_ocelot', 99: 'mc_iron_golem', 101: 'mc_rabbit', 94: null };   // mc_* models exist only in compat mode (see CM below); anything else (fish, phantoms, ...) is skipped
@@ -18,7 +18,7 @@
     if (e.k === 'glass') { const c = rgb(e.t); def(id, 'mc glass', e.t, 0, 0, { opaque: false, noItem: 1, tint: c.map(v => v * .5 + .5) }); }
     else if (e.k === 'fence') { def(id, 'mc fence', '#000000', 0, 0, { opaque: false, fence: 1, noItem: 1 }); BLOCKS[id].top = BLOCKS[id].side = BLOCKS[id].bottom = hex(e.t); }
     else def(id, 'mc block', e.t, e.s || e.t, e.b || e.s || e.t, Object.assign({ noItem: 1 }, e.e ? { emit: e.e, att: 1 } : {}));
-    post(id); if (e.h != null) SPEC[id] = { h: Math.max(.2, e.h * 1.2), tool: e.tl || null, req: 0 }; S.vis.set(key, id); return id;
+    post(id); if (e.h != null) SPEC[id] = { h: Math.max(.2, e.h * 1.2), tool: e.tl || null, req: 0 }; S.vis.set(key, id); if (e.x) texFor(id, e.x, e.k === 'glass' ? '' : ''); return id;
   }
   // Minecraft block -> the equivalent Strata block (so Strata's own shapes, doors, slabs and renderers are used); null = no equivalent
   const WOOD6 = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark'];
@@ -68,29 +68,29 @@
     if (bid === 50) return (TW[meta & 7] && WT[TW[meta & 7]]) || B.TORCH;
     // redstone: torches, dust (brightness by power), repeaters, comparators, tripwire, daylight sensors (compat-only shapes)
     if (bid === 75 || bid === 76) { const on = bid === 76, w = TW[meta & 7];
-      if (w) return cblock('rtw' + w + on, 'Redstone torch', '#b0281c', { solid: false, opaque: false, torch: 1, wt: w.split(',').map(Number), flame: on ? [255, 40, 24] : [96, 22, 16], flame2: on ? [255, 150, 120] : [120, 40, 30], ...(on ? { emit: [9, 2, 1], att: 1 } : {}) });
-      return shape('rt' + on, 'Redstone torch', '#7a5230', [[.4375, 0, .4375, .5625, .5, .5625, [120, 82, 46]], [.40625, .5, .40625, .59375, .6875, .59375, on ? [255, 40, 24] : [96, 22, 16]]], { solid: false, ...(on ? { emit: [9, 2, 1], att: 1 } : {}) }); }
+      if (w) return cblock('rtw' + w + on, 'Redstone torch', '#b0281c', { solid: false, opaque: false, torch: 1, wt: w.split(',').map(Number), flame: on ? [255, 40, 24] : [96, 22, 16], flame2: on ? [255, 150, 120] : [120, 40, 30], tex: Array(3).fill(on ? 'redstone_torch_on' : 'redstone_torch_off'), ...(on ? { emit: [9, 2, 1], att: 1 } : {}) });
+      return shape('rt' + on, 'Redstone torch', '#7a5230', [[.4375, 0, .4375, .5625, .5, .5625, [120, 82, 46]], [.40625, .5, .40625, .59375, .6875, .59375, on ? [255, 40, 24] : [96, 22, 16]]], { solid: false, tex: Array(3).fill(on ? 'redstone_torch_on' : 'redstone_torch_off'), texF: 'x', ...(on ? { emit: [9, 2, 1], att: 1 } : {}) }); }
     if (bid === 55) { const p = meta & 15, k = .3 + .7 * p / 15, c = [Math.round(80 + 175 * k), Math.round(10 + 30 * k * k), Math.round(8 + 14 * k * k)], t = .03;
-      return shape('rd' + p, 'Redstone dust', '#a01010', [[.3125, 0, .3125, .6875, t, .6875, c], [0, 0, .4375, 1, t * .9, .5625, c], [.4375, 0, 0, .5625, t * .9, 1, c]], Object.assign({ solid: false }, p > 8 ? { emit: [Math.round(p / 3), 0, 0], att: 1 } : {})); }
-    if (bid === 93 || bid === 94 || bid === 149 || bid === 150) { const on = bid === 94 || bid === 150, f = [[0, 1], [-1, 0], [0, -1], [1, 0]][meta & 3], tc = on ? [255, 40, 24] : [110, 30, 22];
-      const T = (a, side) => { const cx = .5 + f[0] * a + -f[1] * side, cz = .5 + f[1] * a + f[0] * side; return [cx - .0625, .125, cz - .0625, cx + .0625, .4375, cz + .0625, tc]; };
+      return shape('rd' + p, 'Redstone dust', '#a01010', [[.3125, 0, .3125, .6875, t, .6875, c], [0, 0, .4375, 1, t * .9, .5625, c], [.4375, 0, 0, .5625, t * .9, 1, c]], Object.assign({ solid: false, tex: Array(3).fill('redstone_dust_cross'), texF: 't' }, p > 8 ? { emit: [Math.round(p / 3), 0, 0], att: 1 } : {})); }
+    if (bid === 93 || bid === 94 || bid === 149 || bid === 150) { const on = bid === 94 || bid === 150, f = [[0, 1], [-1, 0], [0, -1], [1, 0]][meta & 3], tc = on ? [255, 40, 24] : [110, 30, 22], TQ = 1;
+      const T = (a, side) => { const cx = .5 + f[0] * a + -f[1] * side, cz = .5 + f[1] * a + f[0] * side; return [cx - .0625, .125, cz - .0625, cx + .0625, .4375, cz + .0625, tc, TQ]; };
       const bx = [[0, 0, 0, 1, .125, 1, [168, 168, 168]]]; if (bid < 100) bx.push(T(-.3125, 0), T(.0625 - ((meta >> 2) & 3) * .125, 0)); else bx.push(T(-.3125, -.1875), T(-.3125, .1875), T(.3125, 0));
-      return shape('rep' + bid + ':' + meta, bid < 100 ? 'Redstone repeater' : 'Redstone comparator', '#a8a8a8', bx, { solid: false }); }
+      const tn = bid < 100 ? (on ? 'repeater_on' : 'repeater_off') : (on ? 'comparator_on' : 'comparator_off'); return shape('rep' + bid + ':' + meta, bid < 100 ? 'Redstone repeater' : 'Redstone comparator', '#a8a8a8', bx, { solid: false, tex: [tn, tn, 'stone_slab_top'] }); }
     if (bid === 131) { const f = [[0, 1], [-1, 0], [0, -1], [1, 0]][meta & 3], att = meta & 4, w = [-f[0], -f[1]];   // hangs on the block behind it
       const plate = w[0] ? [w[0] < 0 ? 0 : .875, .125, .375, w[0] < 0 ? .125 : 1, .625, .625] : [.375, .125, w[1] < 0 ? 0 : .875, .625, .625, w[1] < 0 ? .125 : 1], hy = att ? .3 : .45;
       const hook = [.5 - .1875 + f[0] * .1, hy, .5 - .1875 + f[1] * .1, .5 + .1875 + f[0] * .1, hy + .0625, .5 + .1875 + f[1] * .1];
-      return shape('th' + meta, 'Tripwire hook', '#8a6a3a', [plate.concat([[150, 116, 70]]), hook.concat([[150, 150, 155]])], { solid: false }); }
-    if (bid === 132) return shape('tw' + (meta & 1), 'Tripwire', '#dddddd', [[0, .06, .48, 1, .08, .52, [220, 220, 220]], [.48, .06, 0, .52, .08, 1, [220, 220, 220]]], { solid: false });
-    if (bid === 151 || bid === 178) return shape('ds' + bid, 'Daylight sensor', '#c9b28a', [[0, 0, 0, 1, .375, 1, bid === 151 ? [200, 180, 140] : [90, 110, 150]]], { solid: false });
-    if (bid === 116) return shape('ench', 'Enchantment Table', '#2b1f2e', [[0, 0, 0, 1, .7, 1, [44, 30, 46]], [0, .7, 0, 1, .75, 1, [168, 34, 44]], [.06, .68, .06, .94, .7, .94, [70, 220, 210]]], { solid: true, emit: [3, 1, 4], att: 1 });
-    if (bid === 117) return shape('brew', 'Brewing Stand', '#9a8f7a', [[.4375, 0, .4375, .5625, .875, .5625, [240, 200, 90]], [.0625, 0, .375, .3125, .125, .625, [110, 110, 110]], [.6875, 0, .0625, .9375, .125, .3125, [110, 110, 110]], [.6875, 0, .6875, .9375, .125, .9375, [110, 110, 110]], [.15, .125, .45, .25, .5, .55, [200, 220, 240]], [.75, .125, .15, .85, .5, .25, [200, 220, 240]], [.75, .125, .75, .85, .5, .85, [200, 220, 240]]], { solid: false });
+      return shape('th' + meta, 'Tripwire hook', '#8a6a3a', [plate.concat([[150, 116, 70]]), hook.concat([[150, 150, 155], 1])], { solid: false, tex: Array(3).fill('planks_oak') }); }
+    if (bid === 132) return shape('tw' + (meta & 1), 'Tripwire', '#dddddd', [[0, .06, .48, 1, .08, .52, [220, 220, 220], 1], [.48, .06, 0, .52, .08, 1, [220, 220, 220], 1]], { solid: false });
+    if (bid === 151 || bid === 178) return shape('ds' + bid, 'Daylight sensor', '#c9b28a', [[0, 0, 0, 1, .375, 1, bid === 151 ? [200, 180, 140] : [90, 110, 150]]], { solid: false, tex: bid === 151 ? ['daylight_detector_side', 'daylight_detector_top', 'daylight_detector_side'] : ['daylight_detector_side', 'daylight_detector_inverted_top', 'daylight_detector_side'] });
+    if (bid === 116) return shape('ench', 'Enchantment Table', '#2b1f2e', [[0, 0, 0, 1, .7, 1, [44, 30, 46]], [0, .7, 0, 1, .75, 1, [168, 34, 44]], [.06, .68, .06, .94, .7, .94, [70, 220, 210], 1]], { solid: true, emit: [3, 1, 4], att: 1, tex: ['enchanting_table_side', 'enchanting_table_top', 'enchanting_table_bottom'] });
+    if (bid === 117) return shape('brew', 'Brewing Stand', '#9a8f7a', [[.4375, 0, .4375, .5625, .875, .5625, [240, 200, 90]], [.0625, 0, .375, .3125, .125, .625, [110, 110, 110]], [.6875, 0, .0625, .9375, .125, .3125, [110, 110, 110]], [.6875, 0, .6875, .9375, .125, .9375, [110, 110, 110]], [.15, .125, .45, .25, .5, .55, [200, 220, 240]], [.75, .125, .15, .85, .5, .25, [200, 220, 240]], [.75, .125, .75, .85, .5, .85, [200, 220, 240]]].map((b, i) => i >= 4 ? b.concat([1]) : b), { solid: false, tex: ['brewing_stand', 'brewing_stand_base', 'brewing_stand_base'] });
     if (bid === 145) { const x = meta & 1, dmg = meta >> 2, c = [[70, 70, 74], [80, 76, 72], [92, 82, 74]][dmg] || [70, 70, 74], r = b => x ? [b[2], b[1], b[0], b[5], b[4], b[3]] : b;
-      return shape('anvil' + meta, 'Anvil', '#46464a', [[.125, 0, .125, .875, .25, .875], [.25, .25, .3125, .75, .3125, .6875], [.375, .3125, .3125, .625, .625, .6875], [0, .625, .1875, 1, 1, .8125]].map(b => r(b).concat([c])), { solid: true }); }
+      return shape('anvil' + meta, 'Anvil', '#46464a', [[.125, 0, .125, .875, .25, .875], [.25, .25, .3125, .75, .3125, .6875], [.375, .3125, .3125, .625, .625, .6875], [0, .625, .1875, 1, 1, .8125]].map(b => r(b).concat([c])), { solid: true, tex: ['anvil_base', 'anvil_top_damaged_' + Math.min(2, dmg), 'anvil_base'] }); }
     if (bid === 118) { const lv = meta & 3, c = [58, 58, 64], bx = [[0, 0, 0, 1, .3, 1, c], [0, .3, 0, .125, 1, 1, c], [.875, .3, 0, 1, 1, 1, c], [.125, .3, 0, .875, 1, .125, c], [.125, .3, .875, .875, 1, 1, c]];
-      if (lv) bx.push([.125, .3, .125, .875, .3 + lv * .2, .875, [52, 92, 210]]); return shape('caul' + lv, 'Cauldron', '#3a3a40', bx, { solid: true }); }
-    if (bid === 154) return shape('hop', 'Hopper', '#4a4a4f', [[0, .625, 0, 1, 1, 1, [74, 74, 80]], [.25, .25, .25, .75, .625, .75, [66, 66, 72]], [.375, 0, .375, .625, .25, .625, [60, 60, 66]]], { solid: true });
-    if (bid === 120) return shape('epf' + (meta & 4), 'End Portal Frame', '#7a8a6a', [[0, 0, 0, 1, .8125, 1, [86, 118, 96]]].concat(meta & 4 ? [[.25, .8125, .25, .75, 1, .75, [40, 110, 90]]] : []), { solid: true });
-    if (bid === 122) return shape('egg', 'Dragon Egg', '#180c22', [[.375, 0, .375, .625, .0625, .625], [.25, .0625, .25, .75, .25, .75], [.125, .25, .125, .875, .75, .875], [.25, .75, .25, .75, .9375, .75], [.375, .9375, .375, .625, 1, .625]].map(b => b.concat([[24, 12, 34]])), { solid: true });
+      if (lv) bx.push([.125, .3, .125, .875, .3 + lv * .2, .875, [52, 92, 210], 1]); return shape('caul' + lv, 'Cauldron', '#3a3a40', bx, { solid: true, tex: ['cauldron_side', 'cauldron_top', 'cauldron_bottom'] }); }
+    if (bid === 154) return shape('hop', 'Hopper', '#4a4a4f', [[0, .625, 0, 1, 1, 1, [74, 74, 80]], [.25, .25, .25, .75, .625, .75, [66, 66, 72]], [.375, 0, .375, .625, .25, .625, [60, 60, 66]]], { solid: true, tex: ['hopper_outside', 'hopper_top', 'hopper_outside'] });
+    if (bid === 120) return shape('epf' + (meta & 4), 'End Portal Frame', '#7a8a6a', [[0, 0, 0, 1, .8125, 1, [86, 118, 96]]].concat(meta & 4 ? [[.25, .8125, .25, .75, 1, .75, [40, 110, 90]]] : []), { solid: true, tex: ['endframe_side', 'endframe_top', 'end_stone'] });
+    if (bid === 122) return shape('egg', 'Dragon Egg', '#180c22', [[.375, 0, .375, .625, .0625, .625], [.25, .0625, .25, .75, .25, .75], [.125, .25, .125, .875, .75, .875], [.25, .75, .25, .75, .9375, .75], [.375, .9375, .375, .625, 1, .625]].map(b => b.concat([[24, 12, 34]])), { solid: true, tex: Array(3).fill('dragon_egg') });
     // plants: Strata's own sprites instead of the grass stand-in
     if (bid === 83) return B.SUGAR_CANE || null;
     if (bid === 31) return [B.DEAD_BUSH, B.TALLGRASS, B.FERN][meta & 3] || B.TALLGRASS;
@@ -107,13 +107,15 @@
     if (bid === 70 || bid === 72 || bid === 147 || bid === 148) { const m = PLATE_MATS.find(q => q.k === (bid === 72 ? 'wood' : bid === 70 ? 'stone' : 'iron')); return m && (m.plate + (meta & 1)); }
     return null;
   }
+  // resource-pack textures for compat blocks: [side, top, bottom] 1.8 texture names (+ flags: t tint, x sprite); re-applied when a pack is applied later
+  function texFor(id, x, flags) { S.tex.set(id, [x, flags || '']); try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, flags || ''); } catch (e) { /* no pack */ } }
   function cblock(key, name, col, extra) {   // a compat-only block with Strata's own flags (wall torches...), registered once per key
     key = 'C' + key; if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
-    def(id, name, col, col, 0, Object.assign({ noItem: 1 }, extra || {})); post(id); S.vis.set(key, id); return id;
+    def(id, name, col, col, 0, Object.assign({ noItem: 1 }, extra || {})); post(id); S.vis.set(key, id); if (extra && extra.tex) texFor(id, extra.tex, extra.texF); return id;
   }
   function shape(key, name, col, boxes, extra) {
     key = 'S' + key; if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
-    def(id, name, col, col, 0, Object.assign({ opaque: false, lightOpaque: 0, shape: 1, decor: 1, noItem: 1, boxes }, extra || {})); post(id); S.vis.set(key, id); return id;
+    def(id, name, col, col, 0, Object.assign({ opaque: false, lightOpaque: 0, shape: 1, decor: 1, noItem: 1, boxes }, extra || {})); post(id); S.vis.set(key, id); if (extra && extra.tex) texFor(id, extra.tex, extra.texF); return id;
   }
   function stateToId(st, below) {   // protocol 47: st = blockId<<4 | meta
     { const n = native(st >> 4, st & 15, below); if (n) return n; }
@@ -786,6 +788,7 @@
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
     stepArrows() {},
+    async applyPack(rec) { await S.saved.applyPack(rec); if (S) for (const [id, [x, f]] of S.tex) try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, f); } catch (e) { /* no pack */ } if (world) for (const ch of world.chunks.values()) ch.dirty = true; },
     stepVehicles(dt) { const k = 1 - Math.exp(-12 * dt); for (const v of S.veh.values()) { v.x += (v.sx - v.x) * k; v.y += (v.sy - v.y) * k; v.z += (v.sz - v.z) * k; let d = v.syaw - v.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw += d * k; }
       for (const o of S.objs.values()) if (o.kind === 'bobber') { o.x += (o.sx - o.x) * k; o.y += (o.sy - o.y) * k; o.z += (o.sz - o.z) * k; } },
     stepRide(dt) { const v = player.mount; if (!v || !v.mc) return S.saved.stepRide(dt);
@@ -939,7 +942,7 @@
   MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), objs: new Map(), veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), tex: new Map(), objs: new Map(), veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.addEventListener('click', bookHooks.done, true); if (g) g.addEventListener('click', bookHooks.sign, true); }
     MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
@@ -958,7 +961,7 @@
     if (s.world) {
       for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
       document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null; window.__mcTimeCmd = null;
-      for (const id of s.regs) { BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
+      for (const id of s.regs) { try { packUnassign(id); } catch (e) { /* none */ } BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;
       document.getElementById('menu').hidden = true; startPreview();
     }

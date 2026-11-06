@@ -38,7 +38,7 @@ server.on('login', c => {
       for (let x = 36; x <= 48; x++) for (let y = 61; y <= 63; y++) bc(x, y, 38, 1);   // a stone wall at z=38
       bc(37, 62, 39, 50, 3); bc(39, 62, 39, 76, 3); bc(41, 62, 39, 75, 3); bc(37, 61, 41, 50, 5); bc(39, 61, 41, 76, 5);
       for (let i = 0; i < 4; i++) bc(42 + i, 61, 41, 55, i * 5); bc(42, 61, 43, 93, 0); bc(44, 61, 43, 94, 9); bc(46, 61, 43, 149, 1); bc(47, 62, 39, 131, 0); bc(47, 61, 40, 132, 0); bc(48, 61, 43, 151, 0);
-      bc(36, 60, 44, 42, 0); bc(36, 61, 44, 138, 0); bc(38, 61, 44, 25, 0);
+      bc(36, 60, 44, 42, 0); bc(36, 61, 44, 138, 0); bc(38, 61, 44, 25, 0); bc(34, 61, 46, 46, 0); bc(32, 61, 46, 123, 0);
       c.write('spawn_entity_painting', { entityId: 950, title: 'Kebab', location: { x: 43, y: 62, z: 39 }, direction: 0 });
       c.write('spawn_entity_painting', { entityId: 951, title: 'Pool', location: { x: 45, y: 62, z: 39 }, direction: 0 });
       c.write('spawn_entity', { entityId: 952, type: 51, x: 34 * 32, y: 61 * 32, z: 42 * 32, pitch: 0, yaw: 0, objectData: 0 });
