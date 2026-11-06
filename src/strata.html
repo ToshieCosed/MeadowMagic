@@ -11635,7 +11635,10 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     },
     tryInteract(sx, sy) {
       const r = pick(sx, sy); if (!r || !reachOK(...r.hit)) return false; const h = held(), a = S.client.api;
-      a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8); a.swing(); return true;
+      a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8);
+      // like the vanilla client: a usable item (food, drink, bow, shield, throwables, rod) on a block that doesn't react also uses the item
+      const mc = h && h.mc, bd = BLOCKS[world.get(...r.hit)]; if (mc && (FOOD18.has(mc.id) || EDIBLE.has(mc.id) || DRINK.has(mc.id)) && !(bd && (bd.door || bd.bed || bd.seat || /chest|table|furnace|anvil|brew|ench|beacon|hopper|dispens|dropper|note|juke|door|gate|button|lever|repeat|compar|cake|sign|frame|bed|barrel|shulker|loom|lectern/i.test(bd.name || '')))) { if (IMPL.useHeld()) return true; }
+      a.swing(); return true;
     },
     pickEntity(sx, sy) { const [o, d] = camRay(sx, sy); let best = null, bt = Infinity;
       for (const m of S.mobs) { const { hw, h } = mobBox(m); if (Math.hypot(m.x - player.x, m.z - player.z) > 40) continue; const t = rayBox(o, d, [m.x - hw - .1, m.y, m.z - hw - .1], [m.x + hw + .1, m.y + h, m.z + hw + .1]); if (t < bt) { bt = t; best = { mob: m }; } }
