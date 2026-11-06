@@ -1454,7 +1454,13 @@
   // ---- your own character in compat: elytra glide pose and wings, raised shield (hooks in Strata's buildPlayerSkin) ----
   const ownShield = () => { const h = S.slots[36 + inv.sel], o = S.slots[45]; return h && h.id === 442 ? 1 : o && o.id === 442 ? 2 : 0; };
   function ownHooks(on) {
-    if (!on) { delete window.__plTilt; delete window.__plPose; delete window.__plExtra; return; }
+    if (!on) { delete window.__plTilt; delete window.__plPose; delete window.__plExtra; delete window.__holdUse; return; }
+    window.__holdUse = down => { if (!S) return false; const h = held(), mc = h && h.mc, a = S.client.api;   // hold = right click held: eat/drink, draw a bow, raise a shield; let go = release
+      if (down) { if (!mc || !(FOOD18.has(mc.id) || EDIBLE.has(mc.id) || DRINK.has(mc.id))) return false; if (mc.id === 442) { if (!S.block) { a.useItem(0); S.block = true; } return true; }
+        if (mc.id === 261) { a.place(-1, -1, -1, 255, mc, 0, 0, 0); S.bowT = performance.now(); return true; } return IMPL.useHeld(); }
+      if (S.block && mc && mc.id === 442) { a.dig(5, 0, 0, 0, 0); S.block = false; }
+      else if (S.bowT) { S.bowT = 0; a.dig(5, 0, 0, 0, 0); }   // the bow fires on release
+      else if (player.eating && player.eating.t > .15) { a.dig(5, 0, 0, 0, 0); player.eating = null; player.eatCd = 0; } };
     window.__plTilt = () => (S && player.gliding && window.__elytra ? 1.35 : 0);
     window.__plPose = A => { if (!S) return; if (player.gliding && window.__elytra) { A.rArm = A.lArm = 0; A.rArmZ = -.35; A.lArmZ = .35; A.rLeg = A.lLeg = 0; A.rArmY = A.lArmY = 0; }
       if (S.block) { const sh = ownShield(); if (sh === 1) { A.rArm = -.95; A.rArmY = -.4; } else if (sh === 2) { A.lArm = -.95; A.lArmY = .4; } } };
@@ -1541,7 +1547,7 @@
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
-      const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; cl.sendPos(x, player.y, z, -player.face * 180 / Math.PI, 0, !!player.onGround); } }, 50);
+      const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; const fp = cam.mode === 'fp'; cl.sendPos(x, player.y, z, -(fp ? cam.fpYaw : player.face) * 180 / Math.PI, fp ? Math.max(-90, Math.min(90, -cam.fpPitch * 180 / Math.PI)) : 0, !!player.onGround); /* first person sends where you look (Minecraft pitch: negative = up) */ } }, 50);
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
