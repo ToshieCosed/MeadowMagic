@@ -115,3 +115,13 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - UI: the top bar is gone in a live world; chat is a round button on the left edge, Disconnect is in the pause menu, and the bar returns when the connection drops so the reason shows.
 - Movement: auto-step is limited to vanilla's half block (the 1-block auto-step made servers rubber-band you).
 - The sugar cane item is Strata's sugar cane (placeable, right icon).
+
+## Stage 14 (1.8): world details
+- Torches use Strata's floor/wall torches by metadata, so wall torches lean against their wall. Redstone torches (on/off) are compat-only blocks reusing Strata's torch renderer with red flames (`flame`/`flame2` on the block); lit ones give a little red light.
+- Redstone dust (brightness from power), repeaters (delay torch position), comparators, tripwire hooks and tripwire, and daylight sensors are compat-only shape blocks. Redstone ore/lamps/blocks were already cubes. Rails (incl. detector/powered/activator) stay Strata rails.
+- Beacon beams: beacons in loaded chunks are tracked; a beam is drawn when the block under is iron/gold/diamond/emerald (only the top layer is checked) until it hits an opaque block.
+- End crystals (object 51): spinning nested cubes on a base.
+- Paintings (`spawn_entity_painting`): placed with vanilla's offsets; the picture comes from the pack's `painting/paintings_kristoffer_zetterstrand.png` (now imported) or a framed placeholder with the painting's name.
+- Note blocks: the server's `note.*` sounds play through a small synth (harp, bass, drum, snare, hat) with a coloured note particle by pitch.
+- Moon: at night (server time) a pale moon crosses the sky in first-person/close views, hidden by blocks like the sun.
+- Not in 1.8: shulker boxes (1.11) come with later protocol versions.

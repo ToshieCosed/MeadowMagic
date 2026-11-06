@@ -3,7 +3,7 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv'];
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts', 'openInv', 'closeInv', 'techDyn'];
   const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 54: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 58: 'walker', 120: 'lost',
     50: 'mc_creeper', 56: 'mc_ghast', 57: 'mc_pigman', 59: 'mc_cave_spider', 60: 'mc_silverfish', 61: 'mc_blaze', 62: 'mc_magma_cube', 63: 'mc_dragon', 64: 'mc_wither', 66: 'mc_witch', 67: 'mc_endermite', 68: 'mc_guardian',
     96: 'mc_mooshroom', 97: 'mc_snowman', 98: 'mc_ocelot', 99: 'mc_iron_golem', 101: 'mc_rabbit', 94: null };   // mc_* models exist only in compat mode (see CM below); anything else (fish, phantoms, ...) is skipped
@@ -63,6 +63,25 @@
       else { const w = { 1: 0, 2: 1, 3: 2, 4: 3 }[o]; const f = [[0, .3, .3, .15, .7, .7], [.85, .3, .3, 1, .7, .7], [.3, .3, 0, .7, .7, .15], [.3, .3, .85, .7, .7, 1]][w]; boxes = [f, [.43, .4 + t * .5, .43, .57, .55 + t * .5, .57].map((v, i) => v)]; }
       return shape('lev' + o + ':' + on, 'Lever', '#8a8f96', boxes, { solid: false }); }
     if (bid === 65) return [0, 0, B.LADDER_N, B.LADDER_S, B.LADDER_W, B.LADDER_E][meta & 7] || null;
+    // torches: Strata's floor/wall torches, leaning the right way (1.8 meta: 1..4 = wall to the west/east/north/south, 5 = floor)
+    const TW = { 1: '-1,0', 2: '1,0', 3: '0,-1', 4: '0,1' };
+    if (bid === 50) return (TW[meta & 7] && WT[TW[meta & 7]]) || B.TORCH;
+    // redstone: torches, dust (brightness by power), repeaters, comparators, tripwire, daylight sensors (compat-only shapes)
+    if (bid === 75 || bid === 76) { const on = bid === 76, w = TW[meta & 7];
+      if (w) return cblock('rtw' + w + on, 'Redstone torch', '#b0281c', { solid: false, opaque: false, torch: 1, wt: w.split(',').map(Number), flame: on ? [255, 40, 24] : [96, 22, 16], flame2: on ? [255, 150, 120] : [120, 40, 30], ...(on ? { emit: [9, 2, 1], att: 1 } : {}) });
+      return shape('rt' + on, 'Redstone torch', '#7a5230', [[.4375, 0, .4375, .5625, .5, .5625, [120, 82, 46]], [.40625, .5, .40625, .59375, .6875, .59375, on ? [255, 40, 24] : [96, 22, 16]]], { solid: false, ...(on ? { emit: [9, 2, 1], att: 1 } : {}) }); }
+    if (bid === 55) { const p = meta & 15, k = .3 + .7 * p / 15, c = [Math.round(80 + 175 * k), Math.round(10 + 30 * k * k), Math.round(8 + 14 * k * k)], t = .03;
+      return shape('rd' + p, 'Redstone dust', '#a01010', [[.3125, 0, .3125, .6875, t, .6875, c], [0, 0, .4375, 1, t * .9, .5625, c], [.4375, 0, 0, .5625, t * .9, 1, c]], Object.assign({ solid: false }, p > 8 ? { emit: [Math.round(p / 3), 0, 0], att: 1 } : {})); }
+    if (bid === 93 || bid === 94 || bid === 149 || bid === 150) { const on = bid === 94 || bid === 150, f = [[0, 1], [-1, 0], [0, -1], [1, 0]][meta & 3], tc = on ? [255, 40, 24] : [110, 30, 22];
+      const T = (a, side) => { const cx = .5 + f[0] * a + -f[1] * side, cz = .5 + f[1] * a + f[0] * side; return [cx - .0625, .125, cz - .0625, cx + .0625, .4375, cz + .0625, tc]; };
+      const bx = [[0, 0, 0, 1, .125, 1, [168, 168, 168]]]; if (bid < 100) bx.push(T(-.3125, 0), T(.0625 - ((meta >> 2) & 3) * .125, 0)); else bx.push(T(-.3125, -.1875), T(-.3125, .1875), T(.3125, 0));
+      return shape('rep' + bid + ':' + meta, bid < 100 ? 'Redstone repeater' : 'Redstone comparator', '#a8a8a8', bx, { solid: false }); }
+    if (bid === 131) { const f = [[0, 1], [-1, 0], [0, -1], [1, 0]][meta & 3], att = meta & 4, w = [-f[0], -f[1]];   // hangs on the block behind it
+      const plate = w[0] ? [w[0] < 0 ? 0 : .875, .125, .375, w[0] < 0 ? .125 : 1, .625, .625] : [.375, .125, w[1] < 0 ? 0 : .875, .625, .625, w[1] < 0 ? .125 : 1], hy = att ? .3 : .45;
+      const hook = [.5 - .1875 + f[0] * .1, hy, .5 - .1875 + f[1] * .1, .5 + .1875 + f[0] * .1, hy + .0625, .5 + .1875 + f[1] * .1];
+      return shape('th' + meta, 'Tripwire hook', '#8a6a3a', [plate.concat([[150, 116, 70]]), hook.concat([[150, 150, 155]])], { solid: false }); }
+    if (bid === 132) return shape('tw' + (meta & 1), 'Tripwire', '#dddddd', [[0, .06, .48, 1, .08, .52, [220, 220, 220]], [.48, .06, 0, .52, .08, 1, [220, 220, 220]]], { solid: false });
+    if (bid === 151 || bid === 178) return shape('ds' + bid, 'Daylight sensor', '#c9b28a', [[0, 0, 0, 1, .375, 1, bid === 151 ? [200, 180, 140] : [90, 110, 150]]], { solid: false });
     // plants: Strata's own sprites instead of the grass stand-in
     if (bid === 83) return B.SUGAR_CANE || null;
     if (bid === 31) return [B.DEAD_BUSH, B.TALLGRASS, B.FERN][meta & 3] || B.TALLGRASS;
@@ -78,6 +97,10 @@
     if (bid === 27 || bid === 28 || bid === 66 || bid === 157) return B.RAIL;
     if (bid === 70 || bid === 72 || bid === 147 || bid === 148) { const m = PLATE_MATS.find(q => q.k === (bid === 72 ? 'wood' : bid === 70 ? 'stone' : 'iron')); return m && (m.plate + (meta & 1)); }
     return null;
+  }
+  function cblock(key, name, col, extra) {   // a compat-only block with Strata's own flags (wall torches...), registered once per key
+    key = 'C' + key; if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
+    def(id, name, col, col, 0, Object.assign({ noItem: 1 }, extra || {})); post(id); S.vis.set(key, id); return id;
   }
   function shape(key, name, col, boxes, extra) {
     key = 'S' + key; if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
@@ -152,7 +175,8 @@
   }
   const SNDMAP = { 'random.bow': 'bowShoot', 'random.bowhit': 'arrowHit', 'random.pop': 'pop', 'random.eat': 'eat', 'random.burp': 'burp', 'liquid.splash': 'splash', 'random.door_open': 'doorOpen', 'random.door_close': 'doorClose', 'random.chestopen': 'chestOpen', 'random.chestclosed': 'chestClose', 'creeper.primed': 'ignite', 'fire.ignite': 'ignite', 'random.explode': 'fall', 'game.player.hurt': 'hurt', 'game.neutral.hurt': 'hurt', 'game.hostile.hurt': 'hurt', 'game.player.die': 'hurt', 'game.hostile.die': 'hurt', 'random.orb': 'orb' };
   const DIGB = { stone: 'STONE', grass: 'GRASS', gravel: 'GRAVEL', sand: 'SAND', wood: 'PLANKS', cloth: 'WOOL', glass: 'GLASS', snow: 'SNOW' };
-  function mcSound(name, X, y, Z, vol) {
+  function mcSound(name, X, y, Z, vol, pitch) {
+    { const n = /^note\.(\w+)$/.exec(name); if (n) { playNote(n[1], pitch, X, y, Z, vol); return; } }
     let m = /^(?:dig|step)\.(\w+)$/.exec(name); if (m) { const b = B[DIGB[m[1]]] || B.STONE; sfxBlock(b, /^dig/.test(name) ? 'break' : 'step', Math.floor(X), Math.floor(y), Math.floor(Z), vol); return; }
     if (SNDMAP[name]) { sfx(SNDMAP[name], X, y, Z, Math.min(1.5, vol || 1), 40); return; }
     m = /^mob\.(\w+?)\.(say|hurt|death|idle|hit|step|growl|bark|howl)$/.exec(name); if (m) { const t = { creeper: 'zombie', zombiepig: 'zombie', enderman: 'walker', cave: 'spider', witch: 'lost', villager: 'lost', silverfish: 'spider', blaze: 'demon', ghast: 'demon' }[m[1]] || m[1]; const o = sfxOut(X, y, Z, Math.min(1.2, vol || 1), 32); if (o && sfxPackMob(o, t, m[2] === 'say' ? 'idle' : m[2] === 'death' ? 'death' : 'hurt')) return; if (o && m[2] !== 'step') SND.hurt(o, AC.currentTime); }
@@ -486,6 +510,51 @@
     const w = WINS[type] || {}, size = w.n != null ? w.n : n; let t = title; try { const j = JSON.parse(title); t = typeof j === 'string' ? j : t; } catch (e) { /* plain */ }
     S.win = { id: wid, type, title: t, n: size, kind: w.kind || 'grid', slots: new Array(size + 36).fill(null), prop: {} }; mcInvOpen();
   }
+  // ---- paintings, end crystals, beacon beams, note blocks (compat only) ----
+  // 1.8 paintings: name -> [width, height, u, v] in pixels of paintings_kristoffer_zetterstrand.png (256x256)
+  const ART = { Kebab: [16, 16, 0, 0], Aztec: [16, 16, 16, 0], Alban: [16, 16, 32, 0], Aztec2: [16, 16, 48, 0], Bomb: [16, 16, 64, 0], Plant: [16, 16, 80, 0], Wasteland: [16, 16, 96, 0],
+    Pool: [32, 16, 0, 32], Courbet: [32, 16, 32, 32], Sea: [32, 16, 64, 32], Sunset: [32, 16, 96, 32], Creebet: [32, 16, 128, 32], Wanderer: [16, 32, 0, 64], Graham: [16, 32, 16, 64],
+    Match: [32, 32, 0, 128], Bust: [32, 32, 32, 128], Stage: [32, 32, 64, 128], Void: [32, 32, 96, 128], SkullAndRoses: [32, 32, 128, 128], Wither: [32, 32, 160, 128],
+    Fighters: [64, 32, 0, 96], Pointer: [64, 64, 0, 192], Pigscene: [64, 64, 64, 192], BurningSkull: [64, 64, 128, 192], Skeleton: [64, 48, 192, 64], DonkeyKong: [64, 48, 192, 112] };
+  function artImage(title) {   // the pack's painting, or a framed placeholder with the painting's name
+    const a = ART[title] || [32, 32, 0, 0], c = document.createElement('canvas'), k = 8; c.width = a[0] * k; c.height = a[1] * k; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    const atlas = PACK && PACK.on && PACK.img && PACK.img['p/kz'];
+    if (atlas && ART[title]) { const sc = atlas.width / 256; g.drawImage(atlas, a[2] * sc, a[3] * sc, a[0] * sc, a[1] * sc, 0, 0, c.width, c.height); return c.toDataURL(); }
+    let h = 0; for (const ch of title) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const bg = g.createLinearGradient(0, 0, c.width, c.height); bg.addColorStop(0, `hsl(${h % 360},45%,46%)`); bg.addColorStop(1, `hsl(${(h >> 8) % 360},50%,28%)`); g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = '#6b4a2b'; g.lineWidth = 10; g.strokeRect(5, 5, c.width - 10, c.height - 10); g.fillStyle = '#f4ead8'; g.font = `bold ${Math.min(26, c.width / 6)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(title, c.width / 2, c.height / 2);
+    return c.toDataURL();
+  }
+  function paintingSpawn(eid, title, x, y, z, dir) {
+    if (!S.world) return; const F = [[0, 1], [-1, 0], [0, -1], [1, 0]][dir & 3], L = [[1, 0], [0, 1], [-1, 0], [0, -1]][dir & 3], a = ART[title] || [32, 32], off = v => v % 32 === 0 ? .5 : 0;   // facing, and vanilla's rotateYCCW of it
+    const X = x + S.OX, Z = z + S.OZ, cx = X + .5 - F[0] * .46875 + off(a[0]) * L[0], cy = y + .5 + off(a[1]), cz = Z + .5 - F[1] * .46875 + off(a[0]) * L[1], n = [F[0], 0, F[1]];
+    const e = { kind: 'poster', c: [cx, cy, cz], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: a[0] / 16, h: a[1] / 16, img: artImage(title), cell: [X, y, Z], mcPaint: eid, fixU: 1 };
+    world.decor = world.decor || []; world.decor.push(e); S.paint.set(eid, e); world.changed = true;
+  }
+  function objSpawn2(eid, type, x, y, z) { if (type === 51 && S.world) S.objs.set(eid, { kind: 'crystal', x: x + S.OX, y, z: z + S.OZ, t0: Math.random() * 10 }); }
+  function compatDyn(vb) {   // extra world geometry drawn with Strata's own vertex-colour boxes
+    const now = performance.now() / 1000, p = player;
+    for (const o of S.objs.values()) { if (o.kind !== 'crystal' || Math.hypot(o.x - p.x, o.z - p.z) > 64) continue;
+      const t = now + o.t0, by = o.y + .55 + Math.sin(t * 2) * .2, M = (s, a) => (x, y2, z) => { const ca = Math.cos(a), sa = Math.sin(a), X2 = x * ca - z * sa, Z2 = x * sa + z * ca, cb = Math.cos(a * .7), sb = Math.sin(a * .7); return [o.x + X2 * s, by + (y2 * cb - Z2 * sb) * s, o.z + (y2 * sb + Z2 * cb) * s]; };
+      setVL(sampleLight(o.x, o.y + .5, o.z)); emitBox(vb, [o.x - .5, o.y, o.z - .5], [o.x + .5, o.y + .25, o.z + .5], [40, 40, 44], IDT);
+      setVL(VL_EMISSIVE); emitBox(vb, [-.3, -.3, -.3], [.3, .3, .3], [200, 120, 220], M(1, t * 1.6)); emitBox(vb, [-.2, -.2, -.2], [.2, .2, .2], [255, 210, 255], M(1, -t * 2.2)); }
+    for (const k of S.beacons) { const [x, y, z] = k.split(',').map(Number); if (Math.hypot(x + .5 - p.x, z + .5 - p.z) > 96) continue;
+      const below = S.mcb[world.get(x, y - 1, z)]; if (![41, 42, 57, 133].includes(below)) continue;   // vanilla needs a mineral-block base; only the top layer is checked here
+      let top = y + 1; while (top < Math.min(256, y + 160) && !BLOCKS[Math.max(0, world.get(x, top, z))].opaque) top++;
+      setVL(VL_EMISSIVE); const w = .14 + Math.sin(now * 3) * .015; emitBox(vb, [x + .5 - w, y + 1, z + .5 - w], [x + .5 + w, top, z + .5 + w], [210, 245, 255], IDT); emitBox(vb, [x + .5 - .05, y + 1, z + .5 - .05], [x + .5 + .05, top, z + .5 + .05], [255, 255, 255], IDT); }
+  }
+  function scanBeacons(sx, sz, arr) { const id = lookup(138 << 4, 0); for (const k of [...S.beacons]) { const [x, , z] = k.split(','); if (x >> 4 === sx && z >> 4 === sz) S.beacons.delete(k); }
+    if (!id) return; for (let i = 0; i < arr.length; i++) if (arr[i] === id) { const x = sx * 16 + (i & 15), z = sz * 16 + ((i >> 4) & 15), y = i >> 8; S.beacons.add(x + ',' + y + ',' + z); } }
+  // note blocks: the server sends note.<instrument> with a pitch; Strata plays it with a small synth and shows a note above the block
+  function playNote(inst, pitch, X, y, Z, vol) {
+    try { parts.push({ x: X, y: y + .9, z: Z, vx: 0, vy: 1.1, vz: 0, t: .9, c: hslRgb(((Math.log2(pitch || 1) * 12 + 12) / 24) * 360 % 360), s: .09 }); } catch (e) { /* fx */ }
+    const A = ac(); if (!A) return; const d = Math.hypot(X - player.x, y - player.y, Z - player.z); if (d > 48) return; const g = A.createGain(), t = A.currentTime, f = 369.99 * (pitch || 1), v = Math.min(1, vol || 1) * Math.max(0, 1 - d / 48) * .35;
+    g.connect(MASTER); g.gain.setValueAtTime(v, t);
+    if (inst === 'snare' || inst === 'hat') { const n = A.createBufferSource(), b = A.createBuffer(1, A.sampleRate * .2, A.sampleRate), ch = b.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / ch.length); n.buffer = b; const hp = A.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = inst === 'hat' ? 7000 : 1800; n.connect(hp); hp.connect(g); g.gain.exponentialRampToValueAtTime(.001, t + (inst === 'hat' ? .06 : .16)); n.start(t); n.stop(t + .2); return; }
+    const o = A.createOscillator(); o.type = inst === 'bd' ? 'sine' : inst === 'bassattack' ? 'sawtooth' : 'triangle'; o.frequency.setValueAtTime(inst === 'bd' ? 120 * (pitch || 1) : inst === 'bassattack' ? f / 4 : f, t); if (inst === 'bd') o.frequency.exponentialRampToValueAtTime(40, t + .15);
+    o.connect(g); g.gain.exponentialRampToValueAtTime(.001, t + (inst === 'harp' ? 1.1 : .3)); o.start(t); o.stop(t + 1.2);
+  }
+  const hslRgb = h => { const f = n => { const k = (n + h / 30) % 12; return Math.round(255 * (.5 - .5 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; };
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -560,6 +629,7 @@
     stepArrows() {},
 
     openInv() { if (mode === 'play') mcInvOpen(); },
+    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
     closeInv() { mcInvClose(true); },   // the only arrows in a compat world are the server's, moved by stepProj
     emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
@@ -620,7 +690,7 @@
         const sx = cx + (S.OX >> 4), sz = cz + (S.OZ >> 4); if (!inRange(sx, sz)) return;
         const k = ckey(sx, sz); let arr = gu ? new Uint16Array(CS * CS * HGT) : (S.store.get(k) || new Uint16Array(CS * CS * HGT));
         for (const sec of sections) { const base = sec.y * 4096, b = sec.blocks; for (let j = 0; j < 4096; j++) { const st = b[j]; arr[base + j] = lookup(st, (base + j) >= 256 ? arr[base + j - 256] : 0); } }
-        S.store.set(k, arr);
+        S.store.set(k, arr); scanBeacons(sx, sz, arr);
         const ch = world.chunk(sx, sz); if (ch) { ch.blocks = arr; topOf(ch); lightChunk(world, ch); ch.dirty = true; }
         dirtyAround(sx, sz);
       },
@@ -629,7 +699,7 @@
       meta(eid, idx, it) { const d = S.dr.get(eid); if (!d || idx !== 10 || !it) return; const id = strataItem(it);
         if (!d.q) { d.q = { x: d.x, y: d.y, z: d.z, sx: d.x, sy: d.y, sz: d.z, vx: d.vx, vy: d.vy, vz: d.vz, id, n: it.count, age: 0, spin: Math.random() * 6, mc: eid }; drops.push(d.q); } else { d.q.id = id; d.q.n = it.count; } },
       collect(eid, who) { const d = S.dr.get(eid); if (who === S.eid && d && d.q) { try { feed(d.q.id, d.q.n); } catch (e) { /* ui */ } } Hd.destroy([eid]); },
-      sound(name, x, y, z, vol) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; try { mcSound(name, X, y, Z, vol); } catch (e) { /* audio */ } },
+      sound(name, x, y, z, vol, pitch) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; try { mcSound(name, X, y, Z, vol, pitch); } catch (e) { /* audio */ } },
       explosion(x, y, z, rad, rec, vx, vy, vz) { if (!S.world) return; const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
         for (const r of rec) { const X = bx + r[0] + S.OX, Z = bz + r[2] + S.OZ; setBlock(X, by + r[1], Z, 0); }
         try { burst(x + S.OX, y + .5, z + S.OZ, [190, 190, 190], 24, 5); sfx('fall', x + S.OX, y, z + S.OZ, 1.4, 48); } catch (e) { /* fx */ }
@@ -642,7 +712,7 @@
         if (nb.length === 1 && !sol(X, y - 1, Z)) { const n = [-nb[0][0], 0, -nb[0][1]]; e = { kind: 'sign', c: [X + .5 - n[0] * .47, y + .5, Z + .5 - n[2] * .47], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, mode: 0, cell: [X, y, Z], sup: [X - n[0], y, Z - n[2]], fixU: 1 }; }
         else { const n = [0, 0, 1]; e = { kind: 'sign', c: [X + .5, y + .95, Z + .5], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: 1, h: .6, sup: [X, y - 1, Z], cell: [X, y, Z], post: 1, fixU: 1, mode: 0 }; }
         e.mcCell = [X, y, Z]; e.text = text; e.frame = 'wood'; e.bg = 'planks'; world.decor.push(e); world.changed = true; },
-      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); },
+      block(x, y, z, st) { if (!S.world) return; if (st >> 4 !== 63 && st >> 4 !== 68) delSign(x + S.OX, y, z + S.OZ); const X = x + S.OX, Z = z + S.OZ, old = world.get(X, y, Z), nw = lookup(st, belowId(X, y, Z)); setBlock(X, y, Z, nw); doorAbove(X, y, Z); blockSound(X, y, Z, old, nw); const bk = X + ',' + y + ',' + Z; if (st >> 4 === 138) S.beacons.add(bk); else S.beacons.delete(bk); },
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n, sk) { if (n) { S.names.set(u, n); if (sk) S.skinInfo.set(u, sk); const me = S.o.name && n.toLowerCase() === String(S.o.name).toLowerCase(); if (me) { S.ownUuid = u; ownSkin(u, sk); } for (const pl of S.players) if (pl.uuid === u) loadSkinFor(pl); } else S.names.delete(u); },
       flags(id, v) { const m = S.ents.get(id); if (m && m.pl) { m.sneak = !!(v & 2); m.sprint = !!(v & 8); } },
@@ -652,7 +722,8 @@
         if (idx === 12) m.baby = v < 0 || (v === 1 && (m.type === 'zombie' || m.type === 'mc_pigman'));
         else if (idx === 13 && (m.type === 'skeleton' || m.type === 'mc_wither_skeleton')) { m.type = v === 1 ? 'mc_wither_skeleton' : 'skeleton'; m.size = v === 1 ? CM.mc_wither_skeleton.size : 0; }
         else if (idx === 16 && (m.type === 'slime' || m.type === 'mc_magma_cube') && v > 0) m.size = v; },
-      objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) { projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch); },
+      objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) { projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch); objSpawn2(eid, type, x, y, z); },
+      painting(eid, title, x, y, z, dir) { paintingSpawn(eid, title, x, y, z, dir); },
       anim(id, a) { const m = S.ents.get(id); if (m && m.pl && a === 0) m.swingT = .25; },
       spawn(e) {
         if (!S.world) return; if (e.eid === S.eid) return;
@@ -665,8 +736,8 @@
       move(id, dx, dy, dz) { if (projMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
       look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
-      teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
-      destroy(l) { for (const id of l) { projGone(id); const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
+      teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; { const o = S.objs.get(id); if (o) { o.x = x + S.OX; o.y = y; o.z = z + S.OZ; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
+      destroy(l) { for (const id of l) { projGone(id); S.objs.delete(id); { const e = S.paint.get(id); if (e) { S.paint.delete(id); const i = (world.decor || []).indexOf(e); if (i >= 0) world.decor.splice(i, 1); } } const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;
   }
@@ -696,7 +767,7 @@
   MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), objs: new Map(), paint: new Map(), beacons: new Set(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
     MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };

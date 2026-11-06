@@ -164,6 +164,7 @@
         case 'update_health': if (P === 47 && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
         case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
         case 'set_slot': if (P === 47 && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
+        case 'spawn_entity_painting': if (P === 47 && H && H.painting) { const eid = r.vi(), title = r.str(), hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.painting(eid, title, px, py, pz, r.b()); } return;
         case 'open_window': if (P === 47 && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
         case 'close_window': if (P === 47 && H && H.closeWin) H.closeWin(r.b()); return;
         case 'craft_progress_bar': if (P === 47 && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;

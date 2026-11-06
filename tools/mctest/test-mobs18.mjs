@@ -22,6 +22,17 @@ server.on('login', c => {
     c.write('spawn_entity', { entityId: 901, type: 60, x: 41 * 32, y: Math.round(61.3 * 32), z: 44 * 32, pitch: 0, yaw: 0, objectData: 201, velocity: { x: 3000, y: -3000, z: 1000 } });
     c.write('spawn_entity', { entityId: 902, type: 64, x: 36 * 32, y: 63 * 32, z: 45 * 32, pitch: 0, yaw: 0, objectData: 210, velocity: { x: 400, y: 0, z: 0 } });
     c.write('update_health', { health: 15, food: 13, foodSaturation: 2 });
+    if (process.env.B2) {   // batch 2: torches on walls, redstone parts, beacon, note block, paintings, end crystal
+      const bc = (x, y, z, id, m) => c.write('block_change', { location: { x, y, z }, type: (id << 4) | (m || 0) });
+      for (let x = 36; x <= 48; x++) for (let y = 61; y <= 63; y++) bc(x, y, 38, 1);   // a stone wall at z=38
+      bc(37, 62, 39, 50, 3); bc(39, 62, 39, 76, 3); bc(41, 62, 39, 75, 3); bc(37, 61, 41, 50, 5); bc(39, 61, 41, 76, 5);
+      for (let i = 0; i < 4; i++) bc(42 + i, 61, 41, 55, i * 5); bc(42, 61, 43, 93, 0); bc(44, 61, 43, 94, 9); bc(46, 61, 43, 149, 1); bc(47, 62, 39, 131, 0); bc(47, 61, 40, 132, 0); bc(48, 61, 43, 151, 0);
+      bc(36, 60, 44, 42, 0); bc(36, 61, 44, 138, 0); bc(38, 61, 44, 25, 0);
+      c.write('spawn_entity_painting', { entityId: 950, title: 'Kebab', location: { x: 43, y: 62, z: 39 }, direction: 0 });
+      c.write('spawn_entity_painting', { entityId: 951, title: 'Pool', location: { x: 45, y: 62, z: 39 }, direction: 0 });
+      c.write('spawn_entity', { entityId: 952, type: 51, x: 34 * 32, y: 61 * 32, z: 42 * 32, pitch: 0, yaw: 0, objectData: 0 });
+      setTimeout(() => c.write('named_sound_effect', { soundName: 'note.harp', x: 38 * 8 + 4, y: 61 * 8 + 4, z: 44 * 8 + 4, volume: 1, pitch: 63 }), 3000);
+      if (process.env.NIGHT) c.write('update_time', { age: [0, 18000], time: [0, 18000] }); }
     { const items = Array(45).fill(null).map(() => ({ blockId: -1 })); [[367, 0], [363, 0], [331, 0], [351, 1], [373, 8193], [368, 0], [2256, 0], [341, 0], [83, 0]].forEach(([id, dm], i) => { items[36 + i] = sl(id, 1, dm); }); c.write('window_items', { windowId: 0, items }); }   // hotbar: pack icons, drawn icons, sugar cane
     c.write('block_change', { location: { x: 40, y: 61, z: 44 }, type: 83 << 4 }); c.write('block_change', { location: { x: 40, y: 62, z: 44 }, type: 83 << 4 });
   }, +(process.env.SPAWN_MS || 20000));
@@ -55,6 +66,10 @@ if (process.env.INV) { await pg.evaluate(() => openInv()); await wait(1500); awa
   await pg.evaluate(() => { closeInv(); const S = StrataMCE.dbg(); S.Hd.openWin(3, 'minecraft:crafting_table', 'container.crafting', 0); const l = Array(46).fill(null); l[1] = S.slots[36]; l[5] = S.slots[37]; S.Hd.items(3, l); }); await wait(1200); await pg.screenshot({ path: '/tmp/mcinv-table.png' });
   await pg.evaluate(() => { const S = StrataMCE.dbg(); S.Hd.openWin(4, 'minecraft:furnace', 'container.furnace', 3); S.Hd.winProp(4, 0, 120); S.Hd.winProp(4, 1, 200); S.Hd.winProp(4, 2, 90); }); await wait(1200); await pg.screenshot({ path: '/tmp/mcinv-furnace.png' });
   await pg.evaluate(() => { const S = StrataMCE.dbg(); S.Hd.openWin(5, 'minecraft:chest', 'container.chest', 27); }); await wait(1000); await pg.screenshot({ path: '/tmp/mcinv-chest.png' }); await pg.evaluate(() => closeInv()); }
+if (process.env.B2) { await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 42.5 + S.OX; player.z = 45 + S.OZ; cam.zoom = 5.5; }); await wait(3000); await pg.screenshot({ path: '/tmp/b2-iso.png' });
+  await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 42.5 + S.OX; player.z = 46 + S.OZ; cam.mode = 'fp'; cam.fpYaw = Math.PI; cam.fpPitch = .05; }); await wait(2500); await pg.screenshot({ path: '/tmp/b2-fp.png' });
+  if (process.env.NIGHT) { await pg.evaluate(() => { const d = moonDir() || [0, 1, 0]; cam.fpYaw = Math.atan2(d[0], d[2]); cam.fpPitch = Math.asin(d[1]); }); await wait(2000); await pg.screenshot({ path: '/tmp/b2-moon.png' }); }
+  console.error('b2', await pg.evaluate(() => { const S = StrataMCE.dbg(); return JSON.stringify({ beacons: [...S.beacons], objs: S.objs.size, paint: S.paint.size, t: world.time, dl: world.dayLen }); })); }
 const info = await pg.evaluate(() => { const S = StrataMCE.dbg(); return { hot: inv.slots.slice(0, 9).map(s => s && ITEMS[s.id] && ITEMS[s.id].name), cane: world.get(40 + S.OX, 61, 44 + S.OZ) === B.SUGAR_CANE, mobs: (window.__cmobs || []).map(m => m.type), proj: arrows.filter(a => a.mc).length, food: S.food, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, armed: (window.__cmobs || []).filter(m => m.eq && m.eq[0]).length }; });
 await pg.$eval('#mcLeave', e => e.click()).catch(() => {}); await wait(1200);
 const after = await pg.evaluate(() => ({ active: StrataMCE.active, models: Object.keys(__skins.MODELS).filter(k => k.startsWith('mc')), arrows: arrows.length, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, mobT: Object.keys(MOB).filter(k => k.startsWith('mc')) }));
