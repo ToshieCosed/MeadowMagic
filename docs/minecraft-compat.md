@@ -200,3 +200,6 @@ Everything here exists only while connected in compat mode and is removed on dis
 - **Advancements** (1.12): toasts on completion and an Advancements list (by tab) in the pause menu.
 - **Other packets**: `world_border` (a grid wall near the edge and a movement clamp), `set_cooldown` (hotbar overlay), `abilities` (walk speed scales the speed cap), `combat_event` (the death message), `camera`.
 - Test: `tools/mctest/test-features.mjs` (VER=1.8.9 ... 1.12.2; needs `/tmp/claude-0/srvpack.zip`, any small pack with a stone texture).
+- **Heads** (block 144): skeleton, wither, zombie, creeper and dragon heads as coloured heads with faces; player heads with the owner's skin (from the block entity's texture URL, or the owner's name). Floor rotation and wall mounting follow the block.
+- **Your own character**: lies flat with wings while gliding on an elytra, and shows a raised shield (hooks `__plTilt` / `__plPose` / `__plExtra` in Strata's `buildPlayerSkin`, set only in compat).
+- **Proxy server switches** (BungeeCord / Velocity): a second join or a respawn forgets the old server's entities, heads, map frames, border and cooldowns, like vanilla.

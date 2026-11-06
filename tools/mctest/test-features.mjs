@@ -7,18 +7,20 @@ const ver = process.env.VER || '1.12.2', d = mcdata(ver), P = d.version.version,
 const LABEL = { 47: '1.8.9', 107: '1.9', 110: '1.9.4', 210: '1.10.2', 316: '1.11.2', 340: '1.12.2' }[P];
 const port = 26100 + (P % 97), rport = 26000 + (P % 97), hport = 26300 + (P % 97);
 const relay = spawn('node', ['../relay/relay.mjs'], { env: { ...process.env, PORT: String(rport) }, stdio: 'ignore' }); await wait(1200);
-const hs = http.createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'application/zip' }); r.end(fs.readFileSync('/tmp/claude-0/srvpack.zip')); }).listen(hport);
+const hs = http.createServer((q, r) => { const png = /skin/.test(q.url); r.writeHead(200, { 'Content-Type': png ? 'image/png' : 'application/zip', 'Access-Control-Allow-Origin': '*' }); r.end(fs.readFileSync(png ? '/tmp/claude-0/skin.png' : '/tmp/claude-0/srvpack.zip')); }).listen(hport);
 const server = mc.createServer({ 'online-mode': false, version: ver, host: '127.0.0.1', port });
 function makeChunk(cx, cz) { const c = new C(); for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) { c.setBlockType(new Vec3(x, 0, z), 7); for (let y = 1; y <= 60; y++) c.setBlockType(new Vec3(x, y, z), y === 60 ? 2 : y > 57 ? 3 : 1); try { c.setSkyLight(new Vec3(x, 61, z), 15); } catch (e) { /* ok */ } }
   if (cx === 2 && cz === 2) { c.setBlockType(new Vec3(4, 61, 12), 26); c.setBlockData(new Vec3(4, 61, 12), 0); c.setBlockType(new Vec3(4, 61, 13), 26); c.setBlockData(new Vec3(4, 61, 13), 8); c.setBlockType(new Vec3(14, 61, 12), 1); c.setBlockType(new Vec3(14, 62, 12), 1); }
+  if (cx === 2 && cz === 3) { c.setBlockType(new Vec3(6, 61, 0), 144); c.setBlockData(new Vec3(6, 61, 0), 1); c.setBlockType(new Vec3(7, 61, 0), 144); c.setBlockData(new Vec3(7, 61, 0), 1); }
   return c; }
 const uuid = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0'), sl = (id, count, damage) => ({ blockId: id, itemCount: count, itemDamage: damage });
 const slotB = (id, n, dm) => { const b = Buffer.alloc(6); b.writeInt16BE(id, 0); b.writeInt8(n, 2); b.writeInt16BE(dm, 3); b[5] = 0; return b; };
 const got = { tab: 0, chatCmd: '', trSel: -1, rp: [], click: 0, act: [] };
 const mt = (key, type, value) => ({ key, type, value }), BYTE = 0, STR = V9 ? 3 : 4, BOOL = V9 ? 6 : 0, SLOT = 5;
 server.on('login', c => {
-  c.on('packet', (dt, m) => { if (m.name === 'tab_complete') { got.tab++; c.write('tab_complete', { matches: ['/help', '/heal'] }); } if (m.name === 'chat' && dt.message[0] === '/') got.chatCmd = dt.message;
-    if (m.name === 'custom_payload' && dt.channel === 'MC|TrSel') got.trSel = dt.data.readInt32BE(0); if (m.name === 'resource_pack_receive') got.rp.push(dt.result); if (m.name === 'window_click') got.click++; if (m.name === 'entity_action') got.act.push(dt.actionId); });
+  c.on('packet', (dt, m) => { if (m.name === 'tab_complete') { got.tab++; c.write('tab_complete', { matches: ['/help', '/heal'] }); } if (m.name === 'chat' && dt.message[0] === '/' && !got.chatCmd) got.chatCmd = dt.message;
+    if (m.name === 'custom_payload' && dt.channel === 'MC|TrSel') got.trSel = dt.data.readInt32BE(0); if (m.name === 'resource_pack_receive') got.rp.push(dt.result); if (m.name === 'window_click') got.click++; if (m.name === 'entity_action') got.act.push(dt.actionId);
+    if (m.name === 'chat' && dt.message === '/switch') { c.write('login', { entityId: c.id, gameMode: 0, dimension: 0, difficulty: 0, maxPlayers: 5, levelType: 'default', reducedDebugInfo: false }); c.write('respawn', { dimension: -1, difficulty: 0, gamemode: 0, levelType: 'default' }); c.write('respawn', { dimension: 0, difficulty: 0, gamemode: 0, levelType: 'default' }); } });
   c.write('login', { entityId: c.id, gameMode: 0, dimension: 0, difficulty: 0, maxPlayers: 5, levelType: 'default', reducedDebugInfo: false });
   c.write('position', { x: 40.5, y: 61, z: 46.5, yaw: 0, pitch: 0, flags: 0, teleportId: 7 });
   for (let cx = 0; cx < 5; cx++) for (let cz = 0; cz < 5; cz++) { const ch = makeChunk(cx, cz); const pk = { x: cx, z: cz, groundUp: true, bitMap: ch.getMask(), chunkData: ch.dump() }; if (V9) pk.blockEntities = []; c.write('map_chunk', pk); }
@@ -39,6 +41,9 @@ server.on('login', c => {
     c.write('map', Object.assign({ itemDamage: 5, scale: 0, icons: [{ directionAndType: 0, x: 0, z: 0 }], columns: -128, rows: -128, x: 0, y: 0, data }, V9 ? { trackingPosition: true } : {}));
     const fr = { entityId: 501, type: 71, x: 46, y: 62, z: 45, pitch: 0, yaw: 0, objectData: 0, velocity: { x: 0, y: 0, z: 0 } }; if (V9) fr.objectUUID = uuid(501); else { fr.x *= 32; fr.y *= 32; fr.z *= 32; }
     c.write('spawn_entity', fr); c.write('entity_metadata', { entityId: 501, metadata: [mt(V9 ? 6 + O : 8, SLOT, sl(358, 1, 5))] });
+    const skull = (x, z, type, tex) => c.write('tile_entity_data', { location: { x, y: 61, z }, action: 4, nbtData: { type: 'compound', name: '', value: Object.assign({ id: { type: 'string', value: P >= 315 ? 'minecraft:skull' : 'Skull' }, x: { type: 'int', value: x }, y: { type: 'int', value: 61 }, z: { type: 'int', value: z }, SkullType: { type: 'byte', value: type }, Rot: { type: 'byte', value: 4 } },
+      tex ? { Owner: { type: 'compound', value: { Name: { type: 'string', value: 'Steve' }, Properties: { type: 'compound', value: { textures: { type: 'list', value: { type: 'compound', value: [{ Value: { type: 'string', value: Buffer.from(JSON.stringify({ textures: { SKIN: { url: tex } } })).toString('base64') } }] } } } } } } } : {}) } });
+    skull(38, 48, 3, 'http://127.0.0.1:' + hport + '/skin.png'); skull(39, 48, 4);
     c.write('world_border', { action: 3, x: 40, z: 40, old_radius: 40, new_radius: 40, speed: 0, portalBoundary: 29999984, warning_time: 15, warning_blocks: 5 });
     if (V9) c.write('set_cooldown', { itemID: 276, cooldownTicks: 200 });
     c.write('abilities', { flags: 4, flyingSpeed: .05, walkingSpeed: .1 });
@@ -60,6 +65,7 @@ await pg.$eval('#mpBtn', e => e.click()); await pg.$eval('[data-mp=minecraft]', 
 await pg.selectOption('#mcVer', { label: LABEL + ' (protocol ' + P + ')' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:' + rport); await pg.dispatchEvent('#mcRelay', 'change');
 await pg.fill('#mcHost', '127.0.0.1:' + port); await pg.$eval('#mcGo', e => e.click());
 await pg.waitForFunction(() => typeof mode !== 'undefined' && mode === 'play', null, { timeout: 150000 }).catch(() => {}); await wait(7000);
+if (process.env.SHOT) await pg.evaluate(() => { window.__noSwitch = 1; });
 const info = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)); const r = {};
   r.team = !!(S.teams && S.teams.get('red'));
   r.holo = S.stands.map(s => [s.cname, s.cvis, s.invis, s.marker]); r.map = !!(S.maps && S.maps.get(5)); r.mapPost = (world.decor || []).filter(e => e.mapId === 5).length;
@@ -77,11 +83,13 @@ const info = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms =
   selectSlot(1); for (let k = 0; k < 30 && !r.mapHudOn; k++) { await W(150); r.mapHudOn = !!document.getElementById('mcMapHud') && document.getElementById('mcMapHud').style.display !== 'none'; } r.held = [inv.sel, held() && held().mc && held().mc.id, mode];
   r.tags = [...document.querySelectorAll('#mcTags > div')].map(e => e.textContent);
   player.x = 40 + S.OX + 45; await W(200); r.clamp = Math.round(player.x - S.OX);
+  r.skulls = S.skulls && [...S.skulls.values()].map(q => q.type + ':' + q.face + ':' + !!(q.T && q.T.tex)); r.tilt = window.__plTilt ? 1 : 0;
+  if (!window.__noSwitch) { S.client.chat('/switch'); await W(1500); } r.afterSwitch = [S.players.length, S.mobs.length, S.stands.length, S.ents.size];
   return r; });
-await wait(800); await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 41 + S.OX; player.z = 50 + S.OZ; player.y = 61; cam.zoom = 6; }); await wait(2500); await pg.screenshot({ path: '/tmp/feat-' + ver + '.png' });
+await wait(800); await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 41 + S.OX; player.z = 50 + S.OZ; player.y = 61; cam.zoom = 6; if (window.__noSwitch) { S.slots[36 + inv.sel] = { id: 442, count: 1, damage: 0, raw: new Uint8Array([1, 186, 1, 0, 0, 0]) }; S.block = true; } }); await wait(2500); await pg.screenshot({ path: '/tmp/feat-' + ver + '.png' });
 await pg.$eval('#mcLeave', e => e.click()).catch(() => {}); await wait(1500);
 const after = await pg.evaluate(() => ({ active: StrataMCE.active, pack: !!(PACK.on && PACK.rec && PACK.rec.files && PACK.rec.files['b/stone']), elytra: window.__elytra, css: !!document.getElementById('mcExtCss') }));
 const res = { ver, P, info, got, toasts: toasts.slice(0, 8), after, errs: errs.slice(0, 5) }, x = info;
 res.pass = x.team && x.holo.length === 1 && x.holo[0][1] && x.holo[0][2] && x.holo[0][3] && /Welcome/.test(x.tags.join('|')) && x.map && x.mapPost === 1 && x.border === 20 && x.abil === 4 && x.sleep && x.tags.includes("[R] Alice") && /^red:/.test(x.bed) === (P < 335) && x.stone && got.rp.join() === '3,0' && got.chatCmd === '/spawn' && x.cmdTitle && x.sug.includes('/help') && got.tab >= 1
-  && x.trades === 1 && got.trSel === 0 && x.pay === 388 && x.ct && x.grid.every(v => v === 5) && x.mapHudOn && x.clamp <= 60 && (!V9 || (x.cool && x.glide && x.selfGlide && got.act.some(a => a === 8 || a === 'start_fall_flying'))) && (P < 335 || (x.adv === 2 && x.advBtn && /blue:/.test(x.bed) && toasts.some(t => /Stone Age/.test(t)))) && !errs.length && !after.active && !after.pack && !after.css;
+  && x.trades === 1 && got.trSel === 0 && x.pay === 388 && x.ct && x.grid.every(v => v === 5) && x.mapHudOn && x.clamp <= 60 && (!V9 || (x.cool && x.glide && x.selfGlide && got.act.some(a => a === 8 || a === 'start_fall_flying'))) && (P < 335 || (x.adv === 2 && x.advBtn && /blue:/.test(x.bed) && toasts.some(t => /Stone Age/.test(t)))) && x.skulls && x.skulls.includes('3:1:true') && x.skulls.includes('4:1:false') && x.tilt && x.afterSwitch.join() === '0,0,0,0' && !errs.length && !after.active && !after.pack && !after.css;
 console.log(JSON.stringify(res)); await b.close(); server.close(); hs.close(); relay.kill(); process.exit(res.pass ? 0 : 1);

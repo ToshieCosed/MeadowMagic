@@ -6460,7 +6460,7 @@ function playerSwing(){ const p=player, now=performance.now()/1000;
 function buildPlayerSkin(){ const p=player; SKV.tpN=0; if(cam.mode==='fp'||!world) return;
   const now=performance.now()/1000, sp=p.speed||0; PL.amt=lerp(PL.amt,Math.min(1,sp/5.4)*(p.onGround||p.climbing?1:.25),.25);
   const ls=p.phase||0, a=PL.amt, hs=game()&&held(), s=playerSwing(), crouch=p.crouch&&!p.swimProne&&!p.sitting;
-  const ry=p.y+p.stepOff; p.swimK=p.swimK||0; const sk=p.swimK, bp=sk*1.42+(p.sprinting&&!crouch?.12:0);
+  const ry=p.y+p.stepOff; p.swimK=p.swimK||0; const sk=p.swimK, bp=sk*1.42+(p.sprinting&&!crouch?.12:0)+(window.__plTilt?window.__plTilt():0);
   const BASE=mc(mT(p.x,ry,p.z),mY(p.face),mT(0,.9-.62*sk,0),mX(bp),mT(0,-.9,0),mS(PX));
   const part=(piv,xr,yr,zr,off)=>mc(BASE,mT(piv[0]+(off?off[0]:0),piv[1]+(off?off[1]:0),piv[2]+(off?off[2]:0)),mZ(zr||0),mY(yr||0),mX(xr||0),mT(-piv[0],-piv[1],-piv[2]));
   // angles (our space: xr same as Minecraft, yr and zr flipped)
@@ -6477,6 +6477,7 @@ function buildPlayerSkin(){ const p=player; SKV.tpN=0; if(cam.mode==='fp'||!worl
   if(bowDraw||p.shotT>0){ rArm=-Math.PI/2; lArm=-Math.PI/2; rArmY=.1; lArmY=-.5; rArmZ=lArmZ=0; }
   if(s>0){ bodyY=-Math.sin(Math.sqrt(s)*Math.PI*2)*.2; let f=1-s; f*=f; f*=f; f=1-f; const f1=Math.sin(f*Math.PI), f2=Math.sin(s*Math.PI)*.7*.75;
     rArm-=f1*1.2+f2; rArmY+=bodyY*2; rArmZ+=Math.sin(s*Math.PI)*.4; lArmY+=bodyY; }
+  if(window.__plPose){ const A={rArm,lArm,rArmZ,lArmZ,rArmY,lArmY,rLeg,lLeg}; window.__plPose(A); ({rArm,lArm,rArmZ,lArmZ,rArmY,lArmY,rLeg,lLeg}=A); }   // Minecraft-compat poses (elytra, shield)
   // crouching: lean forward from the neck, lower the head and arms, push the legs back
   const cb=crouch?.5:0, cy=crouch?-3.2:0, chy=crouch?-4.2:0, clz=crouch?-4:0; if(crouch){ rArm+=.4; lArm+=.4; }
   const SL=SKIN.slim, aw=SL?3:4;
@@ -6499,6 +6500,7 @@ function buildPlayerSkin(){ const p=player; SKV.tpN=0; if(cam.mode==='fp'||!worl
     if(col(2)){ ab(body,[-4.4,11.6,-2.4],[4.4,14.5,2.4],col(2)); ab(rL,[-4.4,4,-2.4],[.1,12.2,2.4],col(2)); ab(lL,[-.1,4,-2.4],[4.4,12.2,2.4],col(2)); }
     if(col(3)){ ab(rL,[-4.5,-.1,-2.5],[.2,4.4,2.5],col(3)); ab(lL,[-.2,-.1,-2.5],[4.5,4.4,2.5],col(3)); } }
   // the held item, at the right hand (Minecraft third-person display)
+  if(window.__plExtra&&window.__plExtra({head,body,rA,lA,rL,lL,aw})) return;
   if(hs&&!p.climbing){ const d=dispOf(hs.id), M=mc(rA,mT(-4-aw/2,12.5,0),mS(16),mX(Math.PI/2),mY(Math.PI),mT(1/16,-.125,.1),dispM(d.tp)); setVL(sampleLight(p.x,p.y+1.2,p.z)); emitItem(dynVB,hs.id,mc(mT(0,0,0),M),glinty(hs)); }
 }
 function drawSkinMesh(buf,n,light,alpha,ghost){ if(!n||!SKIN.tex) return;
@@ -10793,7 +10795,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function drawMcPlayers() {
     if (cam.photoHide) return; const keep = SKIN.tex, hurt = player.hurtT; player.hurtT = 9;
     for (const pl of S.players) if (pl.n > 0) { const L = Array.from(sampleLight(pl.x, pl.y + 1.2, pl.z)); SKIN.tex = pl.T && pl.T.tex || keep; drawSkinMesh(pl.buf, pl.n, L, 1, false); for (const a of pl.arm || []) { const e = __ENT[a.key]; if (!e) continue; SKIN.tex = e.tex; drawSkinMesh(a.B, a.n, L, 1, false); } }
-    SKIN.tex = keep; player.hurtT = hurt;
+    SKIN.tex = keep; player.hurtT = hurt; try { drawSkulls(); } catch (e) { /* skin */ }
   }
   function tagColor(nm) { let h = 0; for (const c of nm) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `hsl(${h % 360},80%,74%)`; }
   function tagLoop() {
@@ -11656,7 +11658,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       if (!FOOD18.has(mc.id)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
 
     openInv() { if (mode === 'play') mcInvOpen(); },
-    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); objsDyn(vb); borderDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
+    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); objsDyn(vb); borderDyn(vb); skullDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
     closeInv() { mcInvClose(true); },   // the only arrows in a compat world are the server's, moved by stepProj
     emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
@@ -11953,9 +11955,55 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
+  // ---- skulls and player heads (block 144): drawn from the block entity, with the owner's skin for player heads ----
+  const SKC = [[205, 205, 195], [44, 44, 46], [82, 132, 72], null, [92, 170, 70], [30, 26, 34]];   // skeleton, wither, zombie, player, creeper, dragon
+  const skKey = (x, y, z) => x + ',' + y + ',' + z;
+  function skullMeta(X, y, Z, meta) { const K = S.skulls = S.skulls || new Map(), k = skKey(X, y, Z); let s = K.get(k); if (!s) { s = { x: X, y, z: Z, type: 0, rot: 0 }; K.set(k, s); } s.face = meta & 7; }
+  function skullGone(X, y, Z) { if (S.skulls) S.skulls.delete(skKey(X, y, Z)); }
+  function skullTile(X, y, Z, tag) { const K = S.skulls = S.skulls || new Map(), k = skKey(X, y, Z); let s = K.get(k); if (!s) { s = { x: X, y, z: Z, face: 1 }; K.set(k, s); }
+    s.type = tag.SkullType | 0; s.rot = tag.Rot | 0; const ow = tag.Owner || tag.SkullOwner; let url = null;
+    try { const v = ow && ow.Properties && ow.Properties.textures && ow.Properties.textures[0] && ow.Properties.textures[0].Value; if (v) { const j = JSON.parse(atob(v)); url = j.textures && j.textures.SKIN && String(j.textures.SKIN.url || '').replace(/^http:\/\/textures\.minecraft\.net/, 'https://textures.minecraft.net'); } } catch (e) { /* bad texture */ }
+    s.url = url; s.owner = ow && (ow.Id || ow.Name) || (typeof ow === 'string' ? ow : null); s.T = null; if (s.type === 3) headSkin(s); }
+  async function headSkin(s) { const key = s.url || s.owner; if (!key) return; const C = S.headT = S.headT || new Map(); let T = C.get(key);
+    if (T === undefined) { C.set(key, null); const url = await skinBlob(s.url ? null : s.owner, s.url ? { url: s.url } : null); if (!S) return; T = null;
+      if (url) { T = { cv: document.createElement('canvas'), tex: null, slim: false }; T.cv.width = T.cv.height = 64; try { await loadSkin(url, 'p', 'auto', T); } catch (e) { T = null; } URL.revokeObjectURL(url); } C.set(key, T); }
+    else if (T === null) { setTimeout(() => { if (S && C.get(key)) s.T = C.get(key); }, 3000); return; }
+    s.T = T; }
+  const WALLD = { 2: [0, -1], 3: [0, 1], 4: [-1, 0], 5: [1, 0] };
+  function skullM(s) { const w = WALLD[s.face]; if (w) return mc(mT(s.x + .5 - w[0] * .25, s.y + .25, s.z + .5 - w[1] * .25), mY(Math.atan2(w[0], w[1])), mS(1 / 16));
+    return mc(mT(s.x + .5, s.y, s.z + .5), mY(-(s.rot || 0) * PI / 8), mS(1 / 16)); }
+  function skullDyn(vb) { if (!S.skulls) return; const p = player;   // non-player heads: Strata vertex-colour boxes
+    for (const s of S.skulls.values()) { if (s.type === 3 && s.T) continue; if (Math.hypot(s.x - p.x, s.z - p.z) > 48) continue; const M = skullM(s), T = (a, b, c) => ap(M, a, b, c), c = SKC[s.type] || [176, 128, 96];
+      setVL(sampleLight(s.x + .5, s.y + .5, s.z + .5)); emitBox(vb, [-4, 0, -4], [4, 8, 4], c, T);
+      const ey = [40, 40, 40]; if (s.type === 4) { emitBox(vb, [-3, 4, 4], [-1, 6, 4.2], ey, T); emitBox(vb, [1, 4, 4], [3, 6, 4.2], ey, T); emitBox(vb, [-1, 1, 4], [1, 4, 4.2], ey, T); }
+      else if (s.type !== 3) { emitBox(vb, [-3, 3.5, 4], [-1, 5, 4.2], s.type === 1 ? [10, 10, 10] : ey, T); emitBox(vb, [1, 3.5, 4], [3, 5, 4.2], s.type === 1 ? [10, 10, 10] : ey, T); }
+      else { emitBox(vb, [-3, 3.5, 4], [-1, 4.5, 4.2], [250, 250, 250], T); emitBox(vb, [1, 3.5, 4], [3, 4.5, 4.2], [250, 250, 250], T); } } }
+  function drawSkulls() { if (!S.skulls) return; const keep = SKIN.tex, p = player;   // player heads with the owner's skin (face and hat layers)
+    for (const s of S.skulls.values()) { if (s.type !== 3 || !s.T || !s.T.tex || Math.hypot(s.x - p.x, s.z - p.z) > 48) continue; const M = skullM(s); s.buf = s.buf || new Float32Array(2 * 6 * 6 * 16); let n = 0;
+      n = skinBox(s.buf, n, M, -4, 0, -4, 8, 8, 8, 0, 0, 0); n = skinBox(s.buf, n, M, -4, 0, -4, 8, 8, 8, 32, 0, .25); SKIN.tex = s.T.tex; drawSkinMesh(s.buf, n / 6, Array.from(sampleLight(s.x + .5, s.y + .5, s.z + .5)), 1, false); }
+    SKIN.tex = keep; }
+  function skullScan(sx, sz, sections) { const X0 = sx * 16, Z0 = sz * 16; if (S.skulls) for (const [k, s] of S.skulls) if (s.x >> 4 === sx && s.z >> 4 === sz) S.skulls.delete(k);
+    for (const sec of sections) { const b = sec.blocks; for (let j = 0; j < 4096; j++) if (b[j] >> 4 === 144) skullMeta(X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15), b[j] & 15); } }
+  // ---- your own character in compat: elytra glide pose and wings, raised shield (hooks in Strata's buildPlayerSkin) ----
+  const ownShield = () => { const h = S.slots[36 + inv.sel], o = S.slots[45]; return h && h.id === 442 ? 1 : o && o.id === 442 ? 2 : 0; };
+  function ownHooks(on) {
+    if (!on) { delete window.__plTilt; delete window.__plPose; delete window.__plExtra; return; }
+    window.__plTilt = () => (S && player.gliding && window.__elytra ? 1.35 : 0);
+    window.__plPose = A => { if (!S) return; if (player.gliding && window.__elytra) { A.rArm = A.lArm = 0; A.rArmZ = -.35; A.lArmZ = .35; A.rLeg = A.lLeg = 0; A.rArmY = A.lArmY = 0; }
+      if (S.block) { const sh = ownShield(); if (sh === 1) { A.rArm = -.95; A.rArmY = -.4; } else if (sh === 2) { A.lArm = -.95; A.lArmY = .4; } } };
+    window.__plExtra = P => { if (!S) return false; const p = player; setVL(sampleLight(p.x, p.y + 1.2, p.z)); if (isEly(S.slots[6])) wings({ eq: [null, null, null, S.slots[6]], glide: p.gliding }, P.body);
+      const sh = ownShield(); if (sh === 2) shieldOn(P.lA, 4 + P.aw / 2); if (sh === 1) { shieldOn(P.rA, -4 - P.aw / 2); return true; } return false; };
+  }
+  // proxies (BungeeCord / Velocity) switch servers with a respawn or a second join: forget the old server's entities like vanilla does
+  function forgetEntities(Hd) { const ids = new Set([...S.ents.keys(), ...S.objs.keys(), ...S.dr.keys(), ...S.veh.keys(), ...S.paint.keys(), ...S.pr.keys()]); try { Hd.destroy([...ids]); } catch (e) { /* partly gone */ }
+    S.mobs.length = 0; S.players.length = 0; S.stands.length = 0; S.ents.clear(); if (S.skulls) S.skulls.clear(); if (S.mapPost) S.mapPost.clear(); S.border = null; S.icd = null; }
   function extHandlers(Hd) {
-    const o = { vmeta: Hd.vmeta, bmeta: Hd.bmeta, flags: Hd.flags, playerInfo: Hd.playerInfo, spawn: Hd.spawn, anim: Hd.anim, block: Hd.block, tile: Hd.tile, held: Hd.held, showObjective: Hd.showObjective, multi: Hd.multi };
+    const o = { login: Hd.login, respawn: Hd.respawn, chunk: Hd.chunk, unload: Hd.unload, vmeta: Hd.vmeta, bmeta: Hd.bmeta, flags: Hd.flags, playerInfo: Hd.playerInfo, spawn: Hd.spawn, anim: Hd.anim, block: Hd.block, tile: Hd.tile, held: Hd.held, showObjective: Hd.showObjective, multi: Hd.multi };
     Object.assign(Hd, {
+      login(p) { if (S.joinedOnce && S.world) { forgetEntities(Hd); Hd.respawn(p.dimension); } S.joinedOnce = true; o.login(p); },
+      respawn(dim) { if (S.world) forgetEntities(Hd); o.respawn(dim); },
+      chunk(cx, cz, sections, gu) { o.chunk(cx, cz, sections, gu); if (S.world) try { skullScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ } },
+      unload(cx, cz) { o.unload(cx, cz); const sx = cx + (S.OX >> 4), sz = cz + (S.OZ >> 4); if (S.skulls) for (const [k, q] of S.skulls) if (q.x >> 4 === sx && q.z >> 4 === sz) S.skulls.delete(k); },
       vmeta(eid, idx, kind, v) { if (!S.world) return; if (nameMeta(eid, idx, kind, v)) return; const m = S.ents.get(eid), off = PV() >= 210 ? 1 : 0;
         if (m && m.stand && idx === 10 + off && kind === 'byte') { standFlags(m, v); return; }
         if (m && m.pl && idx === 5 + off && kind === 'byte') { m.useH = v; return; }   // hand states: 1 = using, 2 = off hand
@@ -11969,9 +12017,10 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       spawn(e) { o.spawn(e); const m = S.ents.get(e.eid); if (m && m.pl) m.nm = S.names.get(e.uuid) || null; },
       anim(id, a) { const m = S.ents.get(id); if (m && a === 2) m.sleep = null; o.anim(id, a); },
       bed(eid, x, y, z) { if (S.world) bedPose(eid, x, y, z); },
-      block(x, y, z, st) { o.block(x, y, z, st); if (S.world && st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); },
+      block(x, y, z, st) { o.block(x, y, z, st); if (!S.world) return; if (st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); if (st >> 4 === 144) skullMeta(x + S.OX, y, z + S.OZ, st & 15); else skullGone(x + S.OX, y, z + S.OZ); },
+      multi(l) { o.multi(l); if (S.world) for (const b of l) { if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
       tile(x, y, z, a, raw) { o.tile(x, y, z, a, raw); if (!S.world) return; let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
-        if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); },
+        if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); if (/skull$/i.test(String(tag.id || ''))) skullTile(x + S.OX, y, z + S.OZ, tag); },
       held(n) { S.block = false; o.held(n); },
       showObjective(pos, nm) { if (pos === 2) { S.belowObj = nm || null; return; } o.showObjective(pos, nm); },
       team, map(id, sc, icons, pat) { if (S.world) mapData(id, sc, icons, pat); }, abilities(f, fly, walk) { S.abil = { f, fly, walk }; },
@@ -12015,7 +12064,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
-    try { chatHooks(); } catch (e) { /* ui */ }
+    try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
@@ -12026,7 +12075,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.removeEventListener('click', bookHooks.done, true); if (g) g.removeEventListener('click', bookHooks.sign, true); }
     if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
-    try { chatUnhook(s); } catch (e) { /* ui */ } window.__elytra = false;
+    try { chatUnhook(s); ownHooks(false); } catch (e) { /* ui */ } window.__elytra = false;
     if (s.world) {
       for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
       if (s.srvPack) { try { applyPack(s.packPrev); } catch (e) { /* pack */ } }
