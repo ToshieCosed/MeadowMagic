@@ -11715,7 +11715,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         mcInvRender(); },
       position(p) {
         const c = Hd.cur || { x: 0, y: 0, z: 0 }, x = (p.flags & 1 ? c.x : 0) + p.x, y = (p.flags & 2 ? c.y : 0) + p.y, z = (p.flags & 4 ? c.z : 0) + p.z;
-        ensureWorld(x, z); Hd.cur = { x, y, z };
+        if (S.world && (x + S.OX < 160 || z + S.OZ < 160 || x + S.OX > SIZE - 160 || z + S.OZ > SIZE - 160)) rebase(Hd, x, z);   // a far teleport (/rtp, a new server behind a proxy): re-centre Strata's world window
+        ensureWorld(x, z); Hd.cur = { x, y, z }; S.hold = 0;
         Object.assign(player, { x: x + S.OX, y, z: z + S.OZ, vx: 0, vy: 0, vz: 0, fallTop: y });
         if (!(p.flags & 8)) player.face = -p.yaw * Math.PI / 180;
       },
@@ -11995,14 +11996,20 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       const sh = ownShield(); if (sh === 2) shieldOn(P.lA, 4 + P.aw / 2); if (sh === 1) { shieldOn(P.rA, -4 - P.aw / 2); return true; } return false; };
   }
   // proxies (BungeeCord / Velocity) switch servers with a respawn or a second join: forget the old server's entities like vanilla does
+  function rebase(Hd, x, z) {   // everything Strata holds is in window coordinates: drop it (the server resends what is near the new spot) and move the window
+    forgetEntities(Hd); for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); S.cracks.clear(); if (S.beacons) S.beacons.clear(); if (S.bedCol) S.bedCol.clear();
+    if (world) { world.decor = (world.decor || []).filter(e => !(e.mcCell || e.mcPaint != null || e.mapId != null)); world.changed = true; for (const ch of [...world.chunks.keys()]) unloadKey(ch); }
+    S.OX = 1024 - Math.floor(x / 16) * 16; S.OZ = 1024 - Math.floor(z / 16) * 16;
+    const F = S.far; S.far = new Map(); if (F) for (const c of F.values()) Hd.chunk(...c); }
   function forgetEntities(Hd) { const ids = new Set([...S.ents.keys(), ...S.objs.keys(), ...S.dr.keys(), ...S.veh.keys(), ...S.paint.keys(), ...S.pr.keys()]); try { Hd.destroy([...ids]); } catch (e) { /* partly gone */ }
     S.mobs.length = 0; S.players.length = 0; S.stands.length = 0; S.ents.clear(); if (S.skulls) S.skulls.clear(); if (S.mapPost) S.mapPost.clear(); S.border = null; S.icd = null; }
   function extHandlers(Hd) {
     const o = { login: Hd.login, respawn: Hd.respawn, chunk: Hd.chunk, unload: Hd.unload, vmeta: Hd.vmeta, bmeta: Hd.bmeta, flags: Hd.flags, playerInfo: Hd.playerInfo, spawn: Hd.spawn, anim: Hd.anim, block: Hd.block, tile: Hd.tile, held: Hd.held, showObjective: Hd.showObjective, multi: Hd.multi };
     Object.assign(Hd, {
       login(p) { if (S.joinedOnce && S.world) { forgetEntities(Hd); Hd.respawn(p.dimension); } S.joinedOnce = true; o.login(p); },
-      respawn(dim) { if (S.world) forgetEntities(Hd); o.respawn(dim); },
-      chunk(cx, cz, sections, gu) { o.chunk(cx, cz, sections, gu); if (S.world) try { skullScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ } },
+      respawn(dim) { if (S.world) forgetEntities(Hd); if (S.far) S.far.clear(); o.respawn(dim); },
+      chunk(cx, cz, sections, gu) { if (S.world && !inRange(cx + (S.OX >> 4), cz + (S.OZ >> 4))) { const F = S.far = S.far || new Map(), k = cx + ',' + cz; F.delete(k); F.set(k, [cx, cz, sections, gu]); if (F.size > 200) F.delete(F.keys().next().value); return; }   // outside the window: keep it for a re-centre
+        o.chunk(cx, cz, sections, gu); if (S.world) try { skullScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ } },
       unload(cx, cz) { o.unload(cx, cz); const sx = cx + (S.OX >> 4), sz = cz + (S.OZ >> 4); if (S.skulls) for (const [k, q] of S.skulls) if (q.x >> 4 === sx && q.z >> 4 === sz) S.skulls.delete(k); },
       vmeta(eid, idx, kind, v) { if (!S.world) return; if (nameMeta(eid, idx, kind, v)) return; const m = S.ents.get(eid), off = PV() >= 210 ? 1 : 0;
         if (m && m.stand && idx === 10 + off && kind === 'byte') { standFlags(m, v); return; }
@@ -12045,7 +12052,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now; ensureGeneric();
     if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = (p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4) * (S.abil && S.abil.walk > .1 ? S.abil.walk / .1 : 1); p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
       if (!p.inWater && !p.gliding && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
-    if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
+    if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 60) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
     for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
     if (S.world && S.fx && Object.keys(S.fx).length && (S.fxT = (S.fxT || 0) + dt) > 1) { S.fxT = 0; effectHud(); }
@@ -12122,7 +12129,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   relay.onchange=()=>{ MP.relay=relay.value.trim(); try{ localStorage.setItem('strata.relay',MP.relay); }catch(e){} };
   btn.onclick=()=>{ menu.hidden=true; sh.hidden=false; note.textContent=''; };
   $('mpBack').onclick=()=>{ sh.hidden=true; menu.hidden=false; };
-  sh.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{ MP.mode=b.dataset.mp; panel.hidden=MP.mode!=='minecraft'; note.textContent=MP.mode==='minecraft'?'Chat only for now; the world is a blank sky until block loading is added.':'Strata multiplayer is not built yet.'; });
+  sh.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{ MP.mode=b.dataset.mp; panel.hidden=MP.mode!=='minecraft'; note.textContent=MP.mode==='minecraft'?'Join Minecraft 1.8 - 1.12.2 servers (newer versions are chat only).':'Strata multiplayer is not built yet.'; });
   // Microsoft sign-in runs in the relay (the Xbox/Minecraft login endpoints refuse browser requests); the browser only shows the code
   let ws=null;
   const setAuth=a=>{ MP.auth=a; stat.textContent=a?'Signed in as '+a.name:'Not signed in.'; codeBox.hidden=true; authBtn.disabled=false; authBtn.textContent=a?'Sign in again':'Sign in with Microsoft'; };
