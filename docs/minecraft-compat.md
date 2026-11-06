@@ -90,3 +90,14 @@ Anything added for Minecraft compatibility exists **only while connected in Mine
 
 ## Stage 10: generic fallback mob (compat only)
 Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the zombie model with a speckled green texture generated at runtime (`ENT.mcgeneric`). It is removed on disconnect and never exists outside compat mode. Compat mobs are now drawn by `drawSkins` through `window.__cmobs`.
+
+## Stage 11 (1.8): mob models, held items, projectiles, hunger (compat only)
+- Mobs Strata has no model for now use Minecraft 1.8's own model geometry, so resource-pack entity textures wrap onto them the way the horse/spider/cow skins do: creeper, ghast, blaze, silverfish, endermite, magma cube, witch, iron golem, snow golem (with a pumpkin), ocelot, rabbit, guardian, wither and ender dragon. Variants reuse Strata's models with their own texture: mooshroom (cow), cave spider (spider, 0.7x), zombie pigman (zombie), wither skeleton (skeleton, 1.2x, from metadata), giant (zombie, 6x).
+- These are `mc_*` types in `src/mc/engine.js` (`CM`). `start()` registers their `MOB` entries and `window.__cmModel` (asked first by Strata's `modelFor`); `stop()` removes both, so none of them exist outside compat mode. Their pack files are listed in `ENT_FILES`, so packs imported before this need re-importing to pick them up.
+- Without a pack texture: types with a Strata equivalent fall back to Strata's own model (mooshroom -> cow, magma cube -> magma slime, ...); the rest get a texture generated in the mob's colours, with a face.
+- Spawn metadata is now read (baby, skeleton type, slime/magma size).
+- Held items: `entity_equipment` slot 0 on mobs is drawn with Strata's item renderer in the right hand. Skeletons hold Strata's bow and raise both arms to aim when armed; zombies/pigmen hold their swords.
+- Projectiles: arrows (object 60) and fireballs (63, 64) become entries in Strata's own `arrows` list and are drawn by Strata's arrow/fireball renderer. Their flight is simulated client-side (vanilla physics: drag, gravity, sticking in blocks) and corrected by server position updates; Strata's own `stepArrows` is off while connected.
+- Hunger: a row of drumsticks under the hearts follows the server's `update_health` food value (right to left, half shanks), hidden in creative.
+- Fixes: pack zombie arms/legs (the right limbs sampled zombie.png's empty lower half; they now mirror the left ones like vanilla's biped) and the built-in zombie/skeleton hands z-fighting with their sleeves.
+- Test (dev only): `tools/mctest/test-mobs18.mjs` spawns every 1.8 mob type, arms them, fires arrows and sends food; `PACK=1 CLOSE=1` paints each model's box faces in distinct colours to check the UV wrapping and screenshots each mob.

@@ -59,7 +59,7 @@ await pg.click('#mcChatBtn'); await pg.fill('#mcIn', 'hello from me'); await pg.
 await pg.evaluate(() => { const x = Math.floor(player.x), z = Math.floor(player.z); mining = { t0: 0, target: { hit: [1032 + 7, 61, 1034], prev: [1032 + 7, 62, 1034] }, prog: .65, key: 'x', sx: 0, sy: 0 }; });
 inter.tags = await pg.evaluate(() => [...document.getElementById('mcTags').children].map(e => e.textContent + (e.style.display === 'none' ? '(hidden)' : '')));
 inter.dbg = await pg.evaluate(() => { const S = StrataMCE.dbg(); return { pl: S.players.length, names: [...S.names.values()], eq: S.players[0] && S.players[0].eq.map(e => e && e.id), n: S.players[0] && S.players[0].n }; });
-inter.gen = await pg.evaluate(() => ({ ent: !!__ENT.mcgeneric, m: (window.__cmobs || []).filter(m => m.type === 'mcgeneric').length, f: !!(__skins.modelFor(window.__cmobs.find(m => m.type === 'mcgeneric') || {})) }));
+inter.gen = await pg.evaluate(() => ({ ent: !!__ENT.mcgeneric, m: (window.__cmobs || []).filter(m => m.type === 'mc_creeper').length, f: !!(__skins.modelFor(window.__cmobs.find(m => m.type === 'mc_creeper') || {})) }));   // creepers have a compat-only model now
 inter.crk = await pg.evaluate(() => { const o = mining; mining = { target: { hit: [1039, 61, 1034] }, prog: .65 }; buildCracks(); const n = crVB.n; mining = null; buildCracks(); return n; });
 await pg.screenshot({ path: '/tmp/world18.png' });
 await pg.click('#mcLeave'); await wait(1500);

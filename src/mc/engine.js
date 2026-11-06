@@ -3,8 +3,10 @@
   'use strict';
   const SIZE = 2048, HGT = 256;
   const MCE = window.StrataMCE = { active: false };
-  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin'];
-  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 59: 'spider', 54: 'zombie', 57: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 62: 'slime', 63: 'mcgeneric', 64: 'mcgeneric', 67: 'mcgeneric', 68: 'mcgeneric', 97: 'mcgeneric', 99: 'mcgeneric', 50: 'mcgeneric', 58: 'walker', 56: 'mcgeneric', 61: 'mcgeneric', 60: 'spider', 120: 'lost', 101: 'chicken', 98: 'wolf', 96: 'cow', 102: 'cow', 66: 'lost', 94: null };   // anything else (fish, phantoms, ...) is skipped
+  const OVR = ['stepMobs', 'stepMobSpawning', 'stepHostileSpawning', 'stepGrowth', 'stepDecay', 'stepHealth', 'spawnMob', 'fluidNotify', 'stepFluids', 'saveGame', 'mineBlock', 'placeSurv', 'tapDecor', 'tapEntity', 'useHeld', 'tryInteract', 'clickSlot', 'selectSlot', 'takeOutput', 'hurt', 'tapEntity', 'pickEntity', 'stepMining', 'mineTime', 'stepDrops', 'dropHeld', 'stepHealth', 'stepDecay', 'buildCracks', 'wallAt', 'buildPlayerSkin', 'drawPlayerSkin', 'stepArrows', 'emitMob', 'drawHearts'];
+  const LIVING = { 90: 'pig', 91: 'sheep', 92: 'cow', 93: 'chicken', 100: 'horse', 95: 'wolf', 52: 'spider', 54: 'zombie', 51: 'skeleton', 55: 'slime', 65: 'bat', 53: 'zombie', 58: 'walker', 120: 'lost',
+    50: 'mc_creeper', 56: 'mc_ghast', 57: 'mc_pigman', 59: 'mc_cave_spider', 60: 'mc_silverfish', 61: 'mc_blaze', 62: 'mc_magma_cube', 63: 'mc_dragon', 64: 'mc_wither', 66: 'mc_witch', 67: 'mc_endermite', 68: 'mc_guardian',
+    96: 'mc_mooshroom', 97: 'mc_snowman', 98: 'mc_ocelot', 99: 'mc_iron_golem', 101: 'mc_rabbit', 94: null };   // mc_* models exist only in compat mode (see CM below); anything else (fish, phantoms, ...) is skipped
   let S = null;
 
   // ---- late block registration (ids 8192+), removed again on stop ----
@@ -208,6 +210,184 @@
     for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
     gl.activeTexture(gl.TEXTURE0); __ENT.mcgeneric = { tex: t, w: 64, h: 64 };
   }
+  // ---- Minecraft-compat-only mob models -------------------------------------------------------------------------------
+  // Strata has no model for these mobs, so compat mode carries Minecraft 1.8's own geometry for them: a resource pack's
+  // entity textures wrap onto them exactly like the horse/spider/cow skins do. Without a pack texture they get a generated
+  // texture in the mob's colours (types with a Strata equivalent fall back to Strata's own model instead).
+  // Registered by start() (window.__cmModel + MOB entries), removed by stop(); nothing here exists outside compat mode.
+  // Parts are written in Minecraft model space (y down, front -z, feet at y 24) and converted to Strata's skin space.
+  const PI = Math.PI, age = () => performance.now() / 50, wk = (m, k, ph) => m.moving ? Math.cos((m.phase || 0) * (k || 1) + (ph || 0)) : 0;
+  const mR = (rp, r) => { const R = []; if (r) { if (r[0]) R.push(['x', r[0], 24 - rp[1], -rp[2]]); if (r[1]) R.push(['y', -r[1], rp[0], -rp[2]]); if (r[2]) R.push(['z', -r[2], rp[0], 24 - rp[1]]); } return R; };
+  const mb = (rp, b, uv, r, o) => Object.assign({ p: [rp[0] + b[0], 24 - (rp[1] + b[1] + b[4]), -(rp[2] + b[2] + b[5])], s: [b[3], b[4], b[5]], uv }, o || {}, { rot: mR(rp, r).concat(o && o.par || []) });
+  const mirX = q => Object.assign({}, q, { p: [-(q.p[0] + q.s[0]), q.p[1], q.p[2]], mir: !q.mir, rot: q.rot.map(([ax, a, c1, c2]) => ax === 'x' ? [ax, a, c1, c2] : ax === 'y' ? [ax, -a, -c1, c2] : [ax, -a, -c1, c2]) });
+  const SEG = (sizes, uvs, amp, ampX, wings) => m => { const t = age(), parts = [], fz = [], rY = [], rX = []; let f = -3.5;
+    for (let i = 0; i < sizes.length; i++) { fz.push(f); const a = t * .9 + i * .15 * PI; rY.push(Math.cos(a) * PI * amp * (1 + Math.abs(i - 2))); rX.push(Math.sin(a) * PI * ampX * Math.abs(i - 2)); if (i < sizes.length - 1) f += (sizes[i][2] + sizes[i + 1][2]) * .5; }
+    sizes.forEach((z, i) => parts.push(mb([rX[i], 24 - z[1], fz[i]], [z[0] * -.5, 0, z[2] * -.5, z[0], z[1], z[2]], uvs[i], [0, rY[i], 0])));
+    if (wings) parts.push(mb([0, 16, fz[2]], [-5, 0, sizes[2][2] * -.5, 10, 8, sizes[2][2]], [20, 0], [0, rY[2], 0]), mb([rX[4], 20, fz[4]], [-3, 0, sizes[4][2] * -.5, 6, 4, sizes[4][2]], [20, 11], [0, rY[4], 0]), mb([rX[1], 19, fz[1]], [-3, 0, sizes[4][2] * -.5, 6, 5, sizes[1][2]], [20, 18], [0, rY[1], 0]));
+    return { k: .0625, parts }; };
+  const GHAST_T = [8, 13, 9, 11, 11, 10, 12, 9, 12];   // vanilla's tentacle lengths (java.util.Random(1660).nextInt(7) + 8)
+  const CM = {
+    mc_creeper: { name: 'Creeper', tex: 'creeper/creeper.png', dims: [64, 32], w: .6, h: 1.7, pal: ['#4f9d3a', '#3c7f2c', '#6cba52', '#2d6322', '#86c86e'], face: [[9, 10, 2, 2], [13, 10, 2, 2], [11, 12, 2, 3], [10, 13, 1, 3], [13, 13, 1, 3]],
+      model: m => { const a = wk(m) * .9; return { k: .0625, parts: [mb([0, 6, 0], [-4, -8, -4, 8, 8, 8], [0, 0]), mb([0, 6, 0], [-4, 0, -2, 8, 12, 4], [16, 16]),
+        mb([-2, 18, 4], [-2, 0, -2, 4, 6, 4], [0, 16], [a]), mb([2, 18, 4], [-2, 0, -2, 4, 6, 4], [0, 16], [-a]), mb([-2, 18, -4], [-2, 0, -2, 4, 6, 4], [0, 16], [-a]), mb([2, 18, -4], [-2, 0, -2, 4, 6, 4], [0, 16], [a])] }; } },
+    mc_ghast: { name: 'Ghast', tex: 'ghast/ghast.png', dims: [64, 32], w: 4, h: 4, pal: ['#efefef', '#dcdcdc', '#f7f7f7', '#c8c8c8', '#e4e4e4'], face: [[19, 22, 3, 2], [26, 22, 3, 2], [21, 27, 6, 2]],
+      model: () => { const t = age(), parts = [mb([0, 17.6, 0], [-8, -8, -8, 16, 16, 16], [0, 0])];   // +9.6: vanilla's translate(0, 0.6, 0)
+        for (let j = 0; j < 9; j++) { const x = (((j % 3) - (Math.floor(j / 3) % 2) * .5 + .25) / 2 * 2 - 1) * 5, z = (Math.floor(j / 3) / 2 * 2 - 1) * 5; parts.push(mb([x, 24.6, z], [-1, 0, -1, 2, GHAST_T[j], 2], [0, 0], [.2 * Math.sin(t * .3 + j) + .4])); }
+        return { k: .0625 * 4.5, parts }; } },
+    mc_blaze: { name: 'Blaze', tex: 'blaze.png', dims: [64, 32], w: .6, h: 1.8, pal: ['#f2c12e', '#e89a1c', '#ffd95a', '#c96f12', '#f7e07a'], face: [[9, 11, 2, 1], [13, 11, 2, 1]],
+      model: () => { const t = age(), parts = [mb([0, 0, 0], [-4, -4, -4, 8, 8, 8], [0, 0])], rod = (x, y, z) => parts.push(mb([x, y, z], [0, 0, 0, 2, 8, 2], [0, 16]));
+        let f = t * PI * -.1; for (let i = 0; i < 4; i++, f++) rod(Math.cos(f) * 9, -2 + Math.cos((i * 2 + t) * .25), Math.sin(f) * 9);
+        f = PI / 4 + t * PI * .03; for (let i = 4; i < 8; i++, f++) rod(Math.cos(f) * 7, 2 + Math.cos((i * 2 + t) * .25), Math.sin(f) * 7);
+        f = .47123894 + t * PI * -.05; for (let i = 8; i < 12; i++, f++) rod(Math.cos(f) * 5, 11 + Math.cos((i * 1.5 + t) * .5), Math.sin(f) * 5);
+        return { k: .0625, glow: 1, parts }; } },
+    mc_silverfish: { name: 'Silverfish', tex: 'silverfish.png', dims: [64, 32], w: .4, h: .3, pal: ['#8a8f96', '#6f747a', '#a3a8ae', '#5b5f64', '#9ba0a6'],
+      model: SEG([[3, 2, 2], [4, 3, 2], [6, 4, 3], [3, 3, 3], [2, 2, 3], [2, 1, 2], [1, 1, 2]], [[0, 0], [0, 4], [0, 9], [0, 16], [0, 22], [11, 0], [13, 4]], .05, .2, 1) },
+    mc_endermite: { name: 'Endermite', tex: 'endermite.png', dims: [64, 32], w: .4, h: .3, pal: ['#2c1f3a', '#3d2a52', '#1d1428', '#53386e', '#30223f'],
+      model: SEG([[4, 3, 2], [6, 4, 5], [3, 3, 1], [1, 2, 1]], [[0, 0], [0, 5], [0, 14], [0, 18]], .01, .1, 0) },
+    mc_magma_cube: { name: 'Magma cube', tex: 'slime/magmacube.png', dims: [64, 32], base: 'slime', magma: 1,
+      model: () => { const parts = []; for (let i = 0; i < 8; i++) parts.push(mb([0, 0, 0], [-4, 16 + i, -4, 8, 1, 8], i === 2 ? [24, 10] : i === 3 ? [24, 19] : [0, i])); parts.push(mb([0, 0, 0], [-2, 18, -2, 4, 4, 4], [0, 16])); return { k: .125, glow: 1, parts }; } },
+    mc_witch: { name: 'Witch', tex: 'witch.png', dims: [64, 128], w: .6, h: 1.95, pal: ['#4a2f5c', '#3a2448', '#5d3b72', '#6b8f3a', '#2f1d3a'], face: [[9, 12, 2, 1], [13, 12, 2, 1]],
+      model: m => { const a = wk(m) * .7; return { k: .0625, parts: [mb([0, 0, 0], [-4, -10, -4, 8, 10, 8], [0, 0]), mb([0, -2, 0], [-1, -1, -6, 2, 4, 2], [24, 0]), mb([0, -4, 0], [0, 3, -6.75, 1, 1, 1], [0, 0], null, { g: -.25 }),
+        mb([0, 0, 0], [-4, 0, -3, 8, 12, 6], [16, 20]), mb([0, 0, 0], [-4, 0, -3, 8, 18, 6], [0, 38], null, { g: .5 }),
+        mb([0, 3, -1], [-8, -2, -2, 4, 8, 4], [44, 22], [-.75]), mb([0, 3, -1], [4, -2, -2, 4, 8, 4], [44, 22], [-.75]), mb([0, 3, -1], [-4, 2, -2, 8, 4, 4], [40, 38], [-.75]),
+        mb([-2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [a]), mb([2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [-a], { mir: 1 }),
+        mb([-5, -10.03125, -5], [0, 0, 0, 10, 2, 10], [0, 64]), mb([-3.25, -14.03125, -3], [0, 0, 0, 7, 4, 7], [0, 76]), mb([-1.5, -18.03125, -1], [0, 0, 0, 4, 4, 4], [0, 87]), mb([.25, -20.03125, 1], [0, 0, 0, 1, 2, 1], [0, 95], null, { g: .25 })] }; } },
+    mc_iron_golem: { name: 'Iron golem', tex: ['iron_golem.png', 'iron_golem/iron_golem.png'], dims: [128, 128], ref: 128, w: 1.4, h: 2.9, pal: ['#d8d3cc', '#c4beb6', '#e6e2dc', '#a9a39b', '#7f9a4a'], face: [[9, 12, 2, 1, '#9b1c12'], [13, 12, 2, 1, '#9b1c12']],
+      model: m => { const a = wk(m, .7) * .9; return { k: .0625, ref: 128, parts: [mb([0, -7, -2], [-4, -12, -5.5, 8, 10, 8], [0, 0]), mb([0, -7, -2], [-1, -5, -7.5, 2, 4, 2], [24, 0]),
+        mb([0, -7, 0], [-9, -2, -6, 18, 12, 11], [0, 40]), mb([0, -7, 0], [-4.5, 10, -3, 9, 5, 6], [0, 70], null, { g: .5 }),
+        mb([0, -7, 0], [-13, -2.5, -3, 4, 30, 6], [60, 21], [-.2 + a]), mb([0, -7, 0], [9, -2.5, -3, 4, 30, 6], [60, 58], [-.2 - a]),
+        mb([-4, 11, 0], [-3.5, -3, -3, 6, 16, 5], [37, 0], [-a]), mb([5, 11, 0], [-3.5, -3, -3, 6, 16, 5], [60, 0], [a], { mir: 1 })] }; } },
+    mc_snowman: { name: 'Snow golem', tex: ['snowman.png', 'snow_golem.png'], dims: [64, 64], w: .7, h: 1.9, pal: ['#f4f8fb', '#e3eaf0', '#ffffff', '#d2dbe3', '#eef3f7'], pumpkin: 1,
+      model: () => ({ k: .0625, parts: [mb([0, 4, 0], [-4, -8, -4, 8, 8, 8], [0, 0], null, { g: -.5 }), mb([5, 6, 0], [-1, 0, -1, 12, 2, 2], [32, 0], [0, 0, 1], { g: -.5 }), mb([-5, 6, 0], [-1, 0, -1, 12, 2, 2], [32, 0], [0, PI, -1], { g: -.5 }),
+        mb([0, 13, 0], [-5, -10, -5, 10, 10, 10], [0, 16], null, { g: -.5 }), mb([0, 24, 0], [-6, -12, -6, 12, 12, 12], [0, 36], null, { g: -.5 })] }) },
+    mc_ocelot: { name: 'Ocelot', tex: 'cat/ocelot.png', dims: [64, 32], w: .6, h: .7, pal: ['#e9c46a', '#d4a94d', '#f2d488', '#8a6a2c', '#e0b95c'], face: [[5, 6, 1, 1, '#2f5c1c'], [9, 6, 1, 1, '#2f5c1c']],
+      model: m => { const a = wk(m) * .9, b = wk(m, 1, PI) * .9; return { k: .0625, parts: [mb([0, 15, -9], [-2.5, -2, -3, 5, 4, 5], [0, 0]), mb([0, 15, -9], [-1.5, 0, -4, 3, 2, 2], [0, 24]), mb([0, 15, -9], [-2, -3, 0, 1, 1, 2], [0, 10]), mb([0, 15, -9], [1, -3, 0, 1, 1, 2], [6, 10]),
+        mb([0, 12, -10], [-2, 3, -8, 4, 16, 6], [20, 0], [PI / 2]), mb([0, 15, 8], [-.5, 0, 0, 1, 8, 1], [0, 15], [.9]), mb([0, 20, 14], [-.5, 0, 0, 1, 8, 1], [4, 15], [1.7278761 + a * .25]),
+        mb([1.1, 18, 5], [-1, 0, 1, 2, 6, 2], [8, 13], [a]), mb([-1.1, 18, 5], [-1, 0, 1, 2, 6, 2], [8, 13], [b]), mb([1.2, 13.8, -5], [-1, 0, 0, 2, 10, 2], [40, 0], [b]), mb([-1.2, 13.8, -5], [-1, 0, 0, 2, 10, 2], [40, 0], [a])] }; } },
+    mc_rabbit: { name: 'Rabbit', tex: ['rabbit/brown.png', 'rabbit/salt.png', 'rabbit/white.png', 'rabbit/gold.png', 'rabbit/black.png'], dims: [64, 32], w: .4, h: .5, pal: ['#8a6440', '#73502f', '#9c7652', '#5e3f24', '#a88560'], face: [[37, 6, 1, 1, '#1a1a1a'], [41, 6, 1, 1, '#1a1a1a']],
+      model: m => { const j = (m.moving ? Math.sin((m.phase || 0) * 1.2) : 0) * .5, L = -.34906584 + j, A = -.17453292 - j; return { k: .0625 * .6, parts: [
+        mb([-3, 17.5, 3.7], [-1, 5.5, -3.7, 2, 1, 7], [8, 24], [j]), mb([3, 17.5, 3.7], [-1, 5.5, -3.7, 2, 1, 7], [26, 24], [j], { mir: 1 }),
+        mb([-3, 17.5, 3.7], [-1, 0, 0, 2, 4, 5], [16, 15], [L]), mb([3, 17.5, 3.7], [-1, 0, 0, 2, 4, 5], [30, 15], [L], { mir: 1 }), mb([0, 19, 8], [-3, -2, -10, 6, 5, 10], [0, 0], [-.34906584]),
+        mb([-3, 17, -1], [-1, 0, -1, 2, 7, 2], [0, 15], [A]), mb([3, 17, -1], [-1, 0, -1, 2, 7, 2], [8, 15], [A], { mir: 1 }), mb([0, 16, -1], [-2.5, -4, -5, 5, 4, 5], [32, 0]),
+        mb([0, 16, -1], [-2.5, -9, -1, 2, 5, 1], [52, 0], [0, -.2617994, 0]), mb([0, 16, -1], [.5, -9, -1, 2, 5, 1], [58, 0], [0, .2617994, 0], { mir: 1 }),
+        mb([0, 20, 7], [-1.5, -1.5, 0, 3, 3, 2], [52, 6], [-.3490659]), mb([0, 16, -1], [-.5, -2.5, -5.5, 1, 1, 1], [32, 9])] }; } },
+    mc_mooshroom: { name: 'Mooshroom', tex: 'cow/mooshroom.png', dims: [64, 32], base: 'cow', model: m => __skins.MODELS.cow(m) },
+    mc_cave_spider: { name: 'Cave spider', tex: 'spider/cave_spider.png', dims: [64, 32], base: 'spider', size: 1.4, model: m => __skins.MODELS.spider(m) },
+    mc_pigman: { name: 'Zombie pigman', tex: ['zombie_pigman.png', 'piglin/zombified_piglin.png'], dims: [64, 64], base: 'zombie', geo: 'zombie', model: m => __skins.MODELS.zombie(m) },
+    mc_wither_skeleton: { name: 'Wither skeleton', tex: 'skeleton/wither_skeleton.png', dims: [64, 32], base: 'skeleton', geo: 'skeleton', size: 2.4, model: m => __skins.MODELS.skeleton(m) },
+    mc_guardian: { name: 'Guardian', tex: 'guardian.png', dims: [64, 64], w: .85, h: .85, pal: ['#5d9a8a', '#4b8273', '#74b3a2', '#c77a3c', '#3d6b5f'], face: [[9, 1, 2, 2, '#e8e0b0']],
+      model: () => { const t = age(), sy = Math.sin(t * .15), parts = [mb([0, 0, 0], [-6, 10, -8, 12, 12, 16], [0, 0]), mb([0, 0, 0], [-8, 10, -6, 2, 12, 12], [0, 28]), mb([0, 0, 0], [6, 10, -6, 2, 12, 12], [0, 28], null, { mir: 1 }),
+        mb([0, 0, 0], [-6, 8, -6, 12, 2, 12], [16, 40]), mb([0, 0, 0], [-6, 22, -6, 12, 2, 12], [16, 40]), mb([0, 0, -8.25], [-1, 15, 0, 2, 2, 1], [8, 0])];
+        const RX = [1.75, .25, 0, 0, .5, .5, .5, .5, 1.25, .75, 0, 0], RY = [0, 0, 0, 0, .25, 1.75, 1.25, .75, 0, 0, 0, 0], RZ = [0, 0, .25, 1.75, 0, 0, 0, 0, 0, 0, .75, 1.25], PX = [0, 0, 8, -8, -8, 8, 8, -8, 0, 0, 8, -8], PY = [-8, -8, -8, -8, 0, 0, 0, 0, 8, 8, 8, 8], PZ = [8, -8, 0, 0, -8, -8, 8, 8, 8, -8, 0, 0];
+        for (let i = 0; i < 12; i++) { const e = 1 + Math.cos(t * 1.5 + i) * .01; parts.push(mb([PX[i] * e, 16 + PY[i] * e, PZ[i] * e], [-1, -4.5, -1, 2, 9, 2], [0, 0], [PI * RX[i], PI * RY[i], PI * RZ[i]])); }
+        const y0 = sy * PI * .05, y1 = sy * PI * .1, y2 = sy * PI * .15, R0 = mR([0, 0, 0], [0, y0, 0]), R1 = mR([-1.5, .5, 14], [0, y1, 0]).concat(R0);
+        parts.push(mb([0, 0, 0], [-2, 14, 7, 4, 4, 8], [40, 0], [0, y0, 0]), mb([-1.5, .5, 14], [0, 14, 0, 3, 3, 7], [0, 54], [0, y1, 0], { par: R0 }), mb([-1, 1, 20], [0, 14, 0, 2, 2, 6], [41, 32], [0, y2, 0], { par: R1 }), mb([-1, 1, 20], [1, 10.5, 3, 1, 9, 9], [25, 19], [0, y2, 0], { par: R1 }));
+        return { k: .0625, parts }; } },
+    mc_wither: { name: 'Wither', tex: 'wither/wither.png', dims: [64, 64], w: .9, h: 3.5, pal: ['#2a2a2c', '#1d1d1f', '#3a3a3d', '#4a4a4e', '#151517'], face: [[9, 11, 2, 1, '#d8d8e0'], [13, 11, 2, 1, '#d8d8e0']],
+      model: () => { const c = Math.cos(age() * .1), r1 = (.065 + .05 * c) * PI, sp = [-2, 6.9, -.5]; return { k: .0625 * 2, parts: [mb([0, 0, 0], [-10, 3.9, -.5, 20, 3, 3], [0, 16]),
+        mb(sp, [0, 0, 0, 3, 10, 3], [0, 22], [r1]), mb(sp, [-4, 1.5, .5, 11, 2, 2], [24, 22], [r1]), mb(sp, [-4, 4, .5, 11, 2, 2], [24, 22], [r1]), mb(sp, [-4, 6.5, .5, 11, 2, 2], [24, 22], [r1]),
+        mb([-2, 6.9 + Math.cos(r1) * 10, -.5 + Math.sin(r1) * 10], [0, 0, 0, 3, 6, 3], [12, 22], [(.265 + .1 * c) * PI]),
+        mb([0, 0, 0], [-4, -4, -4, 8, 8, 8], [0, 0]), mb([-8, 4, 0], [-4, -4, -4, 6, 6, 6], [32, 0]), mb([10, 4, 0], [-4, -4, -4, 6, 6, 6], [32, 0])] }; } },
+    mc_dragon: { name: 'Ender dragon', tex: 'enderdragon/dragon.png', dims: [256, 256], ref: 256, w: 16, h: 8, pal: ['#1b1b22', '#26262f', '#121217', '#3a2f4a', '#20202a'], face: [[130, 50, 4, 2, '#cc66ff'], [138, 50, 4, 2, '#cc66ff']],
+      model: () => { const f6 = age() * .05 * PI * 2, f9 = Math.sin(f6), O = p => [p[0], p[1] - 32, p[2] - 48], parts = [], side = [], add = (rp, b, uv, r, o) => parts.push(mb(O(rp), b, uv, r, o));   // O: vanilla's translate(0, -2, -3)
+        add([0, 4, 8], [-12, 0, -16, 24, 24, 64], [0, 0]); for (const z of [-10, 10, 30]) add([0, 4, 8], [-1, -6, z, 2, 6, 12], [220, 53]);
+        for (let i = 0; i < 5; i++) { const y = 14 - i * 2.5 + Math.sin(f6 + i * .6) * .6, z = -2 - i * 10; add([0, y, z], [-5, -5, -5, 10, 10, 10], [192, 104]); add([0, y, z], [-1, -9, -3, 2, 4, 6], [48, 0]); }
+        const hp = [0, 2, -55], HR = mR(O(hp), [.1]);
+        add(hp, [-6, -1, -24, 12, 5, 16], [176, 44], [.1]); add(hp, [-8, -8, -10, 16, 16, 16], [112, 30], [.1]); add(hp, [-5, -12, -4, 2, 4, 6], [0, 0], [.1], { mir: 1 }); add(hp, [-5, -3, -22, 2, 2, 4], [112, 0], [.1], { mir: 1 }); add(hp, [3, -12, -4, 2, 4, 6], [0, 0], [.1]); add(hp, [3, -3, -22, 2, 2, 4], [112, 0], [.1]);
+        add([0, 6, -63], [-6, 0, -16, 12, 4, 16], [176, 65], [(Math.sin(f6) + 1) * .2], { par: HR });
+        for (let i = 0; i < 12; i++) add([Math.sin(f6 * .5 + i * .4) * i * .6, 14 + i * .5 + Math.sin(f6 * .5 + i * .5) * 1.5, 77 + i * 10], [-5, -5, -5, 10, 10, 10], [192, 104]);
+        const wr = [.125 - Math.cos(f6) * .2, .25, (Math.sin(f6) + .125) * .8], W = mR(O([-12, 5, 2]), wr), tz = -(Math.sin(f6 + 2) + .5) * .75;
+        side.push(mb(O([-12, 5, 2]), [-56, -4, -4, 56, 8, 8], [112, 88], wr), mb(O([-12, 5, 2]), [-56, 0, 2, 56, 0, 56], [-56, 88], wr), mb(O([-68, 5, 2]), [-56, -2, -2, 56, 4, 4], [112, 136], [0, 0, tz], { par: W }), mb(O([-68, 5, 2]), [-56, 0, 2, 56, 0, 56], [-56, 144], [0, 0, tz], { par: W }));
+        const FL = mR(O([-12, 20, 2]), [1.3 + f9 * .1]), FT = mR(O([-12, 40, 1]), [-.5 - f9 * .1]).concat(FL), RL = mR(O([-16, 16, 42]), [1 + f9 * .1]), RT = mR(O([-16, 48, 38]), [.5 + f9 * .1]).concat(RL);
+        side.push(mb(O([-12, 20, 2]), [-4, -4, -4, 8, 24, 8], [112, 104], [1.3 + f9 * .1]), mb(O([-12, 40, 1]), [-3, -1, -3, 6, 24, 6], [226, 138], [-.5 - f9 * .1], { par: FL }), mb(O([-12, 63, 1]), [-4, 0, -12, 8, 4, 16], [144, 104], [.75 + f9 * .1], { par: FT }),
+          mb(O([-16, 16, 42]), [-8, -4, -8, 16, 32, 16], [0, 0], [1 + f9 * .1]), mb(O([-16, 48, 38]), [-6, -2, 0, 12, 32, 12], [196, 0], [.5 + f9 * .1], { par: RL }), mb(O([-16, 79, 42]), [-9, 0, -20, 18, 6, 24], [112, 0], [.75 + f9 * .1], { par: RT }));
+        for (const q of side) parts.push(q, mirX(q));
+        for (const q of parts) q.rot = q.rot.concat([['y', PI, 0, 0]]);   // the dragon is drawn turned round compared with other mobs
+        return { k: .0625, ref: 256, parts }; } },
+  };
+  MCE.CM = CM;   // for tests
+  // the pack files these models read (relative to textures/entity/); picked up when a pack is imported
+  if (window.ENT_FILES) for (const k in CM) ENT_FILES.push([k, [].concat(CM[k].tex)]);
+  const TEXKEY = { zombie: 'zombie', skeleton: 'skeleton', slime: 'slime', cow: 'cow', spider: 'spider' };
+  // generated texture in the mob's colours (speckle + a few face marks), for compat models without a pack texture
+  function fallbackTex(k) {
+    const key = 'mcf_' + k; if (__ENT[key]) return key; const d = CM[k]; if (!d.pal) return null;
+    const [W, Hh] = d.dims, c = document.createElement('canvas'); c.width = W; c.height = Hh; const g = c.getContext('2d'), rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+    const pal = d.pal.map(rgb), hs = (x, y, n) => { let v = (x * 374761393 + y * 668265263 + n * 144665) >>> 0; v = (v ^ (v >>> 13)) * 1274126177 >>> 0; return ((v ^ (v >>> 16)) >>> 0) / 4294967295; };
+    const img = g.createImageData(W, Hh); for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { const col = pal[Math.min(pal.length - 1, (hs(x >> 1, y >> 1, 1) * pal.length) | 0)], b = hs(x, y, 2), m = b > .88 ? 1.18 : b < .12 ? .8 : 1, i = (y * W + x) * 4; img.data[i] = Math.min(255, col[0] * m); img.data[i + 1] = Math.min(255, col[1] * m); img.data[i + 2] = Math.min(255, col[2] * m); img.data[i + 3] = 255; }
+    g.putImageData(img, 0, 0); for (const [x, y, w, h, col] of d.face || []) { g.fillStyle = col || '#1c1c1c'; g.fillRect(x, y, w, h); }
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    for (const [p, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, p, v);
+    gl.activeTexture(gl.TEXTURE0); __ENT[key] = { tex: t, w: W, h: Hh }; return key;
+  }
+  // skeletons holding a bow raise both arms to aim, like vanilla
+  const aimed = (f, m) => mm => { const M = f(mm); if (m.aim && M.parts[2] && M.parts[3]) { M.parts[2] = Object.assign({}, M.parts[2], { rot: [['x', -PI / 2, 22, 0]] }); M.parts[3] = Object.assign({}, M.parts[3], { rot: [['x', -PI / 2, 22, 0]] }); } return M; };
+  // model lookup for server mobs (window.__cmModel, asked first by Strata's modelFor): undefined = Strata decides as usual, null = draw Strata's own model
+  function cmModel(m, MODELS) {
+    if (!m.mc) return undefined; const d = CM[m.type];
+    if (!d) { if ((m.type === 'skeleton') && m.aim && PACK.on && __ENT.skeleton) return aimed(MODELS.skeleton, m); return undefined; }
+    let tk = __ENT[m.type] ? m.type : null;
+    let f = d.model;
+    if (!tk && d.base) { if (!PACK.on || !__ENT[TEXKEY[d.base]] || !MODELS[d.base]) return null; tk = TEXKEY[d.base]; f = MODELS[d.base]; }
+    if (!tk) tk = fallbackTex(m.type); if (!tk) return null;
+    const geo = d.geo === 'skeleton' && m.aim ? aimed(f, m) : f;
+    return mm => { const M = geo(mm); M.tex = tk; if (d.ref) M.ref = d.ref; return M; };
+  }
+  // extras drawn with Strata's own item/block renderers: the held item (Strata's bow, swords...) and the snow golem's pumpkin
+  function mobExtras(vb, m) {
+    const d = CM[m.type], sk = !!__skins.modelFor(m), S0 = m.size ? m.size * .5 : m.baby ? .55 : 1;
+    if (d && d.pumpkin) { const B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0 * .0625)), T = (x, y, z) => ap(B0, x, y, z); emitBox(vb, [-5, 19, -5], [5, 29, 5], [214, 126, 30], T); for (const x of [-3.5, 1.5]) emitBox(vb, [x, 24.5, 5], [x + 2, 26.5, 5.15], [40, 22, 8], T); emitBox(vb, [-3, 21, 5], [3, 22.5, 5.15], [40, 22, 8], T); }
+    const it = m.eq && m.eq[0]; if (!it) return; const geo = d ? d.geo || null : m.type; if (geo !== 'zombie' && geo !== 'skeleton') return;
+    const st = toStack(it); if (!st || !ITEMS[st.id]) return; const id = st.id, z = geo === 'zombie', ws = m.moving ? Math.sin(m.phase || 0) : 0; let A;
+    if (sk) { const ang = z ? -1.5 + Math.sin((m.phase || 0) * .5) * .06 : m.aim ? -PI / 2 : -1.1 + ws * .12, B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0 * .0625 * .925));
+      A = mc(B0, mT(0, 22, 0), mX(ang), mT(0, -22, 0), mT(z ? -6 : -5, 12.5, 0), mS(16)); }
+    else { const ang = z ? -1.5 + ws * .7 * .15 : (m.aggro > 0 ? -1.5 : ws * .7 * .8), B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0));
+      A = mc(B0, mT(0, 1.3, 0), mX(ang), mT(0, -1.3, 0), mT(z ? -.34 : -.3, .79, 0)); }
+    emitItem(vb, id, mc(A, mX(PI / 2), mY(PI), mT(1 / 16, -.125, .1), dispM(dispOf(id).tp)));
+  }
+  // drumsticks under the hearts: Minecraft's hunger, which the server owns (compat mode only)
+  function drawHunger() {
+    let c = document.getElementById('mcHunger'); const h = document.getElementById('hearts'); if (!h) return;
+    if (!c) { c = document.createElement('canvas'); c.id = 'mcHunger'; c.setAttribute('aria-label', 'Hunger'); c.style.cssText = 'display:block;margin-top:2px'; h.after(c); }
+    c.hidden = h.hidden; const food = S && S.food != null ? S.food : 20, Z = 14, g = c.getContext('2d'); c.width = 10 * Z * 2; c.height = Z * 2; c.style.width = 10 * Z + 'px'; c.style.height = Z + 'px'; c.setAttribute('aria-label', 'Hunger ' + food + ' of 20'); g.scale(2, 2);
+    const stick = (x, fill, clip) => { g.save(); if (clip) { g.beginPath(); g.rect(x + 6.5, 0, 7, Z); g.clip(); }
+      g.beginPath(); g.ellipse(x + 8.2, 5.2, 4.3, 3.6, -.75, 0, 7); g.fillStyle = fill ? '#b5652f' : 'rgba(0,0,0,.45)'; g.fill(); if (fill) { g.beginPath(); g.ellipse(x + 9, 4.4, 1.7, 1.2, -.75, 0, 7); g.fillStyle = '#d98c4f'; g.fill(); }
+      g.fillStyle = fill ? '#efe6d6' : 'rgba(0,0,0,.45)'; g.fillRect(x + 2.6, 8.2, 3.6, 1.8); g.beginPath(); g.arc(x + 2.6, 8.4, 1.4, 0, 7); g.arc(x + 3.2, 10.6, 1.4, 0, 7); g.fill(); g.restore(); };
+    for (let i = 0; i < 10; i++) { const x = (9 - i) * Z, v = food - i * 2; stick(x, false); if (v > 0) stick(x, true, v === 1); g.beginPath(); g.ellipse(x + 8.2, 5.2, 4.3, 3.6, -.75, 0, 7); g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 1; g.stroke(); }
+  }
+  // projectiles: arrows (60) and fireballs (63 large, 64 small) become entries in Strata's own `arrows` list, so Strata draws them;
+  // their flight is simulated here (vanilla's client does the same) and corrected by the server's position updates
+  const PROJ = { 60: 'arrow', 63: 'fireball', 64: 'fireball' };
+  function projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) {
+    const kind = PROJ[type]; if (!kind || !S.world) return; const X = x + S.OX, Z = z + S.OZ, yr = yaw * PI / 180, pr = pitch * PI / 180;
+    const q = { mc: eid, id: I.ARROW, x: X, y, z: Z, sx: X, sy: y, sz: Z, ux: vx, uy: vy, uz: vz, vx: Math.sin(yr) * Math.cos(pr), vy: Math.sin(pr), vz: Math.cos(yr) * Math.cos(pr), stuck: false, t: 0, noPick: true };
+    if (kind === 'fireball') { const l = Math.hypot(vx, vy, vz) || 1; q.fireball = true; q.ax = vx / l * .1; q.ay = vy / l * .1; q.az = vz / l * .1; }
+    if (Math.hypot(vx, vy, vz) > .01) { q.vx = vx; q.vy = vy; q.vz = vz; }
+    S.pr.set(eid, q); arrows.push(q);
+  }
+  function stepProj(dt) {
+    const n = dt * 20, k = 1 - Math.exp(-18 * dt);
+    for (const q of S.pr.values()) {
+      if (!q.held) {
+        if (q.fireball) { for (let i = 0; i < n; i += 1) { const f = Math.min(1, n - i); q.sx += q.ux * f; q.sy += q.uy * f; q.sz += q.uz * f; q.ux = (q.ux + q.ax * f) * Math.pow(.95, f); q.uy = (q.uy + q.ay * f) * Math.pow(.95, f); q.uz = (q.uz + q.az * f) * Math.pow(.95, f); } }
+        else { const nx = q.sx + q.ux * n, ny = q.sy + q.uy * n, nz = q.sz + q.uz * n; let hit = false; try { hit = world.solid(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } catch (e) { /* unloaded */ }
+          if (hit) q.held = true; else { q.sx = nx; q.sy = ny; q.sz = nz; const dr = Math.pow(.99, n); q.ux *= dr; q.uz *= dr; q.uy = q.uy * dr - .05 * n; if (Math.hypot(q.ux, q.uy, q.uz) > .02) { q.vx = q.ux; q.vy = q.uy; q.vz = q.uz; } } }
+      }
+      q.x += (q.sx - q.x) * k; q.y += (q.sy - q.y) * k; q.z += (q.sz - q.z) * k;
+    }
+  }
+  function projMoved(id, dx, dy, dz, abs) { const q = S.pr.get(id); if (!q) return false; if (abs) { q.sx = dx + S.OX; q.sy = dy; q.sz = dz + S.OZ; } else { q.sx += dx; q.sy += dy; q.sz += dz; } return true; }
+  function projGone(id) { const q = S.pr.get(id); if (!q) return; S.pr.delete(id); const i = arrows.indexOf(q); if (i >= 0) arrows.splice(i, 1); }
+  function cmStart() {
+    window.__cmModel = cmModel; S.cmMob = [];
+    for (const k in CM) { const d = CM[k]; if (MOB[k]) continue; MOB[k] = Object.assign({}, MOB[d.base] || MOB.zombie, { name: d.name }, d.w ? { w: d.w, h: d.h } : {}); S.cmMob.push(k); }
+  }
+  function cmStop(s) {
+    window.__cmModel = null; for (const k of s.cmMob || []) delete MOB[k];
+    for (const k in __ENT) if (k.startsWith('mcf_')) { try { gl.deleteTexture(__ENT[k].tex); } catch (e) { /* gone */ } delete __ENT[k]; }
+    for (let i = arrows.length - 1; i >= 0; i--) if (arrows[i].mc) arrows.splice(i, 1);
+    const hc = document.getElementById('mcHunger'); if (hc) hc.remove();
+  }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -261,6 +441,11 @@
     },
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
+    stepArrows() {},   // the only arrows in a compat world are the server's, moved by stepProj
+    emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
+      if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
+      if (m.mc) { try { mobExtras(vb, m); } catch (e) { if (!S.exErr) { S.exErr = 1; console.error('mob extras', e); } } } },
+    drawHearts() { S.saved.drawHearts(); drawHunger(); },
     drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) drawMcPlayers(); },
     stepHealth(dt) { player.hurtT += dt; },
     stepDecay() {},
@@ -321,7 +506,7 @@
         for (const r of rec) { const X = bx + r[0] + S.OX, Z = bz + r[2] + S.OZ; setBlock(X, by + r[1], Z, 0); }
         try { burst(x + S.OX, y + .5, z + S.OZ, [190, 190, 190], 24, 5); sfx('fall', x + S.OX, y, z + S.OZ, 1.4, 48); } catch (e) { /* fx */ }
         player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } },
-      velocity(id, vx, vy, vz) { { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; d.q.vt = 1; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
+      velocity(id, vx, vy, vz) { { const q = S.pr.get(id); if (q) { q.ux = vx; q.uy = vy; q.uz = vz; q.held = false; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.vx = vx * 20; d.q.vy = vy * 20; d.q.vz = vz * 20; d.q.vt = 1; return; } } if (id === S.eid && S.world) { player.vx += vx * 20; player.vz += vz * 20; if (vy > 0) { player.vy = vy * 20; player.onGround = false; } } else { const m = S.ents.get(id); if (m) m.hurtT = Math.max(m.hurtT, .3); } },
       status(id, st) { if (st === 2 || st === 3) { if (id === S.eid) hurtFx(); else { const m = S.ents.get(id); if (m) m.hurtT = .35; } } },
       sign(x, y, z, ln) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; world.decor = world.decor || []; delSign(X, y, Z);
         const sol = (a, b, c) => { try { return world.solid(a, b, c); } catch (e) { return false; } }, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(d => sol(X + d[0], y, Z + d[1]));
@@ -333,21 +518,27 @@
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n, sk) { if (n) { S.names.set(u, n); if (sk) S.skinInfo.set(u, sk); const me = S.o.name && n.toLowerCase() === String(S.o.name).toLowerCase(); if (me) { S.ownUuid = u; ownSkin(u, sk); } for (const pl of S.players) if (pl.uuid === u) loadSkinFor(pl); } else S.names.delete(u); },
       flags(id, v) { const m = S.ents.get(id); if (m && m.pl) { m.sneak = !!(v & 2); m.sprint = !!(v & 8); } },
-      equip(id, sl, it) { const m = S.ents.get(id); if (m && m.pl && sl >= 0 && sl < 5) m.eq[sl] = it; },
+      equip(id, sl, it) { const m = S.ents.get(id); if (!m || sl < 0 || sl > 4) return; if (!m.eq) m.eq = [null, null, null, null, null]; m.eq[sl] = it;
+        if (!m.pl && sl === 0) { m.aim = !!(it && it.id === 261); m.aggro = m.aim ? 1 : 0; } },   // skeletons with a bow aim it
+      bmeta(id, idx, v) { const m = S.ents.get(id); if (!m || m.pl) return;   // 1.8 metadata bytes: 12 baby/age, 13 skeleton type, 16 slime size
+        if (idx === 12) m.baby = v < 0 || (v === 1 && (m.type === 'zombie' || m.type === 'mc_pigman'));
+        else if (idx === 13 && (m.type === 'skeleton' || m.type === 'mc_wither_skeleton')) { m.type = v === 1 ? 'mc_wither_skeleton' : 'skeleton'; m.size = v === 1 ? CM.mc_wither_skeleton.size : 0; }
+        else if (idx === 16 && (m.type === 'slime' || m.type === 'mc_magma_cube') && v > 0) m.size = v; },
+      objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) { projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch); },
       anim(id, a) { const m = S.ents.get(id); if (m && m.pl && a === 0) m.swingT = .25; },
       spawn(e) {
         if (!S.world) return; if (e.eid === S.eid) return;
         if (e.kind === 'player') { const x = e.x + S.OX, z = e.z + S.OZ, pl = { pl: 1, eid: e.eid, uuid: e.uuid, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, moving: false, phase: 0, amt: 0, swingT: 0, sneak: false, sprint: false, eq: [null, null, null, null, null], buf: new Float32Array(6 * 6 * 6 * 16), n: 0 };
           S.ents.set(e.eid, pl); S.players.push(pl); loadSkinFor(pl); return; }
         const type = LIVING[e.type]; if (!type) return;
-        const x = e.x + S.OX, z = e.z + S.OZ, m = { eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' ? 2 : 0, flee: 0 };
+        const d = CM[type], x = e.x + S.OX, z = e.z + S.OZ, m = { mc: 1, eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' || type === 'mc_magma_cube' ? 2 : e.type === 53 ? 12 : d && d.size || 0, flee: 0, magma: d && d.magma || 0, eq: null };
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
-      move(id, dx, dy, dz) { { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
+      move(id, dx, dy, dz) { if (projMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
       look(id, yaw) { const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
-      teleport(id, x, y, z, yaw) { { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
-      destroy(l) { for (const id of l) { const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
+      teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
+      destroy(l) { for (const id of l) { projGone(id); const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); } } },
     };
     return Hd;
   }
@@ -369,6 +560,7 @@
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
     for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
+    if (S.world) { stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
   }
@@ -376,8 +568,8 @@
   MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
-    MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
+    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
@@ -387,7 +579,7 @@
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
-    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
+    if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
     if (s.world) {
       for (const n of OVR) if (s.saved[n]) window[n] = s.saved[n];

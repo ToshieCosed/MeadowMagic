@@ -142,6 +142,9 @@
       if (name === 'cookie_request') { out('cookie_response', new W().str(r.str()).bool(false)); }
     }
     function onPlay(name, r, body, idLen) {
+      // 1.8 entity metadata: flags (idx 0) and small bytes (baby, skeleton type, slime size) go to H.flags/H.bmeta, item slots to H.meta
+      const meta18 = eid => { for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
+        if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v); } else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); return;
@@ -179,12 +182,11 @@
           H.sign(px, py, pz, ln);
         } return;
         case 'spawn_entity': if (P === 47 && H && H.dropSpawn) {
-          const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32; r.i8(); r.i8(); const data = r.i32(); let vx = 0, vy = 0, vz = 0; if (data) { vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; }
-          if (type === 2) H.dropSpawn(eid, x, y, z, vx, vy, vz);
+          const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, pitch = ang(r.i8()), yaw = ang(r.i8()), data = r.i32(); let vx = 0, vy = 0, vz = 0; if (data) { vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; }
+          if (type === 2) H.dropSpawn(eid, x, y, z, vx, vy, vz); else if (H.objSpawn) H.objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch);   // projectiles (arrows, fireballs) for compat mode
         } return;
         case 'entity_metadata': if (P === 47 && H && H.meta) {
-          const eid = r.vi(); for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
-            if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); } else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; }
+          meta18(r.vi());
         } return;
         case 'collect': if (P === 47 && H && H.collect) { const a = r.vi(); H.collect(a, r.vi()); } return;
         case 'named_sound_effect': if (P === 47 && H && H.sound) { const nm = r.str(), x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(); H.sound(nm, x, y, z, v, r.b() / 63); } return;
@@ -210,7 +212,7 @@
         } return;
         case 'spawn_entity_living': if (P === 47 && H && H.spawn) {
           const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, yaw = ang(r.i8()), pitch = ang(r.i8());
-          H.spawn({ eid, kind: 'mob', type, x, y, z, yaw, pitch });
+          H.spawn({ eid, kind: 'mob', type, x, y, z, yaw, pitch }); r.i8(); r.i16(); r.i16(); r.i16(); if (H.meta) meta18(eid);   // head pitch, velocity, then the spawn metadata (size, skeleton type, baby)
         } return;
         case 'rel_entity_move': if (P === 47 && H && H.move) { const eid = r.vi(); H.move(eid, r.i8() / 32, r.i8() / 32, r.i8() / 32); } return;
         case 'entity_look': if (P === 47 && H && H.look) { const eid = r.vi(); H.look(eid, ang(r.i8()), ang(r.i8())); } return;
