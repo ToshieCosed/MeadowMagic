@@ -106,6 +106,20 @@
     if (groundUp) r.skip(256);
     return out;
   }
+  // 1.9-1.12 chunk sections: bits per block, palette, packed longs (values may span two longs), block light, sky light; global ids are still id<<4|meta
+  function sections19(r, mask, sky, groundUp) {
+    const out = [];
+    for (let i = 0; i < 16; i++) { if (!(mask & (1 << i))) continue; const bits = r.b(), pl = r.vi(), pal = []; for (let k = 0; k < pl; k++) pal.push(r.vi()); const nl = r.vi(), L = new Uint32Array(nl * 2);
+      for (let k = 0; k < nl; k++) { L[k * 2] = r.d.getUint32(r.p); L[k * 2 + 1] = r.d.getUint32(r.p + 4); r.p += 8; }   // [hi, lo]
+      const a = new Uint16Array(4096), mk = (1 << bits) - 1, ind = pl > 0 && bits <= 8;
+      for (let j = 0; j < 4096; j++) { const bi = j * bits, li = bi >>> 6, of = bi & 63; let v;
+        const lo = L[li * 2 + 1], hi = L[li * 2]; if (of < 32) { v = (lo >>> of) | (of ? (hi << (32 - of)) : 0); if (of + bits > 32 && of + bits <= 64) v = (lo >>> of) | (hi << (32 - of)); } else v = hi >>> (of - 32);
+        if (of + bits > 64) { const lo2 = L[(li + 1) * 2 + 1]; v = (v >>> 0) | (lo2 << (64 - of)); }
+        v &= mk; a[j] = ind ? (pal[v] || 0) : v; }
+      r.skip(2048); if (sky) r.skip(2048); out.push({ y: i, blocks: a }); }
+    if (groundUp) r.skip(256);
+    return out;
+  }
   const ang = b => b * 360 / 256;
   function slot18(r) {   // 1.8 item: short id (-1 = empty), byte count, short damage, optional named NBT. raw keeps the bytes for sending back in clicks.
     const p0 = r.p, id = r.i16(); if (id < 0) return null;
@@ -117,6 +131,7 @@
 
   function connect(o) {
     const P = o.protocol, ids = IDS[P];
+    const LEG = P <= 340, V9 = P >= 107, O = P >= 210 ? 1 : 0, SND = (g.StrataMC && g.StrataMC.sounds) ? (s => s && s.lists[s.map[P]])(g.StrataMC.sounds) : null;   // world support: 1.8 (47) .. 1.12.2 (340); V9 = the 1.9+ formats
     if (!ids) throw new Error('No packet table for protocol ' + P);
     const rev = {}; for (const k of ['lc', 'cc', 'pc']) { rev[k] = {}; for (const n in (ids[k] || {})) rev[k][ids[k][n]] = n; }
     let state = 'login', ws, pend = 0, closed = false, joined = false, sky = true, posT = null;
@@ -170,102 +185,123 @@
       // 1.8 entity metadata: flags (idx 0) and small bytes (baby, skeleton type, slime size) go to H.flags/H.bmeta, item slots to H.meta
       const meta18 = eid => { for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
         if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v, 0); } else if (t === 1) { const v = r.i16(); if (H.bmeta) H.bmeta(eid, idx, v, 1); } else if (t === 2) { const v = r.i32(); if (H.bmeta) H.bmeta(eid, idx, v, 2); } else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
+      // 1.9-1.12 metadata: index byte (255 ends), type byte, value; H.vmeta gets (eid, index, kind, value) and the engine maps indices per version
+      const meta19 = eid => { for (let n = 0; n < 60; n++) { const idx = r.b(); if (idx === 255) break; const t = r.b(); let v = null, k = 'skip';
+        if (t === 0) { v = r.i8(); k = 'byte'; } else if (t === 1) { v = r.vi(); k = 'int'; } else if (t === 2) { v = r.f32(); k = 'float'; } else if (t === 3) { v = r.str(); k = 'str'; } else if (t === 4) { v = r.str(); k = 'chat'; } else if (t === 5) { v = slot18(r); k = 'slot'; } else if (t === 6) { v = r.bool() ? 1 : 0; k = 'bool'; }
+        else if (t === 7) { r.f32(); r.f32(); r.f32(); } else if (t === 8) r.skip(8); else if (t === 9) { if (r.bool()) r.skip(8); } else if (t === 10) { v = r.vi(); k = 'int'; } else if (t === 11) { if (r.bool()) r.skip(16); } else if (t === 12) { v = r.vi(); k = 'block'; } else if (t === 13) { const tt = r.b(); if (tt) { r.skip(r.u16()); r.tag(tt); } } else break;
+        if (idx === 0 && k === 'byte' && H.flags) H.flags(eid, v); else if (k !== 'skip' && H.vmeta) H.vmeta(eid, idx, k, v); } };
+      const metaAny = eid => V9 ? meta19(eid) : meta18(eid);
+      const nbtRaw = () => { const p0 = r.p, t = r.b(); if (t) { r.skip(r.u16()); r.tag(t); } return r.u.slice(p0, r.p); };
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
         case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); return;
-        case 'transaction': if (P === 47) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); if (H && H.trans) H.trans(wid, act, ok); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
+        case 'transaction': if (LEG) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); if (H && H.trans) H.trans(wid, act, ok); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
-          if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
+          if (LEG && H) { const eid = r.i32(), gm = r.b(), dim = P >= 108 ? r.i32() : r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm });
+            if (V9) out('settings', new W().str('en_US').b(o.viewDistance || 6).vi(0).bool(true).b(127).vi(1)); else out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
           return;
-        case 'respawn': if (P === 47 && H) { const dim = r.i32(); sky = dim === 0; H.respawn && H.respawn(dim); } return;
-        case 'update_time': if (P === 47 && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
-        case 'update_health': if (P === 47 && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
-        case 'held_item_slot': if (P === 47 && H && H.held) H.held(r.i8()); return;
-        case 'set_slot': if (P === 47 && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
-        case 'spawn_entity_painting': if (P === 47 && H && H.painting) { const eid = r.vi(), title = r.str(), hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.painting(eid, title, px, py, pz, r.b()); } return;
-        case 'experience': if (P === 47 && H && H.xp) { const bar = r.f32(), lv = r.vi(); H.xp(bar, lv, r.vi()); } return;
-        case 'entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(), id = r.i8(), amp = r.i8(), dur = r.vi(); H.effect(eid, id, amp, dur); } return;
-        case 'remove_entity_effect': if (P === 47 && H && H.effect) { const eid = r.vi(); H.effect(eid, r.i8(), 0, 0); } return;
+        case 'respawn': if (LEG && H) { const dim = r.i32(); sky = dim === 0; H.respawn && H.respawn(dim); } return;
+        case 'update_time': if (LEG && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
+        case 'update_health': if (LEG && H && H.health) { const hp = r.f32(), food = r.vi(); H.health(hp, food); } return;
+        case 'held_item_slot': if (LEG && H && H.held) H.held(r.i8()); return;
+        case 'set_slot': if (LEG && H && H.slot) { const wid = r.i8(), sl = r.i16(); H.slot(wid, sl, slot18(r)); } return;
+        case 'spawn_entity_painting': if (LEG && H && H.painting) { const eid = r.vi(); if (V9) r.skip(16); const title = r.str(), hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.painting(eid, title, px, py, pz, r.b()); } return;
+        case 'experience': if (LEG && H && H.xp) { const bar = r.f32(), lv = r.vi(); H.xp(bar, lv, r.vi()); } return;
+        case 'entity_effect': if (LEG && H && H.effect) { const eid = r.vi(), id = r.i8(), amp = r.i8(), dur = r.vi(); H.effect(eid, id, amp, dur); } return;
+        case 'remove_entity_effect': if (LEG && H && H.effect) { const eid = r.vi(); H.effect(eid, r.i8(), 0, 0); } return;
         case 'attach_entity': if (P === 47 && H && H.attach) { const a = r.i32(), v = r.i32(); H.attach(a, v, r.bool()); } return;
-        case 'spawn_entity_experience_orb': if (P === 47 && H && H.orb) { const eid = r.vi(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32; H.orb(eid, x, y, z, r.i16()); } return;
-        case 'spawn_entity_weather': if (P === 47 && H && H.bolt) { const eid = r.vi(), t = r.i8(); H.bolt(eid, t, r.i32() / 32, r.i32() / 32, r.i32() / 32); } return;
-        case 'world_particles': if (P === 47 && H && H.particles) { const id = r.i32(); r.bool(); const x = r.f32(), y = r.f32(), z = r.f32(), ox = r.f32(), oy = r.f32(), oz = r.f32(), sp = r.f32(), n = r.i32(), dt = []; const k = id === 36 ? 2 : id === 37 || id === 38 ? 1 : 0; for (let i = 0; i < k; i++) dt.push(r.vi()); H.particles(id, x, y, z, ox, oy, oz, sp, n, dt); } return;
-        case 'world_event': if (P === 47 && H && H.event) { const id = r.i32(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.event(id, px, py, pz, r.i32(), r.bool()); } return;
-        case 'open_sign_entity': if (P === 47 && H && H.signEdit) { const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.signEdit(px, py, pz); } return;
-        case 'block_break_animation': if (P === 47 && H && H.crack) { const eid = r.vi(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.crack(eid, px, py, pz, r.i8()); } return;
-        case 'scoreboard_objective': if (P === 47 && H && H.objective) { const nm = r.str(), a = r.i8(); let txt = null; if (a === 0 || a === 2) { txt = r.str(); r.str(); } H.objective(nm, a, txt); } return;
-        case 'scoreboard_score': if (P === 47 && H && H.score) { const it = r.str(), a = r.i8(), obj = r.str(); H.score(it, a, obj, a === 1 ? 0 : r.vi()); } return;
-        case 'scoreboard_display_objective': if (P === 47 && H && H.showObjective) { const pos2 = r.i8(); H.showObjective(pos2, r.str()); } return;
-        case 'title': if (P === 47 && H && H.title) { const a = r.vi(); if (a === 0 || a === 1) H.title(a, r.str()); else if (a === 2) H.title(2, [r.i32(), r.i32(), r.i32()]); else H.title(a); } return;
-        case 'playerlist_header': if (P === 47 && H && H.tabHeader) { const h = r.str(); H.tabHeader(h, r.str()); } return;
-        case 'open_window': if (P === 47 && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
-        case 'close_window': if (P === 47 && H && H.closeWin) H.closeWin(r.b()); return;
-        case 'craft_progress_bar': if (P === 47 && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;
-        case 'window_items': if (P === 47 && H && H.items) { const wid = r.b(), n = r.i16(), l = []; for (let i = 0; i < n; i++) l.push(slot18(r)); H.items(wid, l); } return;
-        case 'game_state_change': if (P === 47 && H && H.gameState) { const rs = r.b(), v = r.f32(); H.gameState(rs, v); } return;
-        case 'position': if (P === 47 && H) {
+        case 'spawn_entity_experience_orb': if (LEG && H && H.orb) { const eid = r.vi(), q = V9 ? () => r.f64() : () => r.i32() / 32, x = q(), y = q(), z = q(); H.orb(eid, x, y, z, r.i16()); } return;
+        case 'spawn_entity_weather': if (LEG && H && H.bolt) { const eid = r.vi(), t = r.i8(), q = V9 ? () => r.f64() : () => r.i32() / 32; H.bolt(eid, t, q(), q(), q()); } return;
+        case 'world_particles': if (LEG && H && H.particles) { const id = r.i32(); r.bool(); const x = r.f32(), y = r.f32(), z = r.f32(), ox = r.f32(), oy = r.f32(), oz = r.f32(), sp = r.f32(), n = r.i32(), dt = []; const k = id === 36 ? 2 : id === 37 || id === 38 || id === 46 ? 1 : 0; for (let i = 0; i < k; i++) dt.push(r.vi()); H.particles(id, x, y, z, ox, oy, oz, sp, n, dt); } return;
+        case 'world_event': if (LEG && H && H.event) { const id = r.i32(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.event(id, px, py, pz, r.i32(), r.bool()); } return;
+        case 'open_sign_entity': if (LEG && H && H.signEdit) { const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.signEdit(px, py, pz); } return;
+        case 'block_break_animation': if (LEG && H && H.crack) { const eid = r.vi(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; H.crack(eid, px, py, pz, r.i8()); } return;
+        case 'scoreboard_objective': if (LEG && H && H.objective) { const nm = r.str(), a = r.i8(); let txt = null; if (a === 0 || a === 2) { txt = r.str(); r.str(); } H.objective(nm, a, txt); } return;
+        case 'scoreboard_score': if (LEG && H && H.score) { const it = r.str(), a = r.i8(), obj = r.str(); H.score(it, a, obj, a === 1 ? 0 : r.vi()); } return;
+        case 'scoreboard_display_objective': if (LEG && H && H.showObjective) { const pos2 = r.i8(); H.showObjective(pos2, r.str()); } return;
+        case 'title': if (LEG && H && H.title) { let a = r.vi(); if (P >= 315) { if (a === 2) { const t = r.str(); if (o.onActionBar) try { o.onActionBar(comp(t), compHTML(t)); } catch (e) { /* ui */ } return; } if (a > 2) a--; }
+          if (a === 0 || a === 1) H.title(a, r.str()); else if (a === 2) H.title(2, [r.i32(), r.i32(), r.i32()]); else H.title(a); } return;
+        case 'playerlist_header': if (LEG && H && H.tabHeader) { const h = r.str(); H.tabHeader(h, r.str()); } return;
+        case 'open_window': if (LEG && H && H.openWin) { const wid = r.b(), type = r.str(), title = comp(r.str()), n = r.b(); H.openWin(wid, type, title, n); } return;
+        case 'close_window': if (LEG && H && H.closeWin) H.closeWin(r.b()); return;
+        case 'craft_progress_bar': if (LEG && H && H.winProp) { const wid = r.b(), k = r.i16(); H.winProp(wid, k, r.i16()); } return;
+        case 'window_items': if (LEG && H && H.items) { const wid = r.b(), n = r.i16(), l = []; for (let i = 0; i < n; i++) l.push(slot18(r)); H.items(wid, l); } return;
+        case 'game_state_change': if (LEG && H && H.gameState) { const rs = r.b(), v = r.f32(); H.gameState(rs, v); } return;
+        case 'position': if (LEG && H) {
           const x = r.f64(), y = r.f64(), z = r.f64(), yaw = r.f32(), pitch = r.f32(), fl = r.b();
+          if (V9) out('teleport_confirm', new W().vi(r.vi()));   // 1.9+: every server teleport must be confirmed, or it keeps pulling us back
           H.position && H.position({ x, y, z, yaw, pitch, flags: fl });
           // the server's value is final: confirm with our own position
           const w = new W().f64(H.cur ? H.cur.x : x).f64(H.cur ? H.cur.y : y).f64(H.cur ? H.cur.z : z).f32(yaw).f32(pitch).bool(true); out('position_look', w);
         } return;
-        case 'map_chunk': if (P === 47 && H && H.chunk) {
+        case 'map_chunk': if (LEG && H && H.chunk) {
+          if (V9) { const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.vi(); r.vi(); const sec = sections19(r, mask, sky, gu); H.chunk(x, z, sec, gu);
+            if (P >= 110 && H.tile) { const n = r.vi(); for (let i = 0; i < n; i++) H.tile(null, null, null, 0, nbtRaw()); } return; }   // 1.9.4+: the chunk's block entities (signs...)
           const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.u16(); r.vi();
           if (gu && mask === 0) { H.unload && H.unload(x, z); return; }
           H.chunk(x, z, sections18(r, mask, sky, gu), gu);
         } return;
-        case 'map_chunk_bulk': if (P === 47 && H && H.chunk) {
+        case 'map_chunk_bulk': if (LEG && H && H.chunk) {
           const sk = r.bool(), n = r.vi(), ms = []; for (let i = 0; i < n; i++) ms.push([r.i32(), r.i32(), r.u16()]);
           for (const [x, z, mask] of ms) H.chunk(x, z, sections18(r, mask, sk, true), true);
         } return;
-        case 'entity_velocity': if (P === 47 && H && H.velocity) { const eid = r.vi(); H.velocity(eid, r.i16() / 8000, r.i16() / 8000, r.i16() / 8000); } return;
-        case 'entity_status': if (P === 47 && H && H.status) { const eid = r.d.getInt32(r.p); r.p += 4; H.status(eid, r.i8()); } return;
-        case 'update_sign': if (P === 47 && H && H.sign) {
+        case 'unload_chunk': if (LEG && H && H.unload) { const x = r.i32(); H.unload(x, r.i32()); } return;
+        case 'tile_entity_data': if (LEG && H && H.tile) { const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6; const a = r.b(); H.tile(px, py, pz, a, nbtRaw()); } return;
+        case 'set_passengers': if (LEG && H && H.passengers) { const v = r.vi(), n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.passengers(v, l); } return;
+        case 'boss_bar': if (LEG && H && H.boss) { const u = Array.from(r.u.subarray(r.p, r.p + 16), x => x.toString(16).padStart(2, '0')).join(''); r.p += 16; const a = r.vi(), d = {};
+          if (a === 0) { d.title = r.str(); d.hp = r.f32(); d.color = r.vi(); d.div = r.vi(); d.flags = r.b(); } else if (a === 2) d.hp = r.f32(); else if (a === 3) d.title = r.str(); else if (a === 4) { d.color = r.vi(); d.div = r.vi(); } else if (a === 5) d.flags = r.b(); H.boss(u, a, d); } return;
+        case 'sound_effect': if (LEG && H && H.sound && SND) { const id = r.vi(); r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(), pi = P >= 210 ? r.f32() : r.b() / 63; H.sound(SND[id] || '', x, y, z, v, pi); } return;
+        case 'entity_velocity': if (LEG && H && H.velocity) { const eid = r.vi(); H.velocity(eid, r.i16() / 8000, r.i16() / 8000, r.i16() / 8000); } return;
+        case 'entity_status': if (LEG && H && H.status) { const eid = r.d.getInt32(r.p); r.p += 4; H.status(eid, r.i8()); } return;
+        case 'update_sign': if (LEG && H && H.sign) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6, ln = [];
           for (let i = 0; i < 4; i++) { let t = r.str(); try { const j = JSON.parse(t); t = typeof j === 'string' ? j : (j.text || '') + (j.extra ? j.extra.map(e => e.text || '').join('') : ''); } catch (e) { /* plain */ } ln.push(t); }
           H.sign(px, py, pz, ln);
         } return;
-        case 'spawn_entity': if (P === 47 && H && H.dropSpawn) {
-          const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, pitch = ang(r.i8()), yaw = ang(r.i8()), data = r.i32(); let vx = 0, vy = 0, vz = 0; if (data) { vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; }
+        case 'spawn_entity': if (LEG && H && H.dropSpawn) {
+          let eid, type, x, y, z, pitch, yaw, data, vx = 0, vy = 0, vz = 0;
+          if (V9) { eid = r.vi(); r.skip(16); type = r.b(); x = r.f64(); y = r.f64(); z = r.f64(); pitch = ang(r.i8()); yaw = ang(r.i8()); data = r.i32(); vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; }
+          else { eid = r.vi(); type = r.b(); x = r.i32() / 32; y = r.i32() / 32; z = r.i32() / 32; pitch = ang(r.i8()); yaw = ang(r.i8()); data = r.i32(); if (data) { vx = r.i16() / 8000; vy = r.i16() / 8000; vz = r.i16() / 8000; } }
           if (type === 2) H.dropSpawn(eid, x, y, z, vx, vy, vz); else if (H.objSpawn) H.objSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch);   // projectiles (arrows, fireballs) for compat mode
         } return;
-        case 'entity_metadata': if (P === 47 && H && H.meta) {
-          meta18(r.vi());
+        case 'entity_metadata': if (LEG && H && H.meta) {
+          metaAny(r.vi());
         } return;
-        case 'collect': if (P === 47 && H && H.collect) { const a = r.vi(); H.collect(a, r.vi()); } return;
-        case 'named_sound_effect': if (P === 47 && H && H.sound) { const nm = r.str(), x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(); H.sound(nm, x, y, z, v, r.b() / 63); } return;
-        case 'explosion': if (P === 47 && H && H.explosion) {
+        case 'collect': if (LEG && H && H.collect) { const a = r.vi(); H.collect(a, r.vi()); } return;
+        case 'named_sound_effect': if (LEG && H && H.sound) { const nm = r.str(); if (V9) r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(); H.sound(nm, x, y, z, v, P >= 210 ? r.f32() : r.b() / 63); } return;
+        case 'explosion': if (LEG && H && H.explosion) {
           const x = r.f32(), y = r.f32(), z = r.f32(), rad = r.f32(), n = r.d.getInt32(r.p); r.p += 4; const rec = []; for (let i = 0; i < n; i++) rec.push([r.i8(), r.i8(), r.i8()]);
           H.explosion(x, y, z, rad, rec, r.f32(), r.f32(), r.f32());
         } return;
-        case 'entity_equipment': if (P === 47 && H && H.equip) { const eid = r.vi(), sl = r.i16(); H.equip(eid, sl, slot18(r)); } return;
-        case 'animation': if (P === 47 && H && H.anim) { const eid = r.vi(); H.anim(eid, r.b()); } return;
-        case 'block_change': if (P === 47 && H && H.block) {
+        case 'entity_equipment': if (LEG && H && H.equip) { const eid = r.vi(), sl = V9 ? [0, 5, 1, 2, 3, 4][r.vi()] : r.i16(); H.equip(eid, sl, slot18(r)); } return;   // 1.9+ slots (main, off, feet, legs, chest, head) -> 1.8 order, off hand = 5
+        case 'animation': if (LEG && H && H.anim) { const eid = r.vi(); H.anim(eid, r.b()); } return;
+        case 'block_change': if (LEG && H && H.block) {
           const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8;
           const px = hi >> 6, py = ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, pz = (lo << 6) >> 6;
           H.block(px, py, pz, r.vi());
         } return;
-        case 'multi_block_change': if (P === 47 && H && H.multi) {
+        case 'multi_block_change': if (LEG && H && H.multi) {
           const cx = r.i32(), cz = r.i32(), n = r.vi(), l = [];
           for (let i = 0; i < n; i++) { const hz = r.b(), y = r.b(), st = r.vi(); l.push({ x: cx * 16 + (hz >> 4), y, z: cz * 16 + (hz & 15), state: st }); }
           H.multi(l);
         } return;
-        case 'named_entity_spawn': if (P === 47 && H && H.spawn) {
-          const eid = r.vi(), uuid = r.uuid(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, yaw = ang(r.i8()), pitch = ang(r.i8());
-          H.spawn({ eid, kind: 'player', uuid, x, y, z, yaw, pitch });
+        case 'named_entity_spawn': if (LEG && H && H.spawn) {
+          const eid = r.vi(), uuid = r.uuid(); let x, y, z; if (V9) { x = r.f64(); y = r.f64(); z = r.f64(); } else { x = r.i32() / 32; y = r.i32() / 32; z = r.i32() / 32; } const yaw = ang(r.i8()), pitch = ang(r.i8());
+          H.spawn({ eid, kind: 'player', uuid, x, y, z, yaw, pitch }); if (V9 && H.vmeta) meta19(eid);
         } return;
-        case 'spawn_entity_living': if (P === 47 && H && H.spawn) {
+        case 'spawn_entity_living': if (LEG && H && H.spawn) {
+          if (V9) { const eid = r.vi(); r.skip(16); const type = P >= 315 ? r.vi() : r.b(), x = r.f64(), y = r.f64(), z = r.f64(), yaw = ang(r.i8()), pitch = ang(r.i8()); H.spawn({ eid, kind: 'mob', type, x, y, z, yaw, pitch }); r.i8(); r.i16(); r.i16(); r.i16(); if (H.vmeta) meta19(eid); return; }
           const eid = r.vi(), type = r.b(), x = r.i32() / 32, y = r.i32() / 32, z = r.i32() / 32, yaw = ang(r.i8()), pitch = ang(r.i8());
           H.spawn({ eid, kind: 'mob', type, x, y, z, yaw, pitch }); r.i8(); r.i16(); r.i16(); r.i16(); if (H.meta) meta18(eid);   // head pitch, velocity, then the spawn metadata (size, skeleton type, baby)
         } return;
-        case 'rel_entity_move': if (P === 47 && H && H.move) { const eid = r.vi(); H.move(eid, r.i8() / 32, r.i8() / 32, r.i8() / 32); } return;
-        case 'entity_look': if (P === 47 && H && H.look) { const eid = r.vi(); H.look(eid, ang(r.i8()), ang(r.i8())); } return;
-        case 'entity_move_look': if (P === 47 && H && H.move) { const eid = r.vi(), dx = r.i8() / 32, dy = r.i8() / 32, dz = r.i8() / 32; H.move(eid, dx, dy, dz); H.look && H.look(eid, ang(r.i8()), ang(r.i8())); } return;
-        case 'entity_teleport': if (P === 47 && H && H.teleport) { const eid = r.vi(); H.teleport(eid, r.i32() / 32, r.i32() / 32, r.i32() / 32, ang(r.i8()), ang(r.i8())); } return;
-        case 'entity_head_rotation': if (P === 47 && H && H.head) { const eid = r.vi(); H.head(eid, ang(r.i8())); } return;
-        case 'entity_destroy': if (P === 47 && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
-        case 'player_info': if (P === 47 && H && H.playerInfo) {
+        case 'rel_entity_move': if (LEG && H && H.move) { const eid = r.vi(); if (V9) H.move(eid, r.i16() / 4096, r.i16() / 4096, r.i16() / 4096); else H.move(eid, r.i8() / 32, r.i8() / 32, r.i8() / 32); } return;
+        case 'entity_look': if (LEG && H && H.look) { const eid = r.vi(); H.look(eid, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_move_look': if (LEG && H && H.move) { const eid = r.vi(), q = V9 ? () => r.i16() / 4096 : () => r.i8() / 32, dx = q(), dy = q(), dz = q(); H.move(eid, dx, dy, dz); H.look && H.look(eid, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_teleport': if (LEG && H && H.teleport) { const eid = r.vi(); if (V9) H.teleport(eid, r.f64(), r.f64(), r.f64(), ang(r.i8()), ang(r.i8())); else H.teleport(eid, r.i32() / 32, r.i32() / 32, r.i32() / 32, ang(r.i8()), ang(r.i8())); } return;
+        case 'entity_head_rotation': if (LEG && H && H.head) { const eid = r.vi(); H.head(eid, ang(r.i8())); } return;
+        case 'entity_destroy': if (LEG && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
+        case 'player_info': if (LEG && H && H.playerInfo) {
           const act = r.vi(), n = r.vi();
           for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } const gm = r.vi(), ping = r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm, sk, ping, gm); } else if (act === 4) H.playerInfo(u, null); else if (act === 2) { const ping = r.vi(); H.ping && H.ping(u, ping); } else if (act === 1) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
         } return;
@@ -343,20 +379,27 @@
       return out('chat_message', w);
     }
     const sendPos = (x, y, z, yaw, pitch, ground) => { if (closed || state !== 'play') return false; return out('position_look', new W().f64(x).f64(y).f64(z).f32(yaw).f32(pitch).bool(ground)); };
-    const v47 = f => (...a) => (P === 47 && !closed && state === 'play') ? f(...a) : false;
+    const v47 = f => (...a) => (LEG && !closed && state === 'play') ? f(...a) : false;
     const api = {
       dig: v47((status, x, y, z, face) => out('block_dig', new W().b(status).raw(pos64(x, y, z)).b(face))),
-      place: v47((x, y, z, face, item, cx, cy, cz) => { const w = new W().raw(pos64(x, y, z)).b(face); slotOut(w, item); return out('block_place', w.b(cx).b(cy).b(cz)); }),
+      place: v47((x, y, z, face, item, cx, cy, cz) => {
+        if (V9) { if (face === 255) return out('use_item', new W().vi(0)); const w = new W().raw(pos64(x, y, z)).vi(face).vi(0); return out('block_place', P >= 315 ? w.f32(cx / 16).f32(cy / 16).f32(cz / 16) : w.b(cx).b(cy).b(cz)); }   // 1.9+: hand, and floats from 1.11
+        const w = new W().raw(pos64(x, y, z)).b(face); slotOut(w, item); return out('block_place', w.b(cx).b(cy).b(cz)); }),
+      useItem: v47(hand => V9 ? out('use_item', new W().vi(hand || 0)) : false),
+      swapHands: v47(() => V9 ? out('block_dig', new W().b(6).raw(pos64(0, 0, 0)).b(0)) : false),
+      vehicleMove: v47((x, y, z, yaw, pitch) => V9 ? out('vehicle_move', new W().f64(x).f64(y).f64(z).f32(yaw).f32(pitch)) : false),
+      steerBoat: v47((l, rr) => V9 ? out('steer_boat', new W().bool(l).bool(rr)) : false),
+      sneak: v47((eid, on) => out('entity_action', new W().vi(eid).vi(on ? 0 : 1).vi(0))),
       select: v47(n => out('held_item_slot', new W().b(n >> 8).b(n))),
       click: v47((slot, button, action, mode, item, wid) => { const w = new W().b(wid || 0).b(slot >> 8).b(slot).b(button).b(action >> 8).b(action).b(mode); slotOut(w, item); return out('window_click', w); }),
-      swing: v47(() => out('arm_animation')),
+      swing: v47(() => V9 ? out('arm_animation', new W().vi(0)) : out('arm_animation')),
       respawn: v47(() => out('client_command', new W().vi(0))),
       attack: v47(eid => out('use_entity', new W().vi(eid).vi(1))),
       closeWin: v47(wid => out('close_window', new W().b(wid))),
       creative: v47((slot, item) => { const w = new W().b(slot >> 8).b(slot); slotOut(w, item); return out('set_creative_slot', w); }),
       chatCmd: t => chat(t),
-      sign: v47((x, y, z, lines) => { const w = new W().raw(pos64(x, y, z)); for (const l of lines) w.str(JSON.stringify({ text: l })); return out('update_sign', w); }),
-      interact: v47(eid => out('use_entity', new W().vi(eid).vi(0))),
+      sign: v47((x, y, z, lines) => { const w = new W().raw(pos64(x, y, z)); for (const l of lines) w.str(V9 ? l : JSON.stringify({ text: l })); return out('update_sign', w); }),   // 1.9+ sends plain text
+      interact: v47(eid => out('use_entity', V9 ? new W().vi(eid).vi(0).vi(0) : new W().vi(eid).vi(0))),
       look: v47((yaw, pitch, ground) => out('look', new W().f32(yaw).f32(pitch).bool(ground))),
       steer: v47((side, fwd, flags) => out('steer_vehicle', new W().f32(side).f32(fwd).b(flags))),
       enchant: v47((wid, i) => out('enchant_item', new W().b(wid).b(i))),
@@ -365,5 +408,5 @@
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }
-  g.StrataMC = { connect, comp, compHTML, setIds: x => { IDS = x; }, W, R };
+  g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, comp, compHTML, setIds: x => { IDS = x; }, W, R });
 })(typeof window !== 'undefined' ? window : globalThis);

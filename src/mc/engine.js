@@ -91,6 +91,11 @@
     if (bid === 154) return shape('hop', 'Hopper', '#4a4a4f', [[0, .625, 0, 1, 1, 1, [74, 74, 80]], [.25, .25, .25, .75, .625, .75, [66, 66, 72]], [.375, 0, .375, .625, .25, .625, [60, 60, 66]]], { solid: true, tex: ['hopper_outside', 'hopper_top', 'hopper_outside'] });
     if (bid === 120) return shape('epf' + (meta & 4), 'End Portal Frame', '#7a8a6a', [[0, 0, 0, 1, .8125, 1, [86, 118, 96]]].concat(meta & 4 ? [[.25, .8125, .25, .75, 1, .75, [40, 110, 90]]] : []), { solid: true, tex: ['endframe_side', 'endframe_top', 'end_stone'] });
     if (bid === 122) return shape('egg', 'Dragon Egg', '#180c22', [[.375, 0, .375, .625, .0625, .625], [.25, .0625, .25, .75, .25, .75], [.125, .25, .125, .875, .75, .875], [.25, .75, .25, .75, .9375, .75], [.375, .9375, .375, .625, 1, .625]].map(b => b.concat([[24, 12, 34]])), { solid: true, tex: Array(3).fill('dragon_egg') });
+    if (bid === 207) return B['BEETROOTS_' + Math.min(3, meta & 3)] || null;
+    if (bid === 208) return shape('path', 'Grass Path', '#94793f', [[0, 0, 0, 1, .9375, 1]], { solid: true, tex: ['grass_path_side', 'grass_path_top', 'dirt'] });
+    if (bid === 198) { const f = meta % 6, A = [[.4375, 0, .4375, .5625, 1, .5625], [.4375, 0, .4375, .5625, 1, .5625], [.4375, .4375, 0, .5625, .5625, 1], [.4375, .4375, 0, .5625, .5625, 1], [0, .4375, .4375, 1, .5625, .5625], [0, .4375, .4375, 1, .5625, .5625]][f];
+      return shape('rod' + f, 'End Rod', '#e8e0d0', [A.concat([[240, 236, 226]])], { solid: false, emit: [14, 13, 12], att: 1, tex: Array(3).fill('end_rod') }); }
+    if (bid === 205) return shape('pslab' + (meta & 8), 'Purpur Slab', '#a77ba7', [meta & 8 ? [0, .5, 0, 1, 1, 1] : [0, 0, 0, 1, .5, 1]], { solid: true, tex: Array(3).fill('purpur_block') });
     // plants: Strata's own sprites instead of the grass stand-in
     if (bid === 83) return B.SUGAR_CANE || null;
     if (bid === 31) return [B.DEAD_BUSH, B.TALLGRASS, B.FERN][meta & 3] || B.TALLGRASS;
@@ -149,6 +154,9 @@
   // ---- inventory mirror: the server's window 0 shown through Strata's own hotbar / inventory / armor ----
   const TOOLS = { wooden: 'wood', stone: 'stone', iron: 'iron', golden: 'gold', diamond: 'diamond' }, TT = { pickaxe: 'pick', axe: 'axe', shovel: 'shovel', sword: 'sword', hoe: 'hoe' };
   function strataItem(mc) {
+    if (V9() && POT_IDS[mc.id] != null) { const pe = potion9(mc), key2 = mc.id + ':' + pe[0], c2 = S.itemMap.get(key2); if (c2) return c2; const sid = 54000 + S.items.length, e = StrataMC.items18[mc.id] || [];
+      const nm = mc.id === 440 ? 'Arrow of ' + pe[0] : pe[0] === 'Water Bottle' ? (mc.id === 373 ? 'Water Bottle' : POT_IDS[mc.id] + 'Water Bottle') : /Potion$/.test(pe[0]) ? POT_IDS[mc.id] + pe[0] : POT_IDS[mc.id] + 'Potion of ' + pe[0];
+      ITEMS[sid] = { name: nm, stack: e[2] || 1, mcCompat: 1, cat: 'compat', mcTex: mc.id === 438 ? 'potion_bottle_splash' : mc.id === 441 ? 'potion_bottle_lingering' : mc.id === 440 ? 'tipped_arrow_base' : 'potion_bottle_drinkable', mcName: e[0], potionCol: pe[1] }; S.items.push(sid); S.itemMap.set(key2, sid); return sid; }
     const key = mc.id + ':' + mc.damage, c = S.itemMap.get(key); if (c) return c;
     const it = StrataMC.items18[mc.id] || ['item' + mc.id, 'Item ' + mc.id, 64]; let sid = 0;
     if (mc.id < 256) { sid = native(mc.id, mc.damage, 0) || stateToId((mc.id << 4) | mc.damage, 0) || 0; if (sid && !ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } }
@@ -192,6 +200,7 @@
   const SNDMAP = { 'random.bow': 'bowShoot', 'random.bowhit': 'arrowHit', 'random.pop': 'pop', 'random.eat': 'eat', 'random.burp': 'burp', 'liquid.splash': 'splash', 'random.door_open': 'doorOpen', 'random.door_close': 'doorClose', 'random.chestopen': 'chestOpen', 'random.chestclosed': 'chestClose', 'creeper.primed': 'ignite', 'fire.ignite': 'ignite', 'random.explode': 'fall', 'game.player.hurt': 'hurt', 'game.neutral.hurt': 'hurt', 'game.hostile.hurt': 'hurt', 'game.player.die': 'hurt', 'game.hostile.die': 'hurt', 'random.orb': 'orb' };
   const DIGB = { stone: 'STONE', grass: 'GRASS', gravel: 'GRAVEL', sand: 'SAND', wood: 'PLANKS', cloth: 'WOOL', glass: 'GLASS', snow: 'SNOW' };
   function mcSound(name, X, y, Z, vol, pitch) {
+    if (V9()) name = snd19(name);
     { const n = /^note\.(\w+)$/.exec(name); if (n) { const ok = playMcSound('note/' + n[1], X, y, Z, vol, pitch); playNote(n[1], pitch, X, y, Z, vol, ok); return; } }
     if (playMcSound(SNDPATH[name] || name.replace(/\./g, '/'), X, y, Z, vol, pitch)) return;   // the resource pack's own sound when it has one
     let m = /^(?:dig|step)\.(\w+)$/.exec(name); if (m) { const b = B[DIGB[m[1]]] || B.STONE; sfxBlock(b, /^dig/.test(name) ? 'break' : 'step', Math.floor(X), Math.floor(y), Math.floor(Z), vol); return; }
@@ -236,7 +245,8 @@
       n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 16, 48, 0); n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 0, 48, .25); pl.n = n / 6;
       setVL(sampleLight(pl.x, pl.y + 1.2, pl.z));
       playerArmour(pl, head, body, rA, lA, rL, lL);   // armour drawn with the pack's (or generated) armour textures on the skin renderer
-      if (hs) { const d = dispOf(hs.id), M = mc(rA, mT(-4 - aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, hs.id, mc(mT(0, 0, 0), M), glinty(hs)); } }
+      if (hs) { const d = dispOf(hs.id), M = mc(rA, mT(-4 - aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, hs.id, mc(mT(0, 0, 0), M), glinty(hs)); }
+      { const os = pl.eq[5] && toStack(pl.eq[5]); if (os && ITEMS[os.id]) { const d = dispOf(os.id), M = mc(lA, mT(4 + aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, os.id, M, glinty(os)); } } }   // off hand (1.9+)
   }
   function drawMcPlayers() {
     if (cam.photoHide) return; const keep = SKIN.tex, hurt = player.hurtT; player.hurtT = 9;
@@ -399,7 +409,7 @@
     if (d && d.pumpkin) { const B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0 * .0625)), T = (x, y, z) => ap(B0, x, y, z); emitBox(vb, [-5, 19, -5], [5, 29, 5], [214, 126, 30], T); for (const x of [-3.5, 1.5]) emitBox(vb, [x, 24.5, 5], [x + 2, 26.5, 5.15], [40, 22, 8], T); emitBox(vb, [-3, 21, 5], [3, 22.5, 5.15], [40, 22, 8], T); }
     { const geo0 = d ? d.geo || null : m.type; if (!sk && (geo0 === 'zombie' || geo0 === 'skeleton') && m.eq) { const B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0)), T = (x, y, z) => ap(B0, x, y, z), ab = (sl, mn, mx) => { const a = armOf(m.eq, sl); if (a) emitBox(vb, mn, mx, a.tint || ARCOL[a.mat], T); };
       ab(4, [-.245, 1.37, -.245], [.245, 1.85, .245]); ab(3, [-.27, .74, -.15], [.27, 1.4, .15]); ab(2, [-.26, .3, -.14], [.26, .82, .14]); ab(1, [-.26, -.01, -.14], [.26, .3, .14]); } }
-    const it = m.eq && m.eq[0]; if (!it) return; const geo = d ? d.geo || null : m.type; if (geo !== 'zombie' && geo !== 'skeleton') return;
+    const it = m.eq && m.eq[0]; if (!it) return; const geo = d ? d.geo || null : m.type; if (geo !== 'zombie' && geo !== 'skeleton' && geo !== 'illager') return;
     const st = toStack(it); if (!st || !ITEMS[st.id]) return; const id = st.id, z = geo === 'zombie', ws = m.moving ? Math.sin(m.phase || 0) : 0; let A;
     if (sk) { const ang = z ? -1.5 + Math.sin((m.phase || 0) * .5) * .06 : m.aim ? -PI / 2 : -1.1 + ws * .12, B0 = mc(mT(m.x, m.y, m.z), mY(m.face), mS(S0 * .0625 * .925));
       A = mc(B0, mT(0, 22, 0), mX(ang), mT(0, -22, 0), mT(z ? -6 : -5, 12.5, 0), mS(16)); }
@@ -419,7 +429,7 @@
   }
   // projectiles: arrows (60) and fireballs (63 large, 64 small) become entries in Strata's own `arrows` list, so Strata draws them;
   // their flight is simulated here (vanilla's client does the same) and corrected by the server's position updates
-  const PROJ = { 60: 'arrow', 63: 'fireball', 64: 'fireball' };
+  const PROJ = { 60: 'arrow', 91: 'arrow', 63: 'fireball', 64: 'fireball', 93: 'fireball' };   // 91 spectral arrow, 93 dragon fireball (1.9)
   function projSpawn(eid, type, x, y, z, data, vx, vy, vz, yaw, pitch) {
     const kind = PROJ[type]; if (!kind || !S.world) return; const X = x + S.OX, Z = z + S.OZ, yr = yaw * PI / 180, pr = pitch * PI / 180;
     const q = { mc: eid, id: I.ARROW, x: X, y, z: Z, sx: X, sy: y, sz: Z, ux: vx, uy: vy, uz: vz, vx: Math.sin(yr) * Math.cos(pr), vy: Math.sin(pr), vz: Math.cos(yr) * Math.cos(pr), stuck: false, t: 0, noPick: true };
@@ -521,7 +531,7 @@
     if (cs) el.querySelector('#mcHold small:last-child').textContent = mcName(cur) + (cur.count > 1 ? ' x' + cur.count : '');
     el.querySelector('#mcCre').hidden = !cre; el.querySelector('#mcCatBox').hidden = !(cre && S.cre); if (cre && S.cre) mcCatRender();
     const kind = W ? W.kind : 'player';
-    if (kind === 'player') { const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); top.appendChild(arm);
+    if (kind === 'player') { const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); if (V9()) { mcSlot(arm, 45, { lbl: 'Off hand' }); const sb = document.createElement('button'); sb.className = 'ghost'; sb.textContent = 'Swap hands'; sb.style.cssText = 'font-size:11px;padding:4px 6px'; sb.addEventListener('click', () => { S.client.api.swapHands(); const a = S.slots[36 + inv.sel], b = S.slots[45]; S.slots[36 + inv.sel] = b; S.slots[45] = a; syncInv(); }); arm.appendChild(sb); } top.appendChild(arm);
       const g = grid(2); for (let i = 1; i <= 4; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); }
     else if (kind === 'craft3') { const g = grid(3); for (let i = 1; i <= 9; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); }
     else if (kind === 'furnace') { const p = W.prop || {}, g = grid(1); mcSlot(g, 0, { lbl: 'Smelt' }); const fl = document.createElement('span'); fl.className = 'lbl'; fl.textContent = p[1] ? '🔥 ' + Math.round(100 * (p[0] || 0) / p[1]) + '%' : ''; g.appendChild(fl); mcSlot(g, 1, { lbl: 'Fuel' }); top.appendChild(g); top.appendChild(arrow((p[2] || 0) / (p[3] || 200))); mcSlot(top, 2, { cls: 'out' }); }
@@ -612,7 +622,7 @@
   const EFFECT = { 1: ['Speed', '#7cafc6', 0, 0], 2: ['Slowness', '#5a6c81', 1, 0], 3: ['Haste', '#d9c043', 2, 0], 4: ['Mining Fatigue', '#4a4217', 3, 0], 5: ['Strength', '#932423', 4, 0], 8: ['Jump Boost', '#22ff4c', 2, 1],
     9: ['Nausea', '#551d4a', 3, 1], 10: ['Regeneration', '#cd5cab', 7, 0], 11: ['Resistance', '#99453a', 6, 1], 12: ['Fire Resistance', '#e49a3a', 7, 1], 13: ['Water Breathing', '#2e5299', 0, 2], 14: ['Invisibility', '#7f8392', 0, 1],
     15: ['Blindness', '#1f1f23', 5, 1], 16: ['Night Vision', '#1f1fa1', 4, 1], 17: ['Hunger', '#587653', 1, 1], 18: ['Weakness', '#484d48', 5, 0], 19: ['Poison', '#4e9331', 6, 0], 20: ['Wither', '#352a27', 1, 2],
-    21: ['Health Boost', '#f87d23', 7, 2], 22: ['Absorption', '#2552a5', 2, 2], 23: ['Saturation', '#f82423', -1, 0], 6: ['Instant Health', '#f82423', -1, 0], 7: ['Instant Damage', '#430a09', -1, 0] };
+    21: ['Health Boost', '#f87d23', 7, 2], 24: ['Glowing', '#94a061', -1, 0], 25: ['Levitation', '#ceffff', -1, 0], 26: ['Luck', '#339900', -1, 0], 27: ['Bad Luck', '#c0a44d', -1, 0], 22: ['Absorption', '#2552a5', 2, 2], 23: ['Saturation', '#f82423', -1, 0], 6: ['Instant Health', '#f82423', -1, 0], 7: ['Instant Damage', '#430a09', -1, 0] };
   const ROMAN18 = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   function effectHud() {   // a column of effect icons with time left, like Strata's buff column, for the server's effects on you
     let col = document.getElementById('mcFx'); if (!col) { col = document.createElement('div'); col.id = 'mcFx'; col.style.cssText = 'position:fixed;z-index:5;right:max(8px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);display:flex;flex-direction:column;gap:6px;pointer-events:none;align-items:flex-end'; document.body.appendChild(col); }
@@ -642,7 +652,7 @@
       box.appendChild(b); }
     const xp = document.createElement('small'); xp.className = 'hint'; xp.textContent = 'Your level: ' + lv; box.appendChild(xp); top.appendChild(box);
   }
-  const ENCH18 = { 0: 'Protection', 1: 'Fire Protection', 2: 'Feather Falling', 3: 'Blast Protection', 4: 'Projectile Protection', 5: 'Respiration', 6: 'Aqua Affinity', 7: 'Thorns', 8: 'Depth Strider', 16: 'Sharpness', 17: 'Smite', 18: 'Bane of Arthropods', 19: 'Knockback', 20: 'Fire Aspect', 21: 'Looting', 32: 'Efficiency', 33: 'Silk Touch', 34: 'Unbreaking', 35: 'Fortune', 48: 'Power', 49: 'Punch', 50: 'Flame', 51: 'Infinity', 61: 'Luck of the Sea', 62: 'Lure' };
+  const ENCH18 = { 9: 'Frost Walker', 10: 'Curse of Binding', 22: 'Sweeping Edge', 70: 'Mending', 71: 'Curse of Vanishing', 0: 'Protection', 1: 'Fire Protection', 2: 'Feather Falling', 3: 'Blast Protection', 4: 'Projectile Protection', 5: 'Respiration', 6: 'Aqua Affinity', 7: 'Thorns', 8: 'Depth Strider', 16: 'Sharpness', 17: 'Smite', 18: 'Bane of Arthropods', 19: 'Knockback', 20: 'Fire Aspect', 21: 'Looting', 32: 'Efficiency', 33: 'Silk Touch', 34: 'Unbreaking', 35: 'Fortune', 48: 'Power', 49: 'Punch', 50: 'Flame', 51: 'Infinity', 61: 'Luck of the Sea', 62: 'Lure' };
   function anvilPanel(top, W) {   // rename field and the level cost (window property 0)
     const box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:200px;flex:1';
     const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 30; inp.placeholder = 'Rename (optional)'; inp.value = W.name || ''; inp.setAttribute('aria-label', 'New name');
@@ -704,7 +714,7 @@
     const k = 36 + fwSt.s.mcBook.slot; S.slots[k] = sign ? { id: 387, count: 1, damage: 0, raw: (() => { const r2 = bookItem(387, { pages: pages.map(p => JSON.stringify({ text: p })), title: tag.title, author: tag.author }); return r2; })() } : { id: 386, count: 1, damage: 0, raw }; setTimeout(syncInv, 0);
   }
   const bookHooks = { done: () => bookSend(false), sign: () => bookSend(true) };
-  const FOOD18 = new Set([260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 335, 373, 368, 332, 344, 384, 346, 261, 438]);
+  const FOOD18 = new Set([432, 434, 436, 438, 441, 442, 260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 335, 373, 368, 332, 344, 384, 346, 261, 438]);
   // ---- boats, minecarts and fishing floats (compat only) ----
   // boats/carts are Strata vehicles drawn by Strata's renderer but moved only by the server; riding sends steer_vehicle + look like 1.8
   function vehSpawn(eid, type, x, y, z, yaw) {
@@ -713,11 +723,11 @@
       Object.assign(v, { mc: eid, sx: X, sy: y, sz: Z, syaw: -yaw * PI / 180 }); v.yaw = v.syaw; vehicles.push(v); S.veh.set(eid, v); }
     if (type === 90) S.objs.set(eid, { kind: 'bobber', x: X, y, z: Z, sx: X, sy: y, sz: Z });
   }
-  function vehMoved(id, a, b, c, abs, yaw) { const v = S.veh.get(id) || (S.objs.get(id) && S.objs.get(id).sx != null && S.objs.get(id)); if (!v) return false;
+  function vehMoved(id, a, b, c, abs, yaw) { if (V9() && id === S.rideId && !abs) return true; const v = S.veh.get(id) || (S.objs.get(id) && S.objs.get(id).sx != null && S.objs.get(id)); if (!v) return false;
     if (abs) { v.sx = a + S.OX; v.sy = b; v.sz = c + S.OZ; } else { v.sx += a; v.sy += b; v.sz += c; } if (yaw != null && v.kind) v.syaw = -yaw * PI / 180; return true; }
   function vehGone(id) { const v = S.veh.get(id); if (!v) return; S.veh.delete(id); const i = vehicles.indexOf(v); if (i >= 0) vehicles.splice(i, 1); if (player.mount === v) { player.mount = null; S.riding = null; } }
   function rideTick() {   // every 50 ms while riding: look + steering (1.8 sends no positions while in a vehicle)
-    const v = S.riding, a = S.client.api; if (!v) return false; const mag = Math.min(1, input.mag || 0); let yaw = -player.face * 180 / PI;
+    const v = S.riding, a = S.client.api; if (!v) return false; if (V9() && (v.kind === 'boat' || !v.kind)) { ride9(v); return true; } const mag = Math.min(1, input.mag || 0); let yaw = -player.face * 180 / PI;
     if (mag > .15) yaw = -Math.atan2(input.mx, input.mz) * 180 / PI;   // boats go where the rider looks
     a.look(yaw, 0, false); a.steer(0, mag > .15 ? .98 : 0, input.jump ? 1 : 0); return true;
   }
@@ -760,6 +770,7 @@
     VILL.forEach(v => ENT_FILES.push(['vill_' + v, ['villager/' + v + '.png']])); RABBIT.forEach(v => ENT_FILES.push(['mc_rabbit_' + v, ['rabbit/' + v + '.png']])); CAT.forEach(v => v && ENT_FILES.push(['mc_ocelot_' + v, ['cat/' + v + '.png']]));
     ENT_FILES.push(['zombie_villager', ['zombie/zombie_villager.png', 'zombie_villager/zombie_villager.png']], ['sheep_fur', ['sheep/sheep_fur.png']]); }
   function variantTex(m) {
+    { const v = variantTex9(m); if (v) return v; }
     if (m.type === 'horse') { const k = m.htype ? ['', 'horse_donkey', 'horse_mule', 'horse_zombie', 'horse_skeleton'][m.htype] : 'horse_' + (HORSE_C[(m.hvar || 0) & 255] || 'brown'); return __ENT[k] ? k : null; }
     if (m.type === 'lost' && m.prof != null) { const k = 'vill_' + VILL[m.prof]; return __ENT[k] ? k : null; }
     if (m.type === 'mc_rabbit' && m.rtype != null) { const k = 'mc_rabbit_' + RABBIT[m.rtype]; return __ENT[k] ? k : null; }
@@ -780,7 +791,7 @@
     else if (t === 'mc_creeper' && idx === 17) m.charged = v === 1;
   }
   // ---- objects: item frames, armour stands, falling blocks, primed TNT, XP orbs, lightning, thrown things ----
-  const BALL = { 61: [240, 240, 250], 62: [236, 222, 196], 65: [32, 140, 120], 72: [70, 170, 140], 75: [150, 220, 80], 76: [220, 60, 50], 66: [30, 30, 30] };
+  const BALL = { 67: [230, 220, 240], 68: [236, 230, 210], 61: [240, 240, 250], 62: [236, 222, 196], 65: [32, 140, 120], 72: [70, 170, 140], 75: [150, 220, 80], 76: [220, 60, 50], 66: [30, 30, 30] };
   function obj2(eid, type, x, y, z, data, vx, vy, vz, yaw) {
     if (!S.world) return; const X = x + S.OX, Z = z + S.OZ, base = { x: X, y, z: Z, sx: X, sy: y, sz: Z };
     if (type === 71) S.objs.set(eid, Object.assign(base, { kind: 'frame', f: [[0, 1], [-1, 0], [0, -1], [1, 0]][data & 3], item: null, rot: 0 }));
@@ -834,6 +845,7 @@
   const hslRgb2 = h => { const f = n => { const k = (n + h / 30) % 12; return Math.round(255 * (.5 - .5 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; };
   const RECORDS = { 2256: '13', 2257: 'cat', 2258: 'blocks', 2259: 'chirp', 2260: 'far', 2261: 'mall', 2262: 'mellohi', 2263: 'stal', 2264: 'strad', 2265: 'ward', 2266: '11', 2267: 'wait' };
   function worldEvent(id, x, y, z, data) {
+    if (V9() && id < 2000) { if (EV9[id] == null) return; id = EV9[id]; }
     if (!S.world) return; const X = x + S.OX + .5, Z = z + S.OZ + .5, Y = y + .5;
     if (id === 2001) { const sid = lookup(((data & 4095) << 4) | ((data >> 12) & 15), 0), bd = sid && BLOCKS[sid]; if (bd) { puff(X, Y, Z, bd.side || [128, 128, 128], 14, 3, .6, .07); try { sfxBlock(sid, 'break', x + S.OX, y, z + S.OZ, 1); } catch (e) { /* audio */ } } }
     else if (id === 2000) puff(X, Y, Z, [80, 80, 80], 6, .6, 1, .08, .6);
@@ -883,6 +895,136 @@
     if (a === 0) { document.getElementById('mcT1').innerHTML = H2(v); w.style.opacity = 1; clearTimeout(S.tt); S.tt = setTimeout(() => { w.style.opacity = 0; }, (S.tStay || 70) * 50 + (S.tIn || 10) * 50); }
     else if (a === 1) document.getElementById('mcT2').innerHTML = H2(v); else if (a === 2) { S.tIn = v[0]; S.tStay = v[1]; } else if (a === 3) w.style.opacity = 0; else if (a === 4) { w.style.opacity = 0; document.getElementById('mcT1').textContent = ''; document.getElementById('mcT2').textContent = ''; } }
   function dimSet(dim) { S.dim = dim; if (!S.world || !world || !world.meta) return; world.meta.dim = dim === -1 ? 'under' : dim === 1 ? 'dusk' : undefined; hudDirty = true; }
+  // ==== 1.9 - 1.12.2 (protocols 107-340): new mobs and objects, metadata indices per version, off hand, boss bars, sign block entities, riding ====
+  const PV = () => (S && S.o && S.o.protocol) || 47, V9 = () => PV() >= 107;
+  // mob type ids added in 1.9-1.12 (1.11 split zombie/skeleton/horse/guardian variants into their own ids)
+  const LIVING9 = { 69: 'mc_shulker', 102: 'mc_polar_bear' };
+  const LIVING11 = { 4: 'mc_elder_guardian', 5: 'mc_wither_skeleton', 6: 'mc_stray', 23: 'mc_husk', 27: 'mc_zombie_villager', 28: 'horse', 29: 'horse', 31: 'horse', 32: 'horse', 34: 'mc_evoker', 35: 'mc_vex', 36: 'mc_vindicator', 103: 'mc_llama', 37: 'mc_illusioner', 105: 'parrot' };
+  const HTYPE11 = { 28: 4, 29: 3, 31: 1, 32: 2 };
+  function livingType(t) { const p = PV(); if (p >= 315 && LIVING11[t]) return LIVING11[t]; if (p >= 107 && LIVING9[t]) return LIVING9[t]; return LIVING[t]; }
+  // 1.9+ metadata -> what the 1.8 handlers understand. o = 1 from 1.10 (entities gained "no gravity" at index 5)
+  function vmeta(eid, idx, kind, v) {
+    const p = PV(), o = p >= 210 ? 1 : 0, n11 = p >= 315;
+    if (kind === 'slot') { if (idx === 5 + o) { if (frameItem(eid, 8, v)) return; Hd2.meta(eid, 10, v); } else if (idx === 6 + o) frameItem(eid, 8, v); return; }   // dropped items and item frames
+    { const fr = S.objs.get(eid); if (fr && fr.kind === 'frame' && idx === 7 + o && kind === 'int') { fr.rot = v & 7; return; } }
+    const m = S.ents.get(eid); if (!m || m.pl || m.stand) return; const t = m.type;
+    if (kind === 'bool' && idx === 11 + o && t !== 'mc_creeper' && t !== 'bat') { m.baby = !!v; return; }   // ageable / zombie babies
+    switch (t) {
+      case 'sheep': if (idx === 12 + o) { m.wool = v & 15; m.sheared = (v & 16) !== 0; } break;
+      case 'pig': if (idx === 12 + o) m.saddled = !!v; break;
+      case 'wolf': if (idx === 12 + o) { m.sit = (v & 1) !== 0; m.tame = (v & 4) !== 0; } break;
+      case 'horse': if (n11) { if (idx === 13) m.saddled = (v & 4) !== 0; else if (idx === 15 && m.htype === 0) m.hvar = v; } else { if (idx === 12 + o) m.saddled = (v & 4) !== 0; else if (idx === 13 + o) m.htype = v; else if (idx === 14 + o) m.hvar = v; } break;
+      case 'lost': if (idx === 12 + o) m.prof = Math.max(0, Math.min(4, v)); break;
+      case 'mc_rabbit': if (idx === 12 + o) m.rtype = v === 99 ? 0 : Math.max(0, Math.min(5, v)); break;
+      case 'mc_ocelot': if (idx === 14 + o) m.ctype = v & 3; break;
+      case 'parrot': if (idx === 15) m.pvar = v & 7; break;
+      case 'mc_llama': if (idx === 18) m.lvar = v & 3; break;
+      case 'mc_shulker': if (idx === 13 + o) m.peek = v; else if (idx === 14 + o) m.scol = v; break;
+      case 'mc_creeper': if (idx === 12 + o) m.charged = !!v; break;
+      case 'slime': case 'mc_magma_cube': if (idx === 11 + o && v > 0) m.size = v; break;
+      case 'zombie': if (!n11 && idx === 12 + o) { if (v === 6) { m.type = 'mc_husk'; m.size = CM.mc_husk.size; } else m.zvill = v >= 1 && v <= 5; } break;
+      case 'skeleton': case 'mc_wither_skeleton': case 'mc_stray': if (!n11 && idx === 11 + o) { m.type = v === 1 ? 'mc_wither_skeleton' : v === 2 ? 'mc_stray' : 'skeleton'; m.size = v === 1 ? CM.mc_wither_skeleton.size : 0; } break;
+      case 'mc_guardian': if (!n11 && idx === 11 + o && (v & 4)) { m.type = 'mc_elder_guardian'; m.size = 2.35 * 2; } break;
+    }
+  }
+  const Hd2 = {};   // filled with the session's handler (for item metadata routed back through it)
+  // sign block entities (1.9.4+): from chunks and tile_entity_data
+  function tileData(x, y, z, action, raw) {
+    let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; const id = String(tag.id || '');
+    if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
+    if (/sign$/i.test(id) || tag.Text1 != null) { const ln = [1, 2, 3, 4].map(i => { const t = tag['Text' + i] || ''; try { return StrataMC.comp(t); } catch (e) { return String(t); } }); try { Hd2.sign(x, y, z, ln); } catch (e) { /* not loaded yet */ } }
+  }
+  // boss bars
+  function bossBar(u, a, d) {
+    S.boss = S.boss || new Map(); let b = S.boss.get(u); if (a === 1) { S.boss.delete(u); renderBoss(); return; } if (!b) { b = { hp: 1, color: 0 }; S.boss.set(u, b); }
+    if (d.title != null) b.title = d.title; if (d.hp != null) b.hp = d.hp; if (d.color != null) b.color = d.color; if (d.div != null) b.div = d.div; renderBoss(); }
+  const BOSSC = ['#ec00b8', '#00b7ec', '#ec3a00', '#2bec00', '#ece800', '#7b00ec', '#ececec'];
+  function renderBoss() { hud2(); let el = document.getElementById('mcBoss'); if (!el) { el = document.createElement('div'); el.id = 'mcBoss'; el.style.cssText = 'position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;width:min(360px,70vw)'; document.getElementById('mcHud2').appendChild(el); }
+    el.innerHTML = [...(S.boss || new Map()).values()].map(b => `<div style="width:100%;text-align:center"><div style="font:600 12px system-ui;margin-bottom:2px">${StrataMC.compHTML(b.title || '')}</div><div style="height:6px;border-radius:3px;background:rgba(0,0,0,.5);overflow:hidden"><i style="display:block;height:100%;width:${Math.round(Math.max(0, Math.min(1, b.hp)) * 100)}%;background:${BOSSC[b.color] || '#ec00b8'}"></i></div></div>`).join(''); }
+  // 1.9 sound event names -> the 1.8 names the rest of the sound code (and 1.8-layout packs) understand
+  const SMOB = { zombie_pig: 'zombiepig', enderman: 'endermen', zombie_villager: 'zombie', husk: 'zombie', stray: 'skeleton', wither_skeleton: 'skeleton', elder_guardian: 'guardian', polar_bear: 'bear', magmacube: 'magmacube', small_magmacube: 'magmacube', cat: 'cat', donkey: 'horse.donkey', mule: 'horse.donkey', skeleton_horse: 'horse.skeleton', zombie_horse: 'horse.zombie', villager: 'villager', evocation_illager: 'villager', vindication_illager: 'villager', illusion_illager: 'villager' };
+  const SVERB = { ambient: 'say', hurt: 'hurt', death: 'death', step: 'step', attack: 'say', shoot: 'say' };
+  const SDIRECT = { 'entity.arrow.shoot': 'random.bow', 'entity.arrow.hit': 'random.bowhit', 'entity.item.pickup': 'random.pop', 'entity.generic.eat': 'random.eat', 'entity.player.burp': 'random.burp', 'entity.generic.explode': 'random.explode', 'entity.experience_orb.pickup': 'random.orb', 'entity.player.levelup': 'random.levelup',
+    'block.chest.open': 'random.chestopen', 'block.chest.close': 'random.chestclosed', 'block.wooden_door.open': 'random.door_open', 'block.wooden_door.close': 'random.door_close', 'block.iron_door.open': 'random.door_open', 'block.iron_door.close': 'random.door_close', 'block.fence_gate.open': 'random.door_open', 'block.fence_gate.close': 'random.door_close',
+    'block.wooden_trapdoor.open': 'random.door_open', 'block.wooden_trapdoor.close': 'random.door_close', 'entity.player.hurt': 'game.player.hurt', 'entity.player.death': 'game.player.die', 'entity.generic.hurt': 'game.neutral.hurt', 'entity.player.splash': 'game.player.swim.splash', 'entity.player.swim': 'game.player.swim', 'entity.tnt.primed': 'game.tnt.primed',
+    'block.lever.click': 'random.click', 'block.stone_button.click_on': 'random.click', 'block.wood_button.click_on': 'random.click', 'block.fire.ambient': 'fire.fire', 'item.flintandsteel.use': 'fire.ignite', 'entity.creeper.primed': 'creeper.primed', 'block.portal.ambient': 'portal.portal', 'entity.lightning.thunder': 'ambient.weather.thunder', 'weather.rain': 'ambient.weather.rain', 'block.anvil.use': 'random.anvil_use', 'block.anvil.land': 'random.anvil_land', 'entity.item.break': 'random.break', 'entity.generic.drink': 'random.drink', 'block.glass.break': 'dig.glass', 'block.note.basedrum': 'note.bd', 'block.note.bass': 'note.bassattack', 'block.note.pling': 'note.pling' };
+  function snd19(n) {
+    if (!n || n.indexOf('.') < 0) return n; n = n.replace(/^minecraft:/, ''); if (SDIRECT[n]) return SDIRECT[n];
+    let m = /^block\.(\w+)\.(break|place|step|hit|fall)$/.exec(n); if (m) { const mat = { cloth: 'cloth', wood: 'wood', gravel: 'gravel', grass: 'grass', sand: 'sand', snow: 'snow', stone: 'stone', glass: 'glass', metal: 'stone', ladder: 'wood', slime: 'stone', anvil: 'stone' }[m[1]] || 'stone'; return (m[2] === 'step' || m[2] === 'fall' ? 'step.' : 'dig.') + mat; }
+    m = /^block\.note\.(\w+)$/.exec(n); if (m) return 'note.' + m[1];
+    m = /^entity\.(\w+)\.(\w+)$/.exec(n); if (m && SVERB[m[2]]) return 'mob.' + (SMOB[m[1]] || m[1]) + '.' + SVERB[m[2]];
+    return n; }
+  // 1.9 world events -> the 1.8 numbers worldEvent understands
+  const EV9 = { 1000: 1000, 1001: 1001, 1002: 1002, 1005: 1003, 1006: 1003, 1007: 1003, 1008: 1003, 1009: 1004, 1010: 1005, 1011: 1003, 1012: 1003, 1013: 1003, 1014: 1003, 1015: 1007, 1016: 1008, 1018: 1009, 1019: 1010, 1020: 1011, 1021: 1012, 1024: 1014, 1025: 1015, 1029: 1020, 1030: 1021, 1031: 1022 };
+  // riding in 1.9+: boats and saddled horses/pigs are driven by the client and reported with vehicle_move
+  function ride9(v) {
+    const a = S.client.api, mag = Math.min(1, input.mag || 0), dt = .05, boat = v.kind === 'boat', mob = !v.kind;
+    if (mag > .15) { const want = Math.atan2(input.mx, input.mz); let d = want - (v.yaw || 0); d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw = (v.yaw || 0) + Math.max(-.12, Math.min(.12, d)); }
+    const wet = (() => { try { return isW(world.get(Math.floor(v.sx), Math.floor(v.sy + .3), Math.floor(v.sz))) || isW(world.get(Math.floor(v.sx), Math.floor(v.sy - .2), Math.floor(v.sz))); } catch (e) { return false; } })();
+    const ice = (() => { try { const b = world.get(Math.floor(v.sx), Math.floor(v.sy - .2), Math.floor(v.sz)); return b === B.ICE || b === B.PACKED_ICE; } catch (e) { return false; } })();
+    const top = boat ? (wet ? 7.5 : ice ? 14 : .8) : mob ? ({ horse: 9.5, pig: 2.5, mc_llama: 3.5 }[v.type] || 6) : 0, acc = boat ? (wet ? 3 : 1.5) : 12;
+    v.spd = v.spd || 0; v.spd += ((mag > .15 ? top : 0) - v.spd) * Math.min(1, acc * dt);
+    const nx = v.sx + Math.sin(v.yaw) * v.spd * dt, nz = v.sz + Math.cos(v.yaw) * v.spd * dt, solid = (x, y, z) => { try { return world.solid(Math.floor(x), Math.floor(y), Math.floor(z)); } catch (e) { return true; } };
+    if (!solid(nx, v.sy + .1, v.sz)) v.sx = nx; else if (!solid(nx, v.sy + 1.1, v.sz) && mob) { v.sx = nx; v.sy += 1; } else v.spd *= .5;
+    if (!solid(v.sx, v.sy + .1, nz)) v.sz = nz; else if (!solid(v.sx, v.sy + 1.1, nz) && mob) { v.sz = nz; v.sy += 1; } else v.spd *= .5;
+    if (boat && wet) { const sy = Math.floor(v.sy + .3); if (isW(world.get(Math.floor(v.sx), sy + 1, Math.floor(v.sz)))) v.sy += .1; else v.sy += ((sy + .9 - .45) - v.sy) * .3; v.vy = 0; }
+    else { v.vy = (v.vy || 0) - 32 * dt; if (input.jump && mob && v.onG) { v.vy = v.type === 'horse' ? 9 : 6; } const ny = v.sy + v.vy * dt; if (solid(v.sx, ny, v.sz)) { v.sy = Math.floor(ny) + 1; v.vy = 0; v.onG = true; } else { v.sy = ny; v.onG = false; } }
+    if (mob) { v.tx = v.sx; v.ty = v.sy; v.tz = v.sz; v.tface = v.yaw; v.face = v.yaw; v.moving = v.spd > .3; if (v.moving) v.phase = (v.phase || 0) + v.spd * dt * 2; }
+    const yawDeg = -v.yaw * 180 / PI; a.look(yawDeg, 0, false); a.steer(0, mag > .15 ? .98 : 0, input.jump ? 1 : 0); if (boat) a.steerBoat(mag > .15, mag > .15);
+    a.vehicleMove(v.sx - S.OX, v.sy, v.sz - S.OZ, yawDeg, 0);
+  }
+  function passengers(veh, list) {
+    const mine = list.includes(S.eid), v = S.veh.get(veh) || S.ents.get(veh);
+    if (mine && v) { if (v.kind === 'boat' || v.kind === 'cart') v.syaw = v.yaw; else { v.sx = v.x; v.sy = v.y; v.sz = v.z; v.yaw = v.face; } S.riding = v; S.rideId = veh; player.mount = v; player.sitting = true; v.rider = true; toast('Tap Crouch to get off'); }
+    else if (S.rideId === veh) { if (S.riding) S.riding.rider = false; S.riding = null; S.rideId = null; player.mount = null; player.sitting = false; }
+  }
+  // 1.9 attack cooldown: a bar above the hotbar that fills like vanilla's (attack speed by held item)
+  const ASPD = { sword: 1.6, axe: .9, pickaxe: 1.2, shovel: 1, hoe: 2 };
+  function atkSpeed() { const h = held(), mc = h && h.mc, e = mc && StrataMC.items18[mc.id]; if (!e) return 4; const m = /_(sword|axe|pickaxe|shovel|hoe)$/.exec(e[0]); if (!m) return 4; if (m[1] === 'axe') return /wooden|stone/.test(e[0]) ? .8 : /iron/.test(e[0]) ? .9 : 1; if (m[1] === 'hoe') return /wooden|golden/.test(e[0]) ? 1 : /stone/.test(e[0]) ? 2 : /iron/.test(e[0]) ? 3 : 4; return ASPD[m[1]]; }
+  function cooldownUI() { if (!V9()) return; let el = document.getElementById('mcCool'); if (!el) { hud2(); el = document.createElement('div'); el.id = 'mcCool'; el.style.cssText = 'position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 80px);transform:translateX(-50%);width:64px;height:5px;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden;opacity:0;transition:opacity .2s'; el.innerHTML = '<i style="display:block;height:100%;width:0;background:#e8ecf2"></i>'; document.getElementById('mcHud2').appendChild(el); }
+    const k = Math.min(1, (performance.now() - (S.atkT || 0)) / 1000 * atkSpeed()); el.firstChild.style.width = Math.round(k * 100) + '%'; el.style.opacity = k < 1 ? 1 : 0; }
+  // potions and tipped arrows in 1.9+ are named by NBT ("Potion": "minecraft:long_swiftness")
+  const POT9 = { water: ['Water Bottle', '#385dc6'], mundane: ['Mundane Potion', '#385dc6'], thick: ['Thick Potion', '#385dc6'], awkward: ['Awkward Potion', '#385dc6'], night_vision: ['Night Vision', '#1f1fa1'], invisibility: ['Invisibility', '#7f8392'], leaping: ['Leaping', '#22ff4c'], fire_resistance: ['Fire Resistance', '#e49a3a'], swiftness: ['Swiftness', '#7cafc6'], slowness: ['Slowness', '#5a6c81'], water_breathing: ['Water Breathing', '#2e5299'], healing: ['Healing', '#f82423'], harming: ['Harming', '#430a09'], poison: ['Poison', '#4e9331'], regeneration: ['Regeneration', '#cd5cab'], strength: ['Strength', '#932423'], weakness: ['Weakness', '#484d48'], luck: ['Luck', '#339900'] };
+  function potion9(mc) { const t = itemTag(mc), p = String((t && t.Potion) || 'minecraft:water').replace(/^minecraft:/, '').replace(/^(long|strong)_/, ''); return POT9[p] || ['Potion', '#385dc6']; }
+  const POT_IDS = { 373: '', 438: 'Splash ', 441: 'Lingering ', 440: 'Arrow of ' };
+  // new models (1.9-1.12), in Minecraft model space like the 1.8 ones
+  Object.assign(CM, {
+    mc_husk: { name: 'Husk', tex: 'zombie/husk.png', dims: [64, 64], base: 'zombie', geo: 'zombie', size: 2.125, model: m => __skins.MODELS.zombie(m) },
+    mc_stray: { name: 'Stray', tex: 'skeleton/stray.png', dims: [64, 32], base: 'skeleton', geo: 'skeleton', model: m => __skins.MODELS.skeleton(m) },
+    mc_elder_guardian: { name: 'Elder Guardian', tex: ['guardian_elder.png', 'guardian/elder_guardian.png'], dims: [64, 64], w: 2, h: 2, size: 4.7, pal: ['#cfcbbd', '#b7b2a2', '#e2ded1', '#a09a88', '#8d6b8b'], face: [[9, 1, 2, 2, '#e8e0b0']], model: m => CM.mc_guardian.model(m) },
+    mc_zombie_villager: { name: 'Zombie Villager', tex: ['zombie_villager/zombie_villager.png', 'zombie/zombie_villager.png'], dims: [64, 64], w: .6, h: 1.95, pal: ['#5e8a4a', '#4a7a3a', '#3a6a8a', '#6a9a5a', '#2a5a7a'], face: [[9, 12, 2, 1], [13, 12, 2, 1]], base: 'zombie',
+      model: m => { const a = wk(m) * .7, bob = Math.sin(age() * .09) * .05; return { k: .0625, parts: [mb([0, 0, 0], [-4, -10, -4, 8, 10, 8], [0, 0]), mb([0, -2, 0], [-1, -1, -6, 2, 4, 2], [24, 0]), mb([0, 0, 0], [-4, 0, -2, 8, 12, 4], [16, 20]),
+        mb([-5, 2, 0], [-3, -2, -2, 4, 12, 4], [44, 22], [-PI / 2 + bob]), mb([5, 2, 0], [-1, -2, -2, 4, 12, 4], [44, 22], [-PI / 2 - bob], { mir: 1 }), mb([-2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [a]), mb([2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [-a], { mir: 1 })] }; } },
+    mc_shulker: { name: 'Shulker', tex: ['shulker/shulker_purple.png', 'shulker/endergolem.png'], dims: [64, 64], w: 1, h: 1, pal: ['#8e5e8e', '#7a4e7a', '#a670a6', '#5e3e5e', '#d8c86a'], face: [[2, 56, 2, 1, '#2a2a2a']],
+      model: m => { const pk = Math.max(0, Math.min(100, m.peek || 0)) / 100, up = pk * 8; return { k: .0625, parts: [mb([0, 24, 0], [-8, -8, -8, 16, 8, 16], [0, 28]), mb([0, 24 - up, 0], [-8, -16, -8, 16, 12, 16], [0, 0]), mb([0, 12, 0], [-3, 0, -3, 6, 6, 6], [0, 52])] }; } },
+    mc_polar_bear: { name: 'Polar Bear', tex: ['bear/polarbear.png', 'polarbear.png'], dims: [128, 64], ref: 128, w: 1.3, h: 1.4, pal: ['#f2f2ea', '#e2e2da', '#ffffff', '#d2d2c8', '#ecece2'], face: [[3, 3, 2, 1], [9, 3, 2, 1]],
+      model: m => { const a = wk(m) * .9; return { k: .0625, ref: 128, parts: [mb([0, 10, -16], [-3.5, -3, -3, 7, 7, 7], [0, 0]), mb([0, 10, -16], [-2.5, 1, -6, 5, 3, 3], [0, 44]), mb([0, 10, -16], [-4.5, -4, -1, 2, 2, 1], [26, 0]), mb([0, 10, -16], [2.5, -4, -1, 2, 2, 1], [26, 0], null, { mir: 1 }),
+        mb([-2, 9, 12], [-5, -13, -7, 14, 14, 11], [0, 19], [PI / 2]), mb([-2, 9, 12], [-4, -25, -7, 12, 12, 10], [39, 0], [PI / 2]),
+        mb([-4.5, 14, 6], [-2, 0, -2, 4, 10, 8], [50, 22], [a]), mb([4.5, 14, 6], [-2, 0, -2, 4, 10, 8], [50, 22], [-a]), mb([-3.5, 14, -8], [-2, 0, -2, 4, 10, 6], [50, 40], [-a]), mb([3.5, 14, -8], [-2, 0, -2, 4, 10, 6], [50, 40], [a])] }; } },
+    mc_llama: { name: 'Llama', tex: ['llama/llama_creamy.png', 'llama/creamy.png'], dims: [128, 64], ref: 128, w: .9, h: 1.87, pal: ['#e0cfa4', '#cfbd92', '#ecdcb4', '#b9a77d', '#d8c79c'], face: [[10, 2, 1, 1], [14, 2, 1, 1]],
+      model: m => { const a = wk(m) * .8; return { k: .0625, ref: 128, parts: [mb([0, 7, -6], [-2, -14, -10, 4, 4, 9], [0, 0]), mb([0, 7, -6], [-4, -16, -6, 8, 18, 6], [0, 14]), mb([0, 7, -6], [-4, -19, -4, 3, 3, 2], [17, 0]), mb([0, 7, -6], [1, -19, -4, 3, 3, 2], [17, 0]),
+        mb([0, 5, 2], [-6, -10, -7, 12, 18, 10], [29, 0], [PI / 2]), mb([-2.5, 10, 6], [-2, 0, -2, 4, 14, 4], [29, 29], [a]), mb([2.5, 10, 6], [-2, 0, -2, 4, 14, 4], [29, 29], [-a]), mb([-2.5, 10, -5], [-2, 0, -2, 4, 14, 4], [29, 29], [-a]), mb([2.5, 10, -5], [-2, 0, -2, 4, 14, 4], [29, 29], [a])] }; } },
+    mc_vex: { name: 'Vex', tex: ['illager/vex.png', 'vex.png'], dims: [64, 64], w: .4, h: .8, pal: ['#9fb6cc', '#8aa2b8', '#b6cde0', '#6e86a0', '#cfe0ee'], face: [[9, 11, 2, 2, '#e8f4ff'], [13, 11, 2, 2, '#e8f4ff']],
+      model: m => { const f = Math.sin(age() * .4) * .3; return { k: .0625 * .4, glow: 1, parts: [mb([0, 0, 0], [-4, -8, -4, 8, 8, 8], [0, 0]), mb([0, 0, 0], [-4, 0, -2, 8, 12, 4], [16, 16]), mb([-5, 2, 0], [-3, -2, -2, 4, 12, 4], [40, 16], [-.4]), mb([5, 2, 0], [-1, -2, -2, 4, 12, 4], [40, 16], [-.4], { mir: 1 }),
+        mb([0, 12, 0], [-2, 0, -2, 4, 8, 4], [0, 16], [.6]), mb([-2, 1, 2], [-20, 0, 0, 20, 12, 1], [0, 32], [0, .4 + f, 0]), mb([2, 1, 2], [0, 0, 0, 20, 12, 1], [0, 32], [0, -.4 - f, 0], { mir: 1 })] }; } },
+    mc_evoker: { name: 'Evoker', tex: ['illager/evoker.png', 'evoker.png'], dims: [64, 64], w: .6, h: 1.95, pal: ['#2c2c34', '#3a3a44', '#6a7a6e', '#c8b878', '#1e1e24'], face: [[9, 13, 2, 1, '#6a8a6a'], [13, 13, 2, 1, '#6a8a6a']], model: m => illager(m, false) },
+    mc_vindicator: { name: 'Vindicator', tex: ['illager/vindicator.png', 'vindicator.png'], dims: [64, 64], w: .6, h: 1.95, pal: ['#3a4a4e', '#2c3a3e', '#6a7a6e', '#5a4a3a', '#1e2a2e'], face: [[9, 13, 2, 1, '#6a8a6a'], [13, 13, 2, 1, '#6a8a6a']], geo: 'illager', model: m => illager(m, !!(m.eq && m.eq[0])) },
+    mc_illusioner: { name: 'Illusioner', tex: ['illager/illusionist.png', 'illusionist.png'], dims: [64, 64], w: .6, h: 1.95, pal: ['#2a3a6a', '#1e2c5a', '#6a7a6e', '#c8c8d8', '#141e44'], face: [[9, 13, 2, 1, '#6a8a6a'], [13, 13, 2, 1, '#6a8a6a']], model: m => illager(m, false) },
+  });
+  function illager(m, armsOut) { const a = wk(m) * .7, P2 = [mb([0, 0, 0], [-4, -10, -4, 8, 10, 8], [0, 0]), mb([0, -2, 0], [-1, -1, -6, 2, 4, 2], [24, 0]), mb([0, 0, 0], [-4, 0, -3, 8, 12, 6], [16, 20]), mb([0, 0, 0], [-4, 0, -3, 8, 18, 6], [0, 38], null, { g: .5 }),
+      mb([-2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [a]), mb([2, 12, 0], [-2, 0, -2, 4, 12, 4], [0, 22], [-a], { mir: 1 })];
+    if (armsOut) P2.push(mb([-5, 2, 0], [-3, -2, -2, 4, 12, 4], [40, 46], [-PI / 2]), mb([5, 2, 0], [-1, -2, -2, 4, 12, 4], [40, 46], [-PI / 2], { mir: 1 }));
+    else P2.push(mb([0, 3, -1], [-8, -2, -2, 4, 8, 4], [44, 22], [-.75]), mb([0, 3, -1], [4, -2, -2, 4, 8, 4], [44, 22], [-.75], { mir: 1 }), mb([0, 3, -1], [-4, 2, -2, 8, 4, 4], [40, 38], [-.75]));
+    return { k: .0625, parts: P2 }; }
+  if (window.ENT_FILES) { for (const k of ['mc_husk', 'mc_stray', 'mc_elder_guardian', 'mc_zombie_villager', 'mc_shulker', 'mc_polar_bear', 'mc_llama', 'mc_vex', 'mc_evoker', 'mc_vindicator', 'mc_illusioner']) ENT_FILES.push([k, [].concat(CM[k].tex)]);
+    ['creamy', 'white', 'brown', 'gray'].forEach(c => ENT_FILES.push(['mc_llama_' + c, ['llama/llama_' + c + '.png', 'llama/' + c + '.png']]));
+    ['red_blue', 'blue', 'green', 'yellow_blue', 'grey'].forEach(c => ENT_FILES.push(['parrot_' + c, ['parrot/parrot_' + c + '.png']]));
+    ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].forEach(c => ENT_FILES.push(['mc_shulker_' + c, ['shulker/shulker_' + c + '.png']])); }
+  function variantTex9(m) {
+    if (m.type === 'mc_llama' && m.lvar != null) { const k = 'mc_llama_' + ['creamy', 'white', 'brown', 'gray'][m.lvar]; return __ENT[k] ? k : null; }
+    if (m.type === 'parrot' && m.pvar != null) { const k = 'parrot_' + ['red_blue', 'blue', 'green', 'yellow_blue', 'grey'][m.pvar]; return __ENT[k] ? k : null; }
+    if (m.type === 'mc_shulker' && m.scol != null && m.scol < 16) { const k = 'mc_shulker_' + ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'][m.scol]; return __ENT[k] ? k : null; }
+    return null; }
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
@@ -946,7 +1088,8 @@
       if (!best) return null; const r = pick(sx, sy); if (r) { const c = [r.hit[0] + .5, r.hit[1] + .5, r.hit[2] + .5], tb = (c[0] - o[0]) * d[0] + (c[1] - o[1]) * d[1] + (c[2] - o[2]) * d[2]; if (tb < bt - .6) return null; } return best; },
     tapEntity(sx, sy) { { const [o, d] = camRay(sx, sy); for (const v of S.veh.values()) { if (Math.hypot(v.x - player.x, v.z - player.z) > 4.5) continue; if (rayBox(o, d, [v.x - .7, v.y, v.z - .7], [v.x + .7, v.y + .8, v.z + .7]) < Infinity) { S.client.api.interact(v.mc); return true; } } }
       const e = IMPL.pickEntity(sx, sy); if (!e) return false; const m = e.mob; if (Math.hypot(m.x - player.x, m.z - player.z) > 4.2) { toast('Too far away'); return true; }
-      if ((player.atkCd || 0) > 0) return true; player.atkCd = .4; player.swingT = .25; S.client.api.attack(m.eid); S.client.api.swing(); m.hurtT = .3; return true; },
+      if (buildMode) { S.client.api.interact(m.eid); S.client.api.swing(); return true; }   // Build mode = right click: ride, trade, feed, shear, tame
+      if ((player.atkCd || 0) > 0) return true; player.atkCd = V9() ? .1 : .4; player.swingT = .25; S.atkT = performance.now(); S.client.api.attack(m.eid); S.client.api.swing(); m.hurtT = .3; return true; },
     buildCracks() {   // Minecraft's own destroy_stage_0..9 (from the resource pack when present, a built-in set otherwise) laid over every face
       crVB.n = 0; PAT = 0; CB = 0;
       const one = (x, y, z, stage) => { const tex = window.PACK_CRACK ? window.PACK_CRACK[stage] : defCrack(stage); setVL(sampleLight(x + .5, y + 1.2, z + .5)); VL[3] = 225;
@@ -964,8 +1107,8 @@
     stepVehicles(dt) { const k = 1 - Math.exp(-12 * dt); for (const v of S.veh.values()) { v.x += (v.sx - v.x) * k; v.y += (v.sy - v.y) * k; v.z += (v.sz - v.z) * k; let d = v.syaw - v.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw += d * k; }
       for (const o of S.objs.values()) if (o.kind === 'bobber') { o.x += (o.sx - o.x) * k; o.y += (o.sy - o.y) * k; o.z += (o.sz - o.z) * k; } },
     stepRide(dt) { const v = player.mount; if (!v || !v.mc) return S.saved.stepRide(dt);
-      player.x = v.x; player.y = v.y + (v.kind === 'boat' ? .1 : .35); player.z = v.z; player.vx = player.vy = player.vz = 0; player.fallTop = player.y; player.onGround = true;
-      if (input.crouchToggle) { input.crouchToggle = false; S.client.api.steer(0, 0, 2); } },   // 2 = unmount; the server answers with attach_entity -1
+      player.x = v.x; player.y = v.y + (v.kind === 'boat' ? .1 : v.kind === 'cart' ? .35 : ({ horse: .85, pig: .55, mc_llama: .95, mc_polar_bear: .9 }[v.type] || .7)); player.z = v.z; player.vx = player.vy = player.vz = 0; player.fallTop = player.y; player.onGround = true;
+      if (input.crouchToggle) { input.crouchToggle = false; S.client.api.steer(0, 0, 2); if (V9()) { S.client.api.sneak(S.eid, true); setTimeout(() => { if (S) S.client.api.sneak(S.eid, false); }, 150); } } },   // 2 = unmount; the server answers with attach_entity -1
     useHeld() {   // tapping the air: open books, otherwise use the item like a right click (eat, drink, throw, bow, rod)
       const h = held(), mc = h && h.mc; if (!mc) return false; if (mc.id === 386 || mc.id === 387) return openMcBook(h);
       if (!FOOD18.has(mc.id)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
@@ -1012,16 +1155,18 @@
       health(hp, food) { S.hp = hp; S.food = food; if (!S.world) return; if (S.lastHp != null && hp < S.lastHp) hurtFx(); S.lastHp = hp; player.hp = hp; player.maxHp = 20; hudDirty = true; if (hp <= 0 && !S.dead) { S.dead = true; setTimeout(() => { if (S) { S.client.api.respawn(); S.dead = false; } }, 1200); } },
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
-      items(wid, l) { if (wid === 0) { S.slots = l.slice(0, 45); while (S.slots.length < 45) S.slots.push(null); syncInv(); }
+      items(wid, l) { if (wid === 0) { const n = V9() ? 46 : 45; S.slots = l.slice(0, n); while (S.slots.length < n) S.slots.push(null); syncInv(); }
         else if (S.win && wid === S.win.id) { S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
       trans(wid, act, ok) { onTrans(wid, act, ok); },
+      vmeta(eid, idx, kind, v) { try { vmeta(eid, idx, kind, v); } catch (e) { /* odd metadata */ } }, tile(x, y, z, a, raw) { if (S.world) tileData(x, y, z, a, raw); },
+      passengers(v, l) { passengers(v, l); }, boss(u, a, d) { bossBar(u, a, d); },
       xp(bar, lv, total) { S.level = lv; player.xp = (lv + bar) * XPL; hudDirty = true; mcInvRender(); },
       effect(eid, id, amp, dur) { if (eid !== S.eid) return; S.fx = S.fx || {}; if (dur > 0) S.fx[id] = { amp, dur, end: Date.now() + dur * 50 }; else delete S.fx[id]; effectHud(); },
       closeWin(wid) { if (S.win && S.win.id === wid) mcInvClose(false); },
       winProp(wid, k, v) { if (S.win && S.win.id === wid) { S.win.prop[k] = v; mcInvRender(); } },
-      slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < 45) { S.slots[sl] = it; syncInv(); }
+      slot(wid, sl, it) { if (wid === -1 && sl === -1) { S.cursor = it; syncInv(); } else if (wid === 0 && sl >= 0 && sl < (V9() ? 46 : 45)) { S.slots[sl] = it; syncInv(); }
         else if (S.win && wid === S.win.id && sl >= 0) { S.win.slots[sl] = it; const o = S.win.n, j = sl - o; if (j >= 0 && j < 27) S.slots[9 + j] = it; else if (j >= 27 && j < 36) S.slots[36 + j - 27] = it; syncInv(); }
         mcInvRender(); },
       position(p) {
@@ -1061,7 +1206,7 @@
       multi(l) { if (!S.world) return; l.sort((a, b) => a.y - b.y); for (const b of l) { const X = b.x + S.OX, Z = b.z + S.OZ; setBlock(X, b.y, Z, lookup(b.state, belowId(X, b.y, Z))); doorAbove(X, b.y, Z); } },
       playerInfo(u, n, sk, ping) { if (ping != null) S.ping.set(u, ping); setTimeout(renderTab, 0); if (n) { S.names.set(u, n); if (sk) S.skinInfo.set(u, sk); const me = S.o.name && n.toLowerCase() === String(S.o.name).toLowerCase(); if (me) { S.ownUuid = u; ownSkin(u, sk); } for (const pl of S.players) if (pl.uuid === u) loadSkinFor(pl); } else S.names.delete(u); },
       flags(id, v) { const m = S.ents.get(id); if (m && m.pl) { m.sneak = !!(v & 2); m.sprint = !!(v & 8); } },
-      equip(id, sl, it) { const m = S.ents.get(id); if (!m || sl < 0 || sl > 4) return; if (!m.eq) m.eq = [null, null, null, null, null]; m.eq[sl] = it;
+      equip(id, sl, it) { const m = S.ents.get(id); if (!m || sl < 0 || sl > 5) return; if (!m.eq) m.eq = [null, null, null, null, null]; m.eq[sl] = it;
         if (!m.pl && sl === 0) { m.aim = !!(it && it.id === 261); m.aggro = m.aim ? 1 : 0; } },   // skeletons with a bow aim it
       bmeta(id, idx, v, ty) { { const o = S.objs.get(id); if (o && o.kind === 'frame' && idx === 9) { o.rot = v & 7; return; } } const m = S.ents.get(id); if (!m || m.pl || m.stand) return; bmeta2(m, idx, v, ty);   // 1.8 metadata bytes: 12 baby/age, 13 skeleton type, 16 slime size
         if (idx === 12) m.baby = v < 0 || (v === 1 && (m.type === 'zombie' || m.type === 'mc_pigman'));
@@ -1083,11 +1228,12 @@
         if (!S.world) return; if (e.eid === S.eid) return;
         if (e.kind === 'player') { const x = e.x + S.OX, z = e.z + S.OZ, pl = { pl: 1, eid: e.eid, uuid: e.uuid, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, moving: false, phase: 0, amt: 0, swingT: 0, sneak: false, sprint: false, eq: [null, null, null, null, null], buf: new Float32Array(6 * 6 * 6 * 16), n: 0 };
           S.ents.set(e.eid, pl); S.players.push(pl); loadSkinFor(pl); return; }
-        const type = LIVING[e.type]; if (!type) return;
+        const type = livingType(e.type); if (!type) return;
         const d = CM[type], x = e.x + S.OX, z = e.z + S.OZ, m = { mc: 1, eid: e.eid, type, x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * Math.PI / 180, tface: -e.yaw * Math.PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: type === 'slime' || type === 'mc_magma_cube' ? 2 : e.type === 53 ? 12 : d && d.size || 0, flee: 0, magma: d && d.magma || 0, eq: null };
+        if (PV() >= 315 && HTYPE11[e.type] != null) m.htype = HTYPE11[e.type]; else if (PV() >= 315 && e.type === 100) m.htype = 0;
         S.ents.set(e.eid, m); S.mobs.push(m);
       },
-      move(id, dx, dy, dz) { if (projMoved(id, dx, dy, dz)) return; if (vehMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
+      move(id, dx, dy, dz) { if (V9() && id === S.rideId) return; if (projMoved(id, dx, dy, dz)) return; if (vehMoved(id, dx, dy, dz)) return; { const d = S.dr.get(id); if (d && d.q) { d.q.sx += dx; d.q.sy += dy; d.q.sz += dz; return; } } const m = S.ents.get(id); if (m) { m.tx += dx; m.ty += dy; m.tz += dz; } },
       look(id, yaw) { { const v = S.veh.get(id); if (v) { v.syaw = -yaw * PI / 180; return; } } const m = S.ents.get(id); if (m) m.tface = -yaw * Math.PI / 180; },
       head() {},
       teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; if (vehMoved(id, x, y, z, true, yaw)) return; { const o = S.objs.get(id); if (o) { o.x = x + S.OX; o.y = y; o.z = z + S.OZ; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
@@ -1114,7 +1260,7 @@
     for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
     if (S.world && S.fx && Object.keys(S.fx).length && (S.fxT = (S.fxT || 0) + dt) > 1) { S.fxT = 0; effectHud(); }
-    if (S.world) { try { stepObjs(dt); } catch (e) { /* fx */ } stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
+    if (S.world) { try { stepObjs(dt); cooldownUI(); } catch (e) { /* fx */ } stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
   }
@@ -1125,7 +1271,7 @@
     S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), tex: new Map(), objs: new Map(), bl: new Map(), stands: [], cracks: new Map(), crackDraw: [], objsb: new Map(), ping: new Map(), dim: 0, veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.addEventListener('click', bookHooks.done, true); if (g) g.addEventListener('click', bookHooks.sign, true); }
     window.__mcActionBar = (t, html) => { hud2(); const b = document.getElementById('mcBarTxt'); b.innerHTML = html || ''; b.style.opacity = 1; clearTimeout(window.__mcABt); window.__mcABt = setTimeout(() => { b.style.opacity = 0; }, 2500); };
-    MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
+    MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); Hd2.meta = (...a) => Hd.meta(...a); Hd2.sign = (...a) => Hd.sign(...a); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;

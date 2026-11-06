@@ -1,6 +1,6 @@
 // Dev-time: builds src/mc/blocks18.json, the visual table for Minecraft 1.8 block ids (flat colours; shapes are simplified).
 import mcdata from 'minecraft-data'; import fs from 'node:fs';
-const d = mcdata('1.8.8'); const byId = {}; for (const b of d.blocksArray) byId[b.id] = b;
+const d = mcdata('1.12.2'); /* 1.12.2 has every block id 1.8-1.12 uses (the numbers never changed until 1.13) */ const byId = {}; for (const b of d.blocksArray) byId[b.id] = b;
 const DYE = ['#e9ecec','#f07613','#bd44b3','#3aafd9','#f8c527','#70b919','#ed8dac','#3e4447','#8e8e86','#158991','#792aac','#35399d','#724728','#546d1b','#a12722','#141519'];
 const CLAY = ['#d1b1a1','#a15325','#95586c','#706c8a','#ba8523','#677535','#a14e4e','#392a23','#876b62','#575b5b','#764556','#4a3b5b','#4d3323','#4c522a','#8e3c2e','#251610'];
 const PLANK = ['#b8945f','#7b5a35','#d5c98c','#b0825a','#a95d32','#4a3018'], LOGS = ['#675131','#3a2713','#d6d6d2','#564419'], LOGS2 = ['#6d6559','#3a2a14'];
@@ -19,17 +19,21 @@ const STAIRS = { 53: 'planks:0', 67: 'cobblestone', 108: 'brick_block', 109: 'st
 const FENCE = { 85: PLANK[0], 188: PLANK[1], 189: PLANK[2], 190: PLANK[3], 192: PLANK[4], 191: PLANK[5], 113: '#2d151a', 139: '#7a7a7a' };
 const cube = (t, s, b, e) => { const o = { k: 'cube', t }; if (s && s !== t) o.s = s; if (b && b !== t) o.b = b; if (e) o.e = e; return o; };
 let BT = {}, BM = {};
-try { const A = 'node_modules/minecraft-assets/minecraft-assets/data/1.8.8/'; for (const e of JSON.parse(fs.readFileSync(A + 'blocks_textures.json', 'utf8'))) BT[e.name] = e; BM = JSON.parse(fs.readFileSync(A + 'blocks_models.json', 'utf8')); } catch (e) { console.log('npm i --no-save minecraft-assets for pack texture names'); }
+try { const A = 'node_modules/minecraft-assets/minecraft-assets/data/1.12/'; for (const e of JSON.parse(fs.readFileSync(A + 'blocks_textures.json', 'utf8'))) BT[e.name] = e; BM = JSON.parse(fs.readFileSync(A + 'blocks_models.json', 'utf8')); } catch (e) { console.log('npm i --no-save minecraft-assets for pack texture names'); }
 const strip = t => t && t.replace(/^(minecraft:)?blocks\//, '');
 function modelTex(m) { const tx = {}; for (let k = 0, cur = m; cur && k < 8; k++) { const md = BM[cur.replace(/^block\//, '')]; if (!md) break; for (const [a, v] of Object.entries(md.textures || {})) if (!(a in tx)) tx[a] = v; cur = md.parent; }
   const res = v => { for (let k = 0; v && v[0] === '#' && k < 8; k++) v = tx[v.slice(1)]; return v && v[0] !== '#' ? strip(v) : null; }; const o = {}; for (const a in tx) o[a] = res(tx[a]); return o; }
 function texOf(n) { const e = BT[n]; if (!e || !e.model) return e && e.texture ? Array(3).fill(strip(e.texture)) : null; const t = modelTex(e.model);
   const side = t.side || t.all || t.north || t.front || t.texture || t.particle || t.end, top = t.top || t.end || t.up || t.all || t.particle || side, bot = t.bottom || t.end || t.down || t.all || top;
   return side || top ? [side || top, top || side, bot || top] : null; }
-const COL16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
-const VARTEX = { stained_hardened_clay: m => Array(3).fill('hardened_clay_stained_' + COL16[m & 15]), stained_glass: m => Array(3).fill('glass_' + COL16[m & 15]), stained_glass_pane: m => Array(3).fill('glass_' + COL16[m & 15]),
+const COL16 = globalThis.COL16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+const VARTEX = { stained_hardened_clay: m => Array(3).fill('hardened_clay_stained_' + COL16[m & 15]), stained_glass: m => Array(3).fill('glass_' + COL16[m & 15]), stained_glass_pane: m => Array(3).fill('glass_' + COL16[m & 15]), concrete: m => Array(3).fill('concrete_' + COL16[m & 15]), concrete_powder: m => Array(3).fill('concrete_powder_' + COL16[m & 15]), wool: m => Array(3).fill('wool_colored_' + COL16[m & 15]),
   stonebrick: m => Array(3).fill(['stonebrick', 'stonebrick_mossy', 'stonebrick_cracked', 'stonebrick_carved'][m & 3]), prismarine: m => Array(3).fill(['prismarine_rough', 'prismarine_bricks', 'prismarine_dark'][m % 3]),
   dirt: m => m === 1 ? Array(3).fill('coarse_dirt') : m === 2 ? ['dirt_podzol_side', 'dirt_podzol_top', 'dirt'] : null, sand: m => m === 1 ? Array(3).fill('red_sand') : null };
+// blocks added in 1.9-1.12 (flat colours; textures come from the pack)
+Object.assign(C, { end_rod: ['#e8e0d0'], chorus_plant: ['#5d3d5d'], chorus_flower: ['#8c6c8c'], purpur_block: ['#a77ba7'], purpur_pillar: ['#ab81ab'], purpur_double_slab: ['#a77ba7'], purpur_slab: ['#a77ba7'], end_bricks: ['#dbe0a2'],
+  grass_path: ['#94793f', '#7e6633'], repeating_command_block: ['#7b5fa8'], chain_command_block: ['#6b9b86'], magma: ['#8c3a12'], nether_wart_block: ['#7a0a0a'], red_nether_brick: ['#460709'], bone_block: ['#e1ddc9'], observer: ['#636363', '#4f4f4f'], structure_block: ['#5c4f5c'] });
+Object.assign(EMIT, { magma: [6, 2, 1], end_rod: [14, 13, 12] });
 const out = [];
 for (let id = 0; id < 256; id++) {
   const b = byId[id]; if (!b) { out.push(0); continue; }
@@ -43,6 +47,11 @@ for (let id = 0; id < 256; id++) {
   else if (n === 'wool') { e = { k: 'cube', t: DYE[0], v: {} }; DYE.forEach((c, m) => e.v[m] = cube(c)); }
   else if (n === 'stained_hardened_clay') { e = { k: 'cube', t: CLAY[0], v: {} }; CLAY.forEach((c, m) => e.v[m] = cube(c)); }
   else if (n === 'hardened_clay') e = cube('#985e43');
+  else if (n === 'concrete' || n === 'concrete_powder') { e = { k: 'cube', t: DYE[0], v: {} }; DYE.forEach((c, m) => e.v[m] = cube(n === 'concrete' ? c : mix(c, '#d8d8d8'))); }
+  else if (/_shulker_box$/.test(n)) { const ci = COL16.indexOf(n.replace('_shulker_box', '').replace('light_gray', 'silver')); e = cube(DYE[Math.max(0, ci)]); }
+  else if (/_glazed_terracotta$/.test(n)) { const ci = COL16.indexOf(n.replace('_glazed_terracotta', '').replace('light_gray', 'silver')); e = cube(mix(DYE[Math.max(0, ci)], '#c8b8a8')); }
+  else if (n === 'frosted_ice') e = { k: 'glass', t: '#a8c8ff' };
+  else if (n === 'beetroots' || n === 'structure_void' || n === 'end_gateway') e = { k: 'skip' };
   else if (n === 'stained_glass' || n === 'stained_glass_pane') { e = { k: 'glass', t: DYE[0], v: {} }; DYE.forEach((c, m) => e.v[m] = { k: 'glass', t: c }); }
   else if (n === 'glass_pane') e = { k: 'strata', n: 'GLASS' };
   else if (n === 'ice') e = { k: 'glass', t: '#8cb3ff' };
@@ -61,12 +70,12 @@ for (let id = 0; id < 256; id++) {
   else e = cube('#8a8a8a');
   if (EMIT[n] && e.k === 'cube' && !e.e) e.e = EMIT[n];
   // resource-pack texture names (side, top, bottom) for compat blocks, from minecraft-assets' 1.8.8 models (names only)
-  if (e && e.k !== 'strata' && e.k !== 'skip') { const x = texOf(n); if (x) e.x = x; const vf = VARTEX[n]; if (vf && e.v) for (const m in e.v) { const t = vf(+m); if (t) e.v[m].x = t; } }
+  if (e && e.k !== 'strata' && e.k !== 'skip') { const x = /_shulker_box$/.test(n) ? Array(3).fill('shulker_top_' + n.replace('_shulker_box', '').replace('light_gray', 'silver')) : texOf(n); if (x) e.x = x; const vf = VARTEX[n]; if (vf && e.v) for (const m in e.v) { const t = vf(+m); if (t) e.v[m].x = t; } }
   if (e && b.hardness != null) { e.h = b.hardness; const m = b.material || ''; e.tl = /rock|iron|anvil/.test(m) ? 'pick' : m === 'wood' ? 'axe' : /dirt|sand|snow|clay|grass/.test(m) ? 'shovel' : /leaves/.test(m) ? 'knife' : ''; }
   out.push(e);
 }
 // item texture names (just the names, from minecraft-assets; no textures are copied) so a pack's items/<name>.png can be its icon
-let itx = {}; try { itx = Object.fromEntries(JSON.parse(fs.readFileSync('node_modules/minecraft-assets/minecraft-assets/data/1.8.8/items_textures.json', 'utf8')).map(e => [e.name, (e.texture || '').replace(/^items\//, '')])); } catch (e) { console.log('npm i --no-save minecraft-assets for item texture names'); }
+let itx = {}; try { itx = Object.fromEntries(JSON.parse(fs.readFileSync('node_modules/minecraft-assets/minecraft-assets/data/1.12/items_textures.json', 'utf8')).map(e => [e.name, (e.texture || '').replace(/^items\//, '')])); } catch (e) { console.log('npm i --no-save minecraft-assets for item texture names'); }
 const items = {}; for (const i of d.itemsArray) { items[i.id] = [i.name, i.displayName, i.stackSize]; if (i.id >= 256 && itx[i.name]) items[i.id].push(itx[i.name]); } fs.writeFileSync('../../src/mc/items18.json', JSON.stringify(items)); console.log(Object.keys(items).length, 'items');
 fs.writeFileSync('../../src/mc/blocks18.json', JSON.stringify(out)); console.log(out.length, 'entries', fs.statSync('../../src/mc/blocks18.json').size, 'bytes');
 console.log(JSON.stringify([out[1], out[2], out[5].v[2], out[35].v[14], out[17].v[1], out[44].v[3], out[85], out[64]]));
