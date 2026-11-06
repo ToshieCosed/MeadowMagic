@@ -15,4 +15,7 @@ z = io.BytesIO(); f = zipfile.ZipFile(z, 'w'); f.writestr('pack.mcmeta', '{"pack
 f.writestr('assets/minecraft/textures/blocks/stone.png', png(Image.new('RGBA', (16, 16), (128, 128, 128, 255))))
 f.writestr('assets/minecraft/textures/entity/zombie/zombie.png', png(biped(64, 64)))
 sk = Image.new('RGBA', (64, 32), (0, 0, 0, 0)); d = ImageDraw.Draw(sk); box(d, 0, 0, 8, 8, 8, (220, 220, 210)); box(d, 16, 16, 8, 12, 4, (200, 200, 190)); box(d, 40, 16, 2, 12, 2, (230, 150, 150)); box(d, 0, 16, 2, 12, 2, (150, 150, 230))
-f.writestr('assets/minecraft/textures/entity/skeleton/skeleton.png', png(sk)); f.close(); sys.stdout.buffer.write(z.getvalue())
+f.writestr('assets/minecraft/textures/entity/skeleton/skeleton.png', png(sk));
+for nm, col in [('rotten_flesh', (120, 160, 60)), ('beef_raw', (230, 60, 90))]:   # two item textures: hotbar icons must come from the pack
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im); d.ellipse((2, 2, 13, 13), fill=col + (255,)); d.rectangle((6, 6, 9, 9), fill=(255, 255, 255, 255)); f.writestr('assets/minecraft/textures/items/' + nm + '.png', png(im))
+f.close(); sys.stdout.buffer.write(z.getvalue())

@@ -22,6 +22,8 @@ server.on('login', c => {
     c.write('spawn_entity', { entityId: 901, type: 60, x: 41 * 32, y: Math.round(61.3 * 32), z: 44 * 32, pitch: 0, yaw: 0, objectData: 201, velocity: { x: 3000, y: -3000, z: 1000 } });
     c.write('spawn_entity', { entityId: 902, type: 64, x: 36 * 32, y: 63 * 32, z: 45 * 32, pitch: 0, yaw: 0, objectData: 210, velocity: { x: 400, y: 0, z: 0 } });
     c.write('update_health', { health: 15, food: 13, foodSaturation: 2 });
+    { const items = Array(45).fill(null).map(() => ({ blockId: -1 })); [[367, 0], [363, 0], [331, 0], [351, 1], [373, 8193], [368, 0], [2256, 0], [341, 0], [83, 0]].forEach(([id, dm], i) => { items[36 + i] = sl(id, 1, dm); }); c.write('window_items', { windowId: 0, items }); }   // hotbar: pack icons, drawn icons, sugar cane
+    c.write('block_change', { location: { x: 40, y: 61, z: 44 }, type: 83 << 4 }); c.write('block_change', { location: { x: 40, y: 62, z: 44 }, type: 83 << 4 });
   }, +(process.env.SPAWN_MS || 20000));
 });
 const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -48,7 +50,8 @@ if (process.env.CLOSE) { const n = await pg.evaluate(() => window.__cmobs.length
   await wait(+(process.env.SETTLE || 1000)); const p = await pg.evaluate(() => { const m = window.__tgt, d = MOB[m.type], s = m.size ? m.size * .5 : 1; return toScreen(m.x, m.y + (d ? d.h : 1) * s * .5, m.z); });
   const W = 400, H = 360, x = Math.max(0, Math.min(1000 - W, p[0] - W / 2)), y = Math.max(0, Math.min(620 - H, p[1] - H / 2)); const f = `/tmp/mob-${process.env.PACK ? 'pack' : 'nopack'}-${String(i).padStart(2, '0')}-${t}.png`; await pg.screenshot({ path: f, clip: { x, y, width: W, height: H } }); out.push(f); } }
 for (const sx of shots) { await pg.evaluate(([x, Z]) => { const S = StrataMCE.dbg(); player.x = x + S.OX; player.z = Z + S.OZ; player.face = Math.PI; cam.zoom = +(window.__ZOOM || 7); }, [sx, +(process.env.PZ || 52)]); await wait(1500); const f = `/tmp/mobs18-${process.env.PACK ? 'pack' : 'nopack'}-${sx}.png`; await pg.screenshot({ path: f }); out.push(f); }
-const info = await pg.evaluate(() => { const S = StrataMCE.dbg(); return { mobs: (window.__cmobs || []).map(m => m.type), proj: arrows.filter(a => a.mc).length, food: S.food, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, armed: (window.__cmobs || []).filter(m => m.eq && m.eq[0]).length }; });
+await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 40.5 + S.OX; player.z = 47 + S.OZ; cam.zoom = 6; }); await wait(2500); await pg.screenshot({ path: '/tmp/mobs18-hotbar.png' });
+const info = await pg.evaluate(() => { const S = StrataMCE.dbg(); return { hot: inv.slots.slice(0, 9).map(s => s && ITEMS[s.id] && ITEMS[s.id].name), cane: world.get(40 + S.OX, 61, 44 + S.OZ) === B.SUGAR_CANE, mobs: (window.__cmobs || []).map(m => m.type), proj: arrows.filter(a => a.mc).length, food: S.food, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, armed: (window.__cmobs || []).filter(m => m.eq && m.eq[0]).length }; });
 await pg.$eval('#mcLeave', e => e.click()).catch(() => {}); await wait(1200);
 const after = await pg.evaluate(() => ({ active: StrataMCE.active, models: Object.keys(__skins.MODELS).filter(k => k.startsWith('mc')), arrows: arrows.length, hunger: !!document.getElementById('mcHunger') && getComputedStyle(document.getElementById('mcHunger')).display, mobT: Object.keys(MOB).filter(k => k.startsWith('mc')) }));
 console.log(JSON.stringify({ info, after, shots: out, errs: errs.slice(0, 6) }));

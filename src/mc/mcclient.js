@@ -104,7 +104,13 @@
     const H = o.world || null;
     const say = t => { try { o.onChat && o.onChat(t); } catch (e) { /* ui */ } };
     const status = t => { try { o.onStatus && o.onStatus(t); } catch (e) { /* ui */ } };
-    const end = why => { if (closed) return; closed = true; try { ws.close(); } catch (e) { /* closed */ } try { o.onClose && o.onClose(why); } catch (e) { /* ui */ } };
+    // connection diagnostics: when a drop gives no reason, say how long we were in, when the server last spoke, and whether the app was in the background
+    const T0 = Date.now(); let lastRx = T0, lastKA = 0, hidT = 0, hidMax = 0;
+    const vis = () => { if (typeof document === 'undefined') return; if (document.hidden) hidT = Date.now(); else if (hidT) { hidMax = Math.max(hidMax, Date.now() - hidT); hidT = 0; } };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', vis);
+    const diag = () => { const n = Date.now(), s = ms => Math.round(ms / 1000) + 's', bg = hidT ? n - hidT : hidMax;
+      return ' (connected ' + s(n - T0) + ', last server packet ' + s(n - lastRx) + ' ago' + (lastKA ? ', last keep-alive ' + s(n - lastKA) + ' ago' : '') + (bg > 3000 ? ', app was in the background for ' + s(bg) : '') + ')'; };
+    const end = why => { if (closed) return; closed = true; if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', vis); try { ws.close(); } catch (e) { /* closed */ } try { o.onClose && o.onClose(why); } catch (e) { /* ui */ } };
     const S = { login: 'ls', config: 'cs', play: 'ps' };
     const out = (name, w) => { const id = (ids[S[state]] || {})[name]; if (id == null) return false; const b = new W().vi(id); if (w) b.raw(w.out ? w.out() : w); ws.send(b.out()); return true; };
     const mc = P >= 765 ? r => comp(r.nbt()) : r => comp(r.str());        // text component encoding: NBT from 1.20.3
@@ -147,10 +153,11 @@
         if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v); } else if (t === 1) r.i16(); else if (t === 2) r.i32(); else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
-        case 'keep_alive': out('keep_alive', body.subarray(idLen)); return;
+        case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); return;
+        case 'transaction': if (P === 47) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
-          if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); }
+          if (P === 47 && H) { const eid = r.i32(), gm = r.b(), dim = r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm }); out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
           return;
         case 'respawn': if (P === 47 && H) { sky = r.i32() === 0; H.respawn && H.respawn(); } return;
         case 'update_time': if (P === 47 && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
@@ -257,7 +264,7 @@
       }
     }
     function onPacket(body) {
-      const r = new R(body, 0), id = r.vi(), idLen = r.p;
+      const r = new R(body, 0), id = r.vi(), idLen = r.p; lastRx = Date.now();
       const key = state === 'login' ? 'lc' : state === 'config' ? 'cc' : 'pc', name = rev[key][id];
       if (state === 'play' && !joined) { joined = true; status('Joined the world'); }
       if (o.debug) o.debug(state + ' ' + id + ' ' + (name || '?'));
@@ -269,7 +276,7 @@
     ws = new WebSocket(o.relay); ws.binaryType = 'arraybuffer';
     ws.onopen = () => { status('Connecting to ' + o.host + ':' + o.port + '...'); ws.send(JSON.stringify({ type: 'tcp_open', host: o.host, port: o.port })); };
     ws.onerror = () => end('Could not reach the relay.');
-    ws.onclose = () => end('Connection closed.');
+    ws.onclose = () => end('Lost the connection to the relay' + diag());
     ws.onmessage = e => {
       if (typeof e.data !== 'string') { onPacket(new Uint8Array(e.data)); return; }
       let m; try { m = JSON.parse(e.data); } catch (x) { return; }
@@ -278,7 +285,7 @@
       } else if (m.type === 'mc_encrypt_ready') {
         const w = new W(); w.bytes(unb64(m.secret)); if (P === 759 || P === 760) w.bool(true); w.bytes(unb64(m.token)); out('encryption_begin', w);
       } else if (m.type === 'tcp_error' || m.type === 'mc_error') end(m.message || 'Connection failed.');
-      else if (m.type === 'tcp_closed') end('Server closed the connection.');
+      else if (m.type === 'tcp_closed') end('Server closed the connection without a reason' + diag());
     };
 
     function chat(text) {

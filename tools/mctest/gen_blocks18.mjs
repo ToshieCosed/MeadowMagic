@@ -51,6 +51,8 @@ for (let id = 0; id < 256; id++) {
   if (e && b.hardness != null) { e.h = b.hardness; const m = b.material || ''; e.tl = /rock|iron|anvil/.test(m) ? 'pick' : m === 'wood' ? 'axe' : /dirt|sand|snow|clay|grass/.test(m) ? 'shovel' : /leaves/.test(m) ? 'knife' : ''; }
   out.push(e);
 }
-const items = {}; for (const i of d.itemsArray) items[i.id] = [i.name, i.displayName, i.stackSize]; fs.writeFileSync('../../src/mc/items18.json', JSON.stringify(items)); console.log(Object.keys(items).length, 'items');
+// item texture names (just the names, from minecraft-assets; no textures are copied) so a pack's items/<name>.png can be its icon
+let itx = {}; try { itx = Object.fromEntries(JSON.parse(fs.readFileSync('node_modules/minecraft-assets/minecraft-assets/data/1.8.8/items_textures.json', 'utf8')).map(e => [e.name, (e.texture || '').replace(/^items\//, '')])); } catch (e) { console.log('npm i --no-save minecraft-assets for item texture names'); }
+const items = {}; for (const i of d.itemsArray) { items[i.id] = [i.name, i.displayName, i.stackSize]; if (i.id >= 256 && itx[i.name]) items[i.id].push(itx[i.name]); } fs.writeFileSync('../../src/mc/items18.json', JSON.stringify(items)); console.log(Object.keys(items).length, 'items');
 fs.writeFileSync('../../src/mc/blocks18.json', JSON.stringify(out)); console.log(out.length, 'entries', fs.statSync('../../src/mc/blocks18.json').size, 'bytes');
 console.log(JSON.stringify([out[1], out[2], out[5].v[2], out[35].v[14], out[17].v[1], out[44].v[3], out[85], out[64]]));

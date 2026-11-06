@@ -101,3 +101,10 @@ Server mobs Strata has no model for (ghast, blaze, spider, etc.) render as the z
 - Hunger: a row of drumsticks under the hearts follows the server's `update_health` food value (right to left, half shanks), hidden in creative.
 - Fixes: pack zombie arms/legs (the right limbs sampled zombie.png's empty lower half; they now mirror the left ones like vanilla's biped) and the built-in zombie/skeleton hands z-fighting with their sleeves.
 - Test (dev only): `tools/mctest/test-mobs18.mjs` spawns every 1.8 mob type, arms them, fires arrows and sends food; `PACK=1 CLOSE=1` paints each model's box faces in distinct colours to check the UV wrapping and screenshots each mob.
+
+## Stage 12 (1.8): field fixes
+- Disconnects: the client now sends `MC|Brand` "vanilla" after joining, keeps sending movement every tick even with a menu open (it stopped while the inventory/pause was up), and acknowledges refused window clicks (`transaction`). A drop without a reason now says how long you were connected, when the server last sent anything, when the last keep-alive came, and whether the app was in the background, so the cause can be told apart (server silence vs. app paused vs. relay lost).
+- The Chat/Disconnect bar and chat log hide while the inventory or another game panel is open, so they can't cover it.
+- Plants map to Strata's own: sugar cane, tall grass/fern/dead bush, all 1.8 flowers, saplings, wheat/carrots/potatoes by growth stage, and double plants (both halves).
+- Item icons: a pack's `items/*.png` is now imported in full, and compat items use their 1.8 texture name (from minecraft-assets, names only, in `items18.json`) with damage variants (dyes, coal/charcoal, fish, golden apple, potion bottles). Without a pack texture they get a drawn icon by kind (meat, dust, bottle, ball, rod, book, disc, seeds, gem) in a fitting colour instead of letters.
+- Sun (Strata and compat): the disc, glow and shafts are drawn at the far plane with depth testing, before the first-person hand clears depth, so blocks hide the sun. Test: `tools/tests/phase25_sun_occlusion.py`.

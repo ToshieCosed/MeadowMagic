@@ -63,6 +63,18 @@
       else { const w = { 1: 0, 2: 1, 3: 2, 4: 3 }[o]; const f = [[0, .3, .3, .15, .7, .7], [.85, .3, .3, 1, .7, .7], [.3, .3, 0, .7, .7, .15], [.3, .3, .85, .7, .7, 1]][w]; boxes = [f, [.43, .4 + t * .5, .43, .57, .55 + t * .5, .57].map((v, i) => v)]; }
       return shape('lev' + o + ':' + on, 'Lever', '#8a8f96', boxes, { solid: false }); }
     if (bid === 65) return [0, 0, B.LADDER_N, B.LADDER_S, B.LADDER_W, B.LADDER_E][meta & 7] || null;
+    // plants: Strata's own sprites instead of the grass stand-in
+    if (bid === 83) return B.SUGAR_CANE || null;
+    if (bid === 31) return [B.DEAD_BUSH, B.TALLGRASS, B.FERN][meta & 3] || B.TALLGRASS;
+    if (bid === 32) return B.DEAD_BUSH || null;
+    if (bid === 37) return B.FLOWER_Y || null;
+    if (bid === 38) return [B.FLOWER_R, B.FLOWER_B, B.FLOWER_P, B.FLOWER_AZ, B.TULIP_R, B.TULIP_O, B.TULIP_W, B.TULIP_P, B.FLOWER_W][meta] || B.FLOWER_R || null;
+    if (bid === 6) { const w = wood(WOOD6[(meta & 7) % 6]); return w && w.sapling || null; }
+    if (bid === 59) return B['WHEAT_' + Math.min(7, meta & 7)] || null;
+    if (bid === 141 || bid === 142) { const st = (meta & 7) >= 7 ? 3 : (meta & 7) >= 4 ? 2 : (meta & 7) >= 2 ? 1 : 0; return B[(bid === 141 ? 'CARROTS_' : 'POTATOES_') + st] || null; }
+    if (bid === 175) { const K = ['SUNFLOWER', 'LILAC', 'TALL', 'FERN', 'ROSE_BUSH', 'PEONY'];
+      if (meta & 8) { const k = K.find(k => B[k + '_LO'] === below); return k ? B[k + '_HI'] || null : null; }
+      return B[(K[meta & 7] || 'TALL') + '_LO'] || null; }
     if (bid === 27 || bid === 28 || bid === 66 || bid === 157) return B.RAIL;
     if (bid === 70 || bid === 72 || bid === 147 || bid === 148) { const m = PLATE_MATS.find(q => q.k === (bid === 72 ? 'wood' : bid === 70 ? 'stone' : 'iron')); return m && (m.plate + (meta & 1)); }
     return null;
@@ -79,7 +91,7 @@
     if (e.k === 'skip') return 0;
     return register(e);
   }
-  const lookup = (st, below) => { let v; if ((st & 8) && isDoorId(st >> 4)) v = stateToId(st, below); else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) { S.mcb[v] = st >> 4; if (v >= 8192) MAT_OF[v] = mcMat(st >> 4); } return v; };
+  const lookup = (st, below) => { let v; if ((st & 8) && (isDoorId(st >> 4) || st >> 4 === 175)) v = stateToId(st, below); /* upper halves depend on the block below */ else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) { S.mcb[v] = st >> 4; if (v >= 8192) MAT_OF[v] = mcMat(st >> 4); } return v; };
 
   // Strata sound material (index into MATS_S) for a Minecraft block id: stone grass dirt gravel sand wood leaves metal glass wool snow slime plant
   const MATSETS = [[1, 4, 14, 15, 16, 21, 22, 24, 43, 44, 45, 48, 49, 52, 56, 61, 62, 67, 73, 74, 87, 89, 97, 98, 108, 109, 112, 114, 116, 121, 128, 139, 152, 155, 156, 159, 172, 173, 179, 180, 181, 182], [2, 31], [3, 60, 110, 3], [13], [12, 88], [5, 17, 25, 47, 50, 53, 54, 58, 63, 64, 65, 68, 72, 84, 85, 96, 107, 125, 126, 134, 135, 136, 146, 162, 163, 164, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197], [18, 161], [41, 42, 57, 71, 101, 145, 147, 148, 154, 133, 66, 27, 28, 157], [20, 95, 102, 160, 79], [35, 171], [78, 80], [165], [6, 32, 37, 38, 39, 40, 59, 83, 81, 86, 103, 104, 105, 106, 111, 115, 127, 141, 142, 175, 176]];
@@ -110,9 +122,17 @@
       if (!sid) { if (!S.byName) { S.byName = new Map(); for (let i = 0; i < ITEMS.length; i++) if (ITEMS[i] && ITEMS[i].name && !ITEMS[i].mcCompat) S.byName.set(ITEMS[i].name.toLowerCase(), i); }
         const nm = it[1].toLowerCase().replace('cap', 'helmet').replace('tunic', 'chestplate').replace('pants', 'leggings').replace('golden', 'gold'); sid = S.byName.get(nm) || S.byName.get(it[1].toLowerCase()) || 0; }
     }
-    if (!sid) { sid = 30000 + mc.id; if (!ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: it[2] || 64, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } }
+    if (!sid) { const vr = VARIANT[it[0]], d = mc.damage | 0, vk = vr ? Object.keys(VARIANT).indexOf(it[0]) : -1;
+      sid = vr ? 50000 + vk * 16 + (it[0] === 'potion' ? ((d & 16384) ? 1 : 0) : d & 15) : 30000 + mc.id;   // items whose damage picks a different look get their own entry
+      if (!ITEMS[sid]) { const v = vr && vr(d); ITEMS[sid] = { name: v && v[1] || it[1], stack: it[2] || 64, mcCompat: 1, cat: 'compat', mcTex: v && v[0] || it[3] || it[0], mcName: it[0] }; S.items.push(sid); } }
     S.itemMap.set(key, sid); return sid;
   }
+  const DYES16 = ['black', 'red', 'green', 'brown', 'blue', 'purple', 'cyan', 'silver', 'gray', 'pink', 'lime', 'yellow', 'light_blue', 'magenta', 'orange', 'white'], DYE_NM = ['Ink Sac', 'Rose Red', 'Cactus Green', 'Cocoa Beans', 'Lapis Lazuli', 'Purple Dye', 'Cyan Dye', 'Light Gray Dye', 'Gray Dye', 'Pink Dye', 'Lime Dye', 'Dandelion Yellow', 'Light Blue Dye', 'Magenta Dye', 'Orange Dye', 'Bone Meal'];
+  const VARIANT = {   // 1.8 items whose damage value changes the texture: damage -> [texture name, display name]
+    dye: d => ['dye_powder_' + DYES16[d & 15], DYE_NM[d & 15]], coal: d => d === 1 ? ['charcoal', 'Charcoal'] : ['coal', 'Coal'],
+    fish: d => [['fish_cod_raw', 'Raw Fish'], ['fish_salmon_raw', 'Raw Salmon'], ['fish_clownfish_raw', 'Clownfish'], ['fish_pufferfish_raw', 'Pufferfish']][d & 3],
+    cooked_fish: d => [['fish_cod_cooked', 'Cooked Fish'], ['fish_salmon_cooked', 'Cooked Salmon']][d & 1] || ['fish_cod_cooked', 'Cooked Fish'],
+    golden_apple: d => ['apple_golden', d === 1 ? 'Enchanted Golden Apple' : 'Golden Apple'], potion: d => (d & 16384) ? ['potion_bottle_splash', 'Splash Potion'] : ['potion_bottle_drinkable', d === 0 ? 'Water Bottle' : 'Potion'] };
   const toStack = mc => { if (!mc) return null; const id = strataItem(mc), t = ITEMS[id]; return { id, n: mc.count, d: t && t.dur ? t.dur : undefined, mc }; };
   function syncInv() {
     if (!S.world) return;
@@ -391,10 +411,28 @@
   function delSign(X, y, Z) { const d = world && world.decor; if (!d) return; for (let i = d.length - 1; i >= 0; i--) if (d[i].mcCell && d[i].mcCell[0] === X && d[i].mcCell[1] === y && d[i].mcCell[2] === Z) { d.splice(i, 1); world.changed = true; } }
   function hurtFx() { player.hurtT = 0; hudDirty = true; const v = document.getElementById('hurtfx'); if (v) { v.classList.remove('on'); void v.offsetWidth; v.classList.add('on'); } }
   // generic icon for Minecraft items Strata has no equivalent for: a tinted gem + initials, so each is distinguishable
-  window.__mcIcon = it => { const c = document.createElement('canvas'); c.width = c.height = 60; const g = c.getContext('2d'); let h = 0; for (const ch of it.name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    g.fillStyle = `hsl(${h % 360},45%,42%)`; g.beginPath(); g.moveTo(30, 6); g.lineTo(54, 22); g.lineTo(46, 52); g.lineTo(14, 52); g.lineTo(6, 22); g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 2.5; g.stroke(); g.fillStyle = '#fff'; g.font = 'bold 20px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const w = it.name.split(/\s+/); g.fillText((w[0][0] + (w[1] ? w[1][0] : (w[0][1] || ''))).toUpperCase(), 30, 33); return c; };
+  // icons for Minecraft items Strata has no equivalent for: the resource pack's own item texture when it has one,
+  // otherwise a small pixel icon drawn from the kind of item (meat, dust, ball, rod, bottle, book, disc...) in its colour
+  const ICON_COL = [[/rose red/, '#b02e26'], [/cactus green/, '#5e7c16'], [/lapis/, '#3c44aa'], [/cocoa/, '#835432'], [/ink sac/, '#1d1d21'], [/dandelion/, '#fed83d'], [/redstone/, '#c4180c'], [/glowstone/, '#f4d35e'], [/gunpowder|sulphur/, '#6d6d6d'], [/sugar|bone ?meal|snow/, '#f2f2f2'], [/blaze/, '#f0a020'], [/slime/, '#6cc04a'], [/magma/, '#e0662a'], [/ender|pearl/, '#2a8f7a'], [/eye of/, '#4fb39a'],
+    [/gold|golden/, '#f2cf3c'], [/emerald/, '#2fc46a'], [/quartz/, '#ece6dc'], [/beef|steak|porkchop|mutton|rabbit|chicken/, '#c45a4a'], [/cooked|baked/, '#9a5a32'], [/flesh/, '#8a6a3a'], [/fish|cod|salmon/, '#7aa0c8'], [/potion|bottle/, '#9ad0ff'],
+    [/book/, '#8a3a2a'], [/record|disc/, '#2a2a2a'], [/string|web/, '#e8e8e8'], [/feather|ghast/, '#f0f0f0'], [/wart|nether/, '#a02a2a'], [/egg/, '#efe0c4'], [/clay|brick/, '#b46a4a'], [/leather|saddle/, '#8a5a32']];
+  const iconKind = n => /beef|steak|porkchop|mutton|chicken|rabbit|flesh|fish|cod|salmon/.test(n) ? 'meat' : /redstone|glowstone|gunpowder|sulphur|sugar|powder|dust|bone ?meal|dye|rose red|cactus green|lapis|cocoa|ink sac|dandelion/.test(n) ? 'dust' : /potion|bottle/.test(n) ? 'bottle' : /book/.test(n) ? 'book' : /record|disc/.test(n) ? 'disc'
+    : /ball|pearl|eye of|cream|charge|egg|snowball|slime/.test(n) ? 'ball' : /rod|stick|bone|arrow/.test(n) ? 'rod' : /string|lead|web/.test(n) ? 'string' : /seeds|wart/.test(n) ? 'seeds' : 'gem';
+  window.__mcIcon = it => { const c = document.createElement('canvas'); c.width = c.height = 60; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    const img = PACK && PACK.on && PACK.img && [it.mcTex, it.mcName].map(k => k && PACK.img['i/' + k]).find(Boolean); if (img) { const w = img.width; g.drawImage(img, 0, 0, w, w, 2, 2, 56, 56); return c; }
+    const n = it.name.toLowerCase(), col = (ICON_COL.find(e => e[0].test(n)) || [0, null])[1] || (() => { let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360},50%,50%)`; })();
+    const P = (x, y, w, h, f) => { g.fillStyle = f; g.fillRect(4 + x * 3.25, 4 + y * 3.25, w * 3.25 + .3, h * 3.25 + .3); }, dk = 'rgba(0,0,0,.38)', lt = 'rgba(255,255,255,.4)', k = iconKind(n);
+    if (k === 'meat') { P(4, 3, 8, 7, col); P(3, 5, 1, 4, col); P(12, 5, 1, 3, col); P(5, 4, 3, 2, lt); P(4, 9, 8, 1, dk); P(2, 10, 4, 2, '#efe6d6'); P(1, 11, 2, 3, '#efe6d6'); }
+    else if (k === 'dust') { for (const [x, y, w] of [[6, 4, 3], [4, 6, 7], [3, 8, 10], [2, 10, 12], [3, 12, 10]]) P(x, y, w, 2, col); P(6, 6, 2, 2, lt); P(9, 9, 2, 1, lt); P(3, 13, 10, 1, dk); }
+    else if (k === 'bottle') { P(6, 2, 4, 2, '#a07a52'); P(6, 4, 4, 2, 'rgba(220,235,255,.85)'); P(3, 6, 10, 8, 'rgba(220,235,255,.85)'); P(4, 8, 8, 5, col); P(4, 7, 2, 2, lt); P(3, 13, 10, 1, dk); }
+    else if (k === 'book') { P(3, 2, 10, 12, col); P(4, 3, 1, 10, dk); P(11, 3, 2, 11, '#eee6d0'); P(6, 5, 4, 1, lt); P(3, 13, 10, 1, dk); if (/enchant/.test(n)) { g.globalAlpha = .45; P(3, 2, 10, 12, '#b07cff'); g.globalAlpha = 1; } }
+    else if (k === 'disc') { g.fillStyle = '#202020'; g.beginPath(); g.arc(30, 30, 24, 0, 7); g.fill(); g.fillStyle = `hsl(${(n.length * 47) % 360},60%,55%)`; g.beginPath(); g.arc(30, 30, 9, 0, 7); g.fill(); g.fillStyle = '#000'; g.beginPath(); g.arc(30, 30, 2.5, 0, 7); g.fill(); }
+    else if (k === 'ball') { g.fillStyle = col; g.beginPath(); g.arc(30, 32, 19, 0, 7); g.fill(); g.fillStyle = lt; g.beginPath(); g.arc(23, 25, 6, 0, 7); g.fill(); g.fillStyle = dk; g.beginPath(); g.arc(30, 32, 19, .2, 2.4); g.lineTo(30, 32); g.fill(); }
+    else if (k === 'rod') { for (let i = 0; i < 11; i++) P(2 + i, 12 - i, 2, 2, col); for (let i = 0; i < 11; i += 2) P(3 + i, 12 - i, 1, 1, lt); }
+    else if (k === 'string') { g.strokeStyle = col; g.lineWidth = 3.5; g.beginPath(); g.moveTo(10, 48); g.bezierCurveTo(18, 6, 34, 56, 50, 12); g.stroke(); }
+    else if (k === 'seeds') { for (const [x, y] of [[4, 5], [9, 4], [6, 9], [11, 9], [3, 11], [8, 12]]) { P(x, y, 2, 2, col); P(x, y, 1, 1, lt); } }
+    else { g.fillStyle = col; g.beginPath(); g.moveTo(30, 6); g.lineTo(54, 22); g.lineTo(46, 52); g.lineTo(14, 52); g.lineTo(6, 22); g.closePath(); g.fill(); g.fillStyle = lt; g.beginPath(); g.moveTo(30, 6); g.lineTo(18, 22); g.lineTo(30, 26); g.closePath(); g.fill(); g.strokeStyle = dk; g.lineWidth = 2.5; g.stroke(); }
+    return c; };
   function tipOf(el) { const t = el.closest && el.closest('.slot'); if (!t || t.title) return; const l = t.getAttribute('aria-label'); if (l) t.title = l; }
   let nameT = 0; function popName() { const h = held(); let el = document.getElementById('mcItemName'); if (!el) { el = document.createElement('div'); el.id = 'mcItemName'; el.style.cssText = 'position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;color:#fff;font:600 14px sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .4s;opacity:0'; document.body.appendChild(el); }
     el.textContent = h ? ITEMS[h.id].name : ''; el.style.opacity = h ? 1 : 0; clearTimeout(nameT); nameT = setTimeout(() => { el.style.opacity = 0; }, 1800); }
@@ -575,7 +613,8 @@
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
-    S.t2 = setInterval(() => { if (S && S.world && mode === 'play' && Hd.cur) { const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; cl.sendPos(x, player.y, z, -player.face * 180 / Math.PI, 0, !!player.onGround); } }, 50);
+    S.t2 = setInterval(() => { if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
+      const x = player.x - S.OX, z = player.z - S.OZ; Hd.cur = { x, y: player.y, z }; cl.sendPos(x, player.y, z, -player.face * 180 / Math.PI, 0, !!player.onGround); } }, 50);
     return { chat: t => cl.chat(t), close: () => MCE.stop(), get state() { return cl.state; } };
   };
   MCE.stop = function () {
