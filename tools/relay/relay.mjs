@@ -137,8 +137,17 @@ wss.on('connection', ws => {
     else if (m.type === 'tcp_open') tcpOpen(ws, send, ctx, String(m.host), +m.port);
     else if (m.type === 'tcp_close') tcpClose(ctx);
     else if (m.type === 'mc_encrypt_begin') encryptBegin(ctx, send, m);
+    else if (m.type === 'http_get') httpGet(String(m.url || '')).then(b => send({ type: 'http_data', id: m.id, data: b.toString('base64') }), e => send({ type: 'http_error', id: m.id, message: e.message }));
   });
   ws.on('close', () => tcpClose(ctx));
   send({ type: 'hello', relay: 'strata-minecraft-compat', version: 2 });
 });
 console.log('Strata relay listening on ws://localhost:' + PORT + (CLIENT_ID ? '' : '  (no MS_CLIENT_ID set: enter one in the menu)'));
+
+// server resource packs: the browser can't fetch them (CORS), so the relay downloads them (http/https, redirects followed, 100 MB cap)
+async function httpGet(url) {
+  if (!/^https?:\/\//i.test(url)) throw new Error('bad url');
+  const r = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Strata-Compat' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const b = Buffer.from(await r.arrayBuffer()); if (b.length > 100 << 20) throw new Error('pack too large'); return b;
+}

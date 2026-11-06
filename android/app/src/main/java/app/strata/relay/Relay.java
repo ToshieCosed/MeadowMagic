@@ -79,6 +79,9 @@ public final class Relay implements WsServer.Handler {
             case "tcp_open": { final String host = Json.str(m, "host"); final int port = (int) Json.num(m, "port", 25565); thread(() -> tcpOpen(x, host, port)); break; }
             case "tcp_close": tcpClose(x); break;
             case "mc_encrypt_begin": thread(() -> encryptBegin(x, m)); break;
+            case "http_get": { final Object id = m.get("id"); final String url = Json.str(m, "url"); thread(() -> {
+                try { if (url == null || !url.matches("(?i)^https?://.*")) throw new IOException("bad url"); send(x, Json.of("type", "http_data", "id", id, "data", Base64.getEncoder().encodeToString(Http.getBytes(url)))); }
+                catch (Exception e) { send(x, Json.of("type", "http_error", "id", id, "message", String.valueOf(e.getMessage()))); } }); break; }
             default: break;
         }
     }

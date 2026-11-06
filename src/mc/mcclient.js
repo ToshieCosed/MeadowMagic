@@ -79,15 +79,17 @@
   const escH = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   function secHTML(t, st) {   // legacy § codes inside a text run
     let out = '', cur = Object.assign({}, st); const span = (txt, c) => { if (!txt) return ''; const css = []; if (c.color) css.push('color:' + (MCOL[c.color] || c.color)); if (c.bold) css.push('font-weight:700'); if (c.italic) css.push('font-style:italic'); const d = [c.underlined && 'underline', c.strikethrough && 'line-through'].filter(Boolean); if (d.length) css.push('text-decoration:' + d.join(' ')); if (c.obfuscated) css.push('filter:blur(1.5px)');
-      let h = escH(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">$1</a>'); if (c.link) h = `<a href="${escH(c.link)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">${h}</a>`; return css.length ? `<span style="${css.join(';')}">${h}</span>` : h; };
+      let h = escH(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">$1</a>'); if (c.link) h = `<a href="${escH(c.link)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">${h}</a>`; if (c.cmd) h = `<span class="mcCmd" data-a="${c.cmd[0]}" data-v="${escH(c.cmd[1])}" style="cursor:pointer">${h}</span>`; if (c.hover) h = `<span title="${escH(c.hover)}">${h}</span>`; return css.length ? `<span style="${css.join(';')}">${h}</span>` : h; };
     const parts = String(t).split('§'); out += span(parts[0], cur);
     for (let i = 1; i < parts.length; i++) { const k = (parts[i][0] || '').toLowerCase(), rest = parts[i].slice(1), ci = SEC.indexOf(k);
-      if (ci >= 0) cur = { color: SECN[ci], link: cur.link }; else if (k === 'r') cur = Object.assign({}, st); else if (k === 'l') cur.bold = 1; else if (k === 'o') cur.italic = 1; else if (k === 'n') cur.underlined = 1; else if (k === 'm') cur.strikethrough = 1; else if (k === 'k') cur.obfuscated = 1; out += span(rest, cur); }
+      if (ci >= 0) cur = { color: SECN[ci], link: cur.link, cmd: cur.cmd, hover: cur.hover }; else if (k === 'r') cur = Object.assign({}, st); else if (k === 'l') cur.bold = 1; else if (k === 'o') cur.italic = 1; else if (k === 'n') cur.underlined = 1; else if (k === 'm') cur.strikethrough = 1; else if (k === 'k') cur.obfuscated = 1; out += span(rest, cur); }
     return out; }
   function compHTML(x, st) {
     st = st || {}; if (x == null) return ''; if (typeof x === 'string') { const t = x.trim(); if (t[0] === '{' || t[0] === '[' || t[0] === '"') { try { return compHTML(JSON.parse(t), st); } catch (e) { /* plain */ } } return secHTML(x, st); }
     if (typeof x === 'number' || typeof x === 'boolean') return escH(String(x)); if (Array.isArray(x)) { if (!x.length) return ''; const [h, ...rest] = x; return compHTML(h, st) + rest.map(e => compHTML(e, st)).join(''); }
     const s2 = Object.assign({}, st); for (const k of ['color', 'bold', 'italic', 'underlined', 'strikethrough', 'obfuscated']) if (x[k] != null) s2[k] = x[k] === 'false' ? false : x[k];
+    if (x.clickEvent && /^(run|suggest)_command$/.test(x.clickEvent.action)) s2.cmd = [x.clickEvent.action[0], String(x.clickEvent.value || '')];
+    if (x.hoverEvent && x.hoverEvent.action === 'show_text') s2.hover = comp(x.hoverEvent.value);
     if (x.clickEvent && x.clickEvent.action === 'open_url' && /^https?:\/\//i.test(x.clickEvent.value || '')) s2.link = x.clickEvent.value;
     let h = ''; if (x.text != null) h += secHTML(String(x.text), s2); else if (x.translate != null) { const w = (x.with || []).map(e => compHTML(e, s2)); let i = 0; const f = TR[x.translate];
       h += f ? secHTML(f, s2).replace(/%(\d+\$)?s/g, (m, n) => n ? (w[parseInt(n) - 1] || '') : (w[i++] || '')) : escH(x.translate) + (w.length ? ' ' + w.join(' ') : ''); } else if (x.selector != null) h += escH(x.selector);
@@ -155,10 +157,14 @@
       if (P >= 764) w.uuid(o.uuid); else if (P >= 761) { w.bool(true).uuid(o.uuid); } else if (P >= 759) { w.bool(false).bool(true).uuid(o.uuid); }
       out('login_start', w);
     }
-    function resourcePack(r, hash) {   // pretend-accept so servers that require a pack don't kick us
+    function resourcePack(r, hash, url) {   // accept; on 1.8-1.12 download the pack through the relay and hand it to the engine, then report loaded (0) or failed (2)
       const send = res => { const w = new W(); if (P >= 765) w.uuid(r.id); else if (P < 210) w.str(hash || ''); w.vi(res); out('resource_pack_receive', w); };
-      send(3); send(0);
+      send(3);
+      if (!(LEG && url && H && H.serverPack && /^https?:\/\//i.test(url))) { send(0); return; }
+      httpGet(url).then(buf => Promise.resolve(H.serverPack(buf, url)).then(() => send(0)), e => { status('Server resource pack failed: ' + (e && e.message || e)); send(2); });
     }
+    const HTTP = {}; let httpN = 0;
+    function httpGet(url) { return new Promise((res, rej) => { const id = ++httpN; HTTP[id] = { res, rej }; ws.send(JSON.stringify({ type: 'http_get', id, url })); setTimeout(() => { if (HTTP[id]) { delete HTTP[id]; rej(new Error('timed out')); } }, 120000); }); }
     function onLogin(name, r, body) {
       if (name === 'disconnect') return end(comp(r.str()));
       if (name === 'encryption_begin') {
@@ -184,7 +190,7 @@
     function onPlay(name, r, body, idLen) {
       // 1.8 entity metadata: flags (idx 0) and small bytes (baby, skeleton type, slime size) go to H.flags/H.bmeta, item slots to H.meta
       const meta18 = eid => { for (let n = 0; n < 40; n++) { const b = r.b() & 255; if (b === 127) break; const t = b >> 5, idx = b & 31;
-        if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v, 0); } else if (t === 1) { const v = r.i16(); if (H.bmeta) H.bmeta(eid, idx, v, 1); } else if (t === 2) { const v = r.i32(); if (H.bmeta) H.bmeta(eid, idx, v, 2); } else if (t === 3) r.f32(); else if (t === 4) r.str(); else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
+        if (t === 0) { const v = r.i8(); if (idx === 0 && H.flags) H.flags(eid, v); else if (H.bmeta) H.bmeta(eid, idx, v, 0); } else if (t === 1) { const v = r.i16(); if (H.bmeta) H.bmeta(eid, idx, v, 1); } else if (t === 2) { const v = r.i32(); if (H.bmeta) H.bmeta(eid, idx, v, 2); } else if (t === 3) r.f32(); else if (t === 4) { const sv = r.str(); if (H.smeta) H.smeta(eid, idx, sv); } else if (t === 5) { const it = slot18(r); H.meta(eid, idx, it); } else if (t === 6) { r.i32(); r.i32(); r.i32(); } else if (t === 7) { r.f32(); r.f32(); r.f32(); } else break; } };
       // 1.9-1.12 metadata: index byte (255 ends), type byte, value; H.vmeta gets (eid, index, kind, value) and the engine maps indices per version
       const meta19 = eid => { for (let n = 0; n < 60; n++) { const idx = r.b(); if (idx === 255) break; const t = r.b(); let v = null, k = 'skip';
         if (t === 0) { v = r.i8(); k = 'byte'; } else if (t === 1) { v = r.vi(); k = 'int'; } else if (t === 2) { v = r.f32(); k = 'float'; } else if (t === 3) { v = r.str(); k = 'str'; } else if (t === 4) { v = r.str(); k = 'chat'; } else if (t === 5) { v = slot18(r); k = 'slot'; } else if (t === 6) { v = r.bool() ? 1 : 0; k = 'bool'; }
@@ -303,10 +309,39 @@
         case 'entity_destroy': if (LEG && H && H.destroy) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.destroy(l); } return;
         case 'player_info': if (LEG && H && H.playerInfo) {
           const act = r.vi(), n = r.vi();
-          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } const gm = r.vi(), ping = r.vi(); if (r.bool()) r.str(); H.playerInfo(u, nm, sk, ping, gm); } else if (act === 4) H.playerInfo(u, null); else if (act === 2) { const ping = r.vi(); H.ping && H.ping(u, ping); } else if (act === 1) r.vi(); else if (act === 3) { if (r.bool()) r.str(); } }
+          for (let i = 0; i < n; i++) { const u = r.uuid(); if (act === 0) { const nm = r.str(), pc = r.vi(); let sk = null; for (let k = 0; k < pc; k++) { const pn = r.str(), pv = r.str(); if (r.bool()) r.str(); if (pn === 'textures') { try { const j = JSON.parse(atob(pv)), t = j.textures && j.textures.SKIN; if (t) sk = { url: String(t.url || '').replace(/^http:/, 'https:'), slim: !!(t.metadata && t.metadata.model === 'slim') }; } catch (e) { /* bad property */ } } } const gm = r.vi(), ping = r.vi(); const dn = r.bool() ? r.str() : null; H.playerInfo(u, nm, sk, ping, gm); if (dn && H.dispName) H.dispName(u, comp(dn), compHTML(dn)); } else if (act === 4) H.playerInfo(u, null); else if (act === 2) { const ping = r.vi(); H.ping && H.ping(u, ping); } else if (act === 1) r.vi(); else if (act === 3) { const dn = r.bool() ? r.str() : null; H.dispName && H.dispName(u, dn && comp(dn), dn && compHTML(dn)); } }
         } return;
+        case 'scoreboard_team': case 'teams': if (LEG && H && H.team) { const t = r.str(), m = r.i8(); let info = null, pl = null;
+            if (m === 0 || m === 2) { info = { name: r.str(), prefix: r.str(), suffix: r.str() }; r.i8(); info.vis = r.str(); if (V9) info.coll = r.str(); info.color = r.i8(); }
+            if (m === 0 || m === 3 || m === 4) { const n = r.vi(); pl = []; for (let i = 0; i < n; i++) pl.push(r.str()); }
+            H.team(t, m, info, pl); } return;
+        case 'map': if (LEG && H && H.map) { const id = r.vi(), sc = r.i8(); if (V9) r.bool(); const n = r.vi(), icons = []; for (let i = 0; i < n; i++) { const dt = r.b(); icons.push({ dir: dt >> 4, type: dt & 15, x: r.i8(), z: r.i8() }); }
+            const cols = r.b(); let pat = null; if (cols > 0) { const rows = r.b(), x = r.b(), y = r.b(); pat = { cols, rows, x, y, data: r.bytes().slice() }; } H.map(id, sc, icons, pat); } return;
+        case 'abilities': if (LEG && H && H.abilities) { const f = r.i8(), fs = r.f32(); H.abilities(f, fs, r.f32()); } return;
+        case 'combat_event': if (LEG && H && H.combat) { const ev = r.vi(); if (ev === 2) { const pid = r.vi(); r.i32(); const m = r.str(); H.combat(pid, comp(m), compHTML(m)); } } return;
+        case 'world_border': if (LEG && H && H.border) { const a = r.vi(), vl = () => { let v = 0, s = 1, x; do { x = r.b(); v += (x & 127) * s; s *= 128; } while (x & 128); return v; }, b = { a };
+            if (a === 0) b.r = r.f64() / 2; else if (a === 1) { b.from = r.f64() / 2; b.r = r.f64() / 2; b.ms = vl(); } else if (a === 2) { b.x = r.f64(); b.z = r.f64(); }
+            else if (a === 3) { b.x = r.f64(); b.z = r.f64(); b.from = r.f64() / 2; b.r = r.f64() / 2; b.ms = vl(); r.vi(); b.warnT = r.vi(); b.warnB = r.vi(); } else if (a === 4) b.warnT = r.vi(); else if (a === 5) b.warnB = r.vi();
+            H.border(b); } return;
+        case 'tab_complete': if (LEG && H && H.tabDone) { const n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.str()); H.tabDone(l); } return;
+        case 'set_cooldown': if (LEG && H && H.cooldown) { const it = r.vi(); H.cooldown(it, r.vi()); } return;
+        case 'bed': if (LEG && H && H.bed) { const eid = r.vi(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; H.bed(eid, hi >> 6, ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, (lo << 6) >> 6); } return;
+        case 'camera': if (LEG && H && H.camera) H.camera(r.vi()); return;
+        case 'custom_payload': if (LEG && H) { const ch = r.str();
+            if (ch === 'MC|TrList' && H.trades) { const wid = r.i32(), n = r.b(), l = []; for (let i = 0; i < n; i++) { const a = slot18(r), out1 = slot18(r), b2 = r.bool() ? slot18(r) : null, off = r.bool(), uses = r.i32(), max = r.i32(); l.push({ a, out: out1, b: b2, off, uses, max }); } H.trades(wid, l); }
+            else if (ch === 'MC|BOpen' && H.bookOpen) H.bookOpen(V9 && r.p < r.u.length ? r.vi() : 0);
+            else if (ch === 'MC|Brand' && H.brand) H.brand(r.str());
+            else if (H.plugin) H.plugin(ch, r.u.slice(r.p)); } return;
+        case 'advancements': if (LEG && H && H.advancements) { const reset = r.bool(), n = r.vi(), add = [];
+            for (let i = 0; i < n; i++) { const id = r.str(), a = { id, parent: r.bool() ? r.str() : null, crit: [] };
+              if (r.bool()) { const t = r.str(), d = r.str(); a.title = comp(t); a.desc = comp(d); a.icon = slot18(r); a.frame = r.vi(); const f = r.i32(); a.bg = (f & 1) ? r.str() : null; a.toast = !!(f & 2); a.hidden = !!(f & 4); a.x = r.f32(); a.y = r.f32(); }
+              const nc = r.vi(); for (let k = 0; k < nc; k++) a.crit.push(r.str()); const nr = r.vi(); a.req = []; for (let k = 0; k < nr; k++) { const m = r.vi(), g2 = []; for (let j = 0; j < m; j++) g2.push(r.str()); a.req.push(g2); } add.push(a); }
+            const nd = r.vi(), rem = []; for (let i = 0; i < nd; i++) rem.push(r.str());
+            const np = r.vi(), prog = []; for (let i = 0; i < np; i++) { const id = r.str(), m = r.vi(), c = {}; for (let k = 0; k < m; k++) { const cn = r.str(); c[cn] = r.bool() ? r.i64() : 0; } prog.push({ id, c }); }
+            H.advancements(reset, add, rem, prog); } return;
+        case 'unlock_recipes': return;
         case 'start_configuration': out('configuration_acknowledged'); state = 'config'; return;
-        case 'resource_pack_send': { const u = r.str(), h = r.str(); resourcePack({}, h); return; }
+        case 'resource_pack_send': { const u = r.str(), h = r.str(); resourcePack({}, h, u); return; }
         case 'add_resource_pack': resourcePack({ id: r.uuid() }); return;
         case 'cookie_request': out('cookie_response', new W().str(r.str()).bool(false)); return;
         case 'chat': {
@@ -359,6 +394,7 @@
       } else if (m.type === 'mc_encrypt_ready') {
         const w = new W(); w.bytes(unb64(m.secret)); if (P === 759 || P === 760) w.bool(true); w.bytes(unb64(m.token)); out('encryption_begin', w);
       } else if (m.type === 'tcp_error' || m.type === 'mc_error') end(m.message || 'Connection failed.');
+      else if (m.type === 'http_data' || m.type === 'http_error') { const h = HTTP[m.id]; if (h) { delete HTTP[m.id]; if (m.type === 'http_data') h.res(unb64(m.data)); else h.rej(new Error(m.message || 'download failed')); } }
       else if (m.type === 'tcp_closed') end('Server closed the connection without a reason' + diag());
     };
 
@@ -404,6 +440,11 @@
       steer: v47((side, fwd, flags) => out('steer_vehicle', new W().f32(side).f32(fwd).b(flags))),
       enchant: v47((wid, i) => out('enchant_item', new W().b(wid).b(i))),
       rename: v47(t => out('custom_payload', new W().str('MC|ItemName').str(t))),
+      action: v47((eid, a, p) => out('entity_action', new W().vi(eid).vi(a).vi(p || 0))),   // 3/4 sprint, 8 elytra (1.9+)
+      abilities: v47((flags, fly, walk) => out('abilities', new W().b(flags).f32(fly).f32(walk))),
+      tab: v47(text => out('tab_complete', V9 ? new W().str(text).bool(false).bool(false) : new W().str(text).bool(false))),
+      trade: v47(i => out('custom_payload', new W().str('MC|TrSel').i32(i))),
+      advTab: v47(id => P >= 335 ? out('advancement_tab', id ? new W().vi(0).str(id) : new W().vi(1)) : false),
       payload: v47((ch, bytes) => out('custom_payload', new W().str(ch).raw(bytes))),
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };

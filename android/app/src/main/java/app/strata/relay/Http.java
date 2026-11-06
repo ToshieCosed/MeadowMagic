@@ -31,6 +31,22 @@ final class Http {
 
     static Res get(String url, String bearer) throws IOException { return send("GET", url, null, null, bearer); }
 
+    /** Download raw bytes (server resource packs), following up to 5 redirects, capped at 100 MB. */
+    static byte[] getBytes(String url) throws IOException {
+        for (int hop = 0; hop < 6; hop++) {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setInstanceFollowRedirects(false); c.setConnectTimeout(15000); c.setReadTimeout(60000);
+            c.setRequestProperty("User-Agent", "Strata-Compat");
+            int st = c.getResponseCode();
+            if (st >= 300 && st < 400 && c.getHeaderField("Location") != null) { url = new URL(new URL(url), c.getHeaderField("Location")).toString(); c.disconnect(); continue; }
+            if (st >= 400) { c.disconnect(); throw new IOException("HTTP " + st); }
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            try (InputStream in = c.getInputStream()) { byte[] buf = new byte[16384]; int n; while ((n = in.read(buf)) > 0) { bo.write(buf, 0, n); if (bo.size() > 100 << 20) throw new IOException("pack too large"); } }
+            c.disconnect(); return bo.toByteArray();
+        }
+        throw new IOException("too many redirects");
+    }
+
     private static Res send(String method, String url, String type, String body, String bearer) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod(method); c.setConnectTimeout(15000); c.setReadTimeout(30000);

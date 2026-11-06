@@ -34,6 +34,7 @@
     const m4 = ['e', 'w', 's', 'n'];
     if (SIMPLE[bid]) return B[SIMPLE[bid]] || null;
     if (bid === 98) return meta === 0 ? B.STONE_BRICK : null;
+    if (bid === 26) return DYES[14][(meta & 8) ? 'bedH' : 'bedF'][[2, 3, 0, 1][meta & 3]];   // red until 1.12's block entity says otherwise
     if (bid === 35) return DYES[meta & 15].woolB;
     if (bid === 171) return DYES[meta & 15].carpet;
     if (bid === 5) return wood(WOOD6[(meta & 7) % 6]).planks;
@@ -229,10 +230,10 @@
     const now = performance.now() / 1000;
     for (const pl of S.players) { pl.n = 0; if (Math.hypot(pl.x - player.x, pl.z - player.z) > 56) continue;
       pl.amt = lerp(pl.amt, pl.moving ? 1 : 0, .25); const ls = pl.phase, a = pl.amt, crouch = pl.sneak, sw = pl.swingT > 0 ? 1 - pl.swingT / .25 : 0, hs = pl.eq[0] && toStack(pl.eq[0]);
-      const BASE = mc(mT(pl.x, pl.y, pl.z), mY(pl.face), mT(0, .9, 0), mX(pl.sprint && !crouch ? .12 : 0), mT(0, -.9, 0), mS(PX));
+      const BASE = pl.sleep ? sleepBase(pl, PX) : pl.glide ? mc(mT(pl.x, pl.y + .3, pl.z), mY(pl.face), mT(0, .9, 0), mX(1.35), mT(0, -.9, 0), mS(PX)) : mc(mT(pl.x, pl.y, pl.z), mY(pl.face), mT(0, .9, 0), mX(pl.sprint && !crouch ? .12 : 0), mT(0, -.9, 0), mS(PX));
       const part = (piv, xr, yr, zr, off) => mc(BASE, mT(piv[0] + (off ? off[0] : 0), piv[1] + (off ? off[1] : 0), piv[2] + (off ? off[2] : 0)), mZ(zr || 0), mY(yr || 0), mX(xr || 0), mT(-piv[0], -piv[1], -piv[2]));
       let rArm = Math.cos(ls + Math.PI) * a * .9, lArm = Math.cos(ls) * a * .9, rLeg = Math.cos(ls) * 1.25 * a, lLeg = Math.cos(ls + Math.PI) * 1.25 * a, rArmZ = -(Math.cos(now * 1.8) * .05 + .05), lArmZ = Math.cos(now * 1.8) * .05 + .05;
-      rArm += Math.sin(now * 1.34) * .05; lArm -= Math.sin(now * 1.34) * .05; if (hs) rArm = rArm * .5 - Math.PI / 10; if (sw > 0) rArm -= Math.sin(sw * Math.PI) * 1.6;
+      rArm += Math.sin(now * 1.34) * .05; lArm -= Math.sin(now * 1.34) * .05; if (hs) rArm = rArm * .5 - Math.PI / 10; if (sw > 0) rArm -= Math.sin(sw * Math.PI) * 1.6; { const A = { rArm, lArm, rLeg, lLeg, rArmZ, lArmZ }; poseArms(pl, A); ({ rArm, lArm, rLeg, lLeg, rArmZ, lArmZ } = A); }
       const cb = crouch ? .5 : 0, cy = crouch ? -3.2 : 0, chy = crouch ? -4.2 : 0, clz = crouch ? -4 : 0; if (crouch) { rArm += .4; lArm += .4; }
       const SL = pl.T ? pl.T.slim : SKIN.slim, aw = SL ? 3 : 4, body = mc(BASE, mT(0, 24 + cy, 0), mX(cb), mT(0, -24, 0)), head = mc(BASE, mT(0, 24 + chy, 0), mT(0, -24, 0));
       const rA = part([-5, 22, 0], rArm, 0, rArmZ, [0, cy, 0]), lA = part([5, 22, 0], lArm, 0, lArmZ, [0, cy, 0]), rL = part([-2, 12, 0], rLeg, 0, 0, [0, -.2 * (crouch ? 1 : 0), clz]), lL = part([2, 12, 0], lLeg, 0, 0, [0, -.2 * (crouch ? 1 : 0), clz]);
@@ -244,9 +245,9 @@
       n = skinBox(B, n, rL, -4, 0, -2, 4, 12, 4, 0, 16, 0); n = skinBox(B, n, rL, -4, 0, -2, 4, 12, 4, 0, 32, .25);
       n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 16, 48, 0); n = skinBox(B, n, lL, 0, 0, -2, 4, 12, 4, 0, 48, .25); pl.n = n / 6;
       setVL(sampleLight(pl.x, pl.y + 1.2, pl.z));
-      playerArmour(pl, head, body, rA, lA, rL, lL);   // armour drawn with the pack's (or generated) armour textures on the skin renderer
-      if (hs) { const d = dispOf(hs.id), M = mc(rA, mT(-4 - aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, hs.id, mc(mT(0, 0, 0), M), glinty(hs)); }
-      { const os = pl.eq[5] && toStack(pl.eq[5]); if (os && ITEMS[os.id]) { const d = dispOf(os.id), M = mc(lA, mT(4 + aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, os.id, M, glinty(os)); } } }   // off hand (1.9+)
+      playerArmour(pl, head, body, rA, lA, rL, lL); wings(pl, body);   // armour drawn with the pack's (or generated) armour textures on the skin renderer
+      if (hs && !(pl.eq[0].id === 442 && shieldOn(rA, -4 - aw / 2))) { const d = dispOf(hs.id), M = mc(rA, mT(-4 - aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, hs.id, mc(mT(0, 0, 0), M), glinty(hs)); }
+      { const os = pl.eq[5] && toStack(pl.eq[5]); if (os && pl.eq[5].id === 442) shieldOn(lA, 4 + aw / 2); else if (os && ITEMS[os.id]) { const d = dispOf(os.id), M = mc(lA, mT(4 + aw / 2, 12.5, 0), mS(16), mX(Math.PI / 2), mY(Math.PI), mT(1 / 16, -.125, .1), dispM(d.tp)); emitItem(dynVB, os.id, M, glinty(os)); } } }   // off hand (1.9+)
   }
   function drawMcPlayers() {
     if (cam.photoHide) return; const keep = SKIN.tex, hurt = player.hurtT; player.hurtT = 9;
@@ -258,12 +259,11 @@
     if (!S) return; S.tagRaf = requestAnimationFrame(tagLoop);
     let box = document.getElementById('mcTags'); if (!box) { box = document.createElement('div'); box.id = 'mcTags'; box.style.cssText = 'position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden'; document.body.appendChild(box); }
     const show = window.__mcTags !== false && S.world && mode === 'play'; box.style.display = show ? '' : 'none'; if (!show) return;
-    const items = S.players.map(p => ({ k: p.eid, nm: S.names.get(p.uuid) || '', x: p.x, y: p.y, z: p.z }));
-    if (cam.mode !== 'fp' && S.o.name) items.push({ k: 'me', nm: S.o.name, x: player.x, y: player.y, z: player.z });
+    const items = tagItems();
     const live = new Set();
-    for (const it of items) { if (!it.nm) continue; live.add(it.k); let el = S.tags.get(it.k);
-      if (!el) { el = document.createElement('div'); el.textContent = it.nm; el.style.cssText = 'position:absolute;left:0;top:0;font:600 11px/1 system-ui,sans-serif;padding:2px 6px;border-radius:9px;background:rgba(10,14,20,.42);white-space:nowrap;text-shadow:0 1px 2px #000a;will-change:transform'; el.style.color = tagColor(it.nm); box.appendChild(el); S.tags.set(it.k, el); }
-      const d = Math.hypot(it.x - player.x, it.z - player.z), p = toScreen(it.x, it.y + 2.3, it.z);
+    for (const it of items) { if (!it.h) continue; live.add(it.k); let el = S.tags.get(it.k);
+      if (!el) { el = document.createElement('div'); el.innerHTML = it.h; el._h = it.h; el.style.cssText = 'position:absolute;left:0;top:0;font:600 11px/1 system-ui,sans-serif;padding:2px 6px;border-radius:9px;background:rgba(10,14,20,.42);white-space:nowrap;text-shadow:0 1px 2px #000a;will-change:transform'; el.style.color = it.c || '#fff'; if (it.holo) el.style.background = 'rgba(10,14,20,.25)'; box.appendChild(el); S.tags.set(it.k, el); } else if (el._h !== it.h) { el.innerHTML = it.h; el._h = it.h; }
+      const d = Math.hypot(it.x - player.x, it.z - player.z), p = toScreen(it.x, it.y, it.z);
       if (!(p[2] > 0) || p[0] < -80 || p[1] < -30 || p[0] > innerWidth + 80 || p[1] > innerHeight + 30 || d > 48) { el.style.display = 'none'; continue; }
       el.style.display = ''; el.style.opacity = d < 24 ? .95 : Math.max(.25, .95 - (d - 24) / 30); el.style.transform = `translate(${Math.round(p[0])}px,${Math.round(p[1])}px) translate(-50%,-100%)`; }
     for (const [k, el] of S.tags) if (!live.has(k)) { el.remove(); S.tags.delete(k); }
@@ -540,6 +540,7 @@
     else if (kind === 'anvil') { mcSlot(top, 0, { lbl: 'Item' }); top.appendChild(Object.assign(document.createElement('span'), { className: 'mcArrow', textContent: '+' })); mcSlot(top, 1, { lbl: 'Add' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); anvilPanel(top, W); }
     else if (kind === 'trade') { mcSlot(top, 0, { lbl: 'Pay' }); mcSlot(top, 1, { lbl: 'Pay' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
     else { const g = grid(kind === 'grid3' ? 3 : Math.min(9, W.n)); for (let i = 0; i < W.n; i++) mcSlot(g, i); top.appendChild(g); }
+    try { extInvRender(el, W, kind, top); } catch (e) { console.error('compat inv', e); }
     const off = winOff(), mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = '';
     for (let i = 0; i < 27; i++) mcSlot(mn, off + i); for (let i = 0; i < 9; i++) mcSlot(ht, off + 27 + i, { cls: i === inv.sel ? 'sel' : '' });
   }
@@ -805,21 +806,21 @@
   function orbSpawn(eid, x, y, z, n) { if (S.world) S.objs.set(eid, { kind: 'orb', x: x + S.OX, y, z: z + S.OZ, sx: x + S.OX, sy: y, sz: z + S.OZ, n, t0: Math.random() * 6 }); }
   function boltSpawn(eid, t, x, y, z) { if (!S.world) return; S.objs.set(eid, { kind: 'bolt', x: x + S.OX, y, z: z + S.OZ, t0: performance.now(), seed: Math.random() * 1e4 }); S.flash = performance.now();
     try { sfx('fall', x + S.OX, y, z + S.OZ, 2, 200); } catch (e) { /* audio */ } setTimeout(() => { if (S) S.objs.delete(eid); }, 900); }
-  function frameItem(eid, idx, it) { const o = S.objs.get(eid); if (!o || o.kind !== 'frame' || idx !== 8) return false; o.item = it ? toStack(it) : null; return true; }
+  function frameItem(eid, idx, it) { const o = S.objs.get(eid); if (!o || o.kind !== 'frame' || idx !== 8) return false; o.item = it ? toStack(it) : null; o.mci = it || null; return true; }
   function objsDyn(vb) {
     const now = performance.now(), p = player;
     for (const o of S.objs.values()) { if (Math.hypot(o.x - p.x, o.z - p.z) > 64) continue;
       if (o.kind === 'frame') { const [fx, fz] = o.f, cx = o.x + .5 - fx * .47, cz = o.z + .5 - fz * .47, cy = o.y + .5, ux = fz, uz = -fx; setVL(sampleLight(o.x + .5, o.y + .5, o.z + .5));
         const P = (a, b, d) => [cx + ux * a + fx * d, cy + b, cz + uz * a + fz * d], B = (a0, b0, a1, b1, d0, d1, c) => { const q = [P(a0, b0, d0), P(a1, b1, d1)]; emitBox(vb, [Math.min(q[0][0], q[1][0]), Math.min(q[0][1], q[1][1]), Math.min(q[0][2], q[1][2])], [Math.max(q[0][0], q[1][0]), Math.max(q[0][1], q[1][1]), Math.max(q[0][2], q[1][2])], c, IDT); };
         B(-.375, -.375, .375, .375, -.03, 0, [120, 86, 52]); B(-.31, -.31, .31, .31, 0, .005, [150, 112, 70]);
-        if (o.item && ITEMS[o.item.id]) { const yaw = Math.atan2(fx, fz), M = mc(mT(cx + fx * .04, cy, cz + fz * .04), mY(yaw), mZ(-(o.rot || 0) * PI / 4), mS(.5), mT(-.5, -.5, -.03)); emitItem(vb, o.item.id, isFlatItem(o.item.id) ? M : mc(M, mT(.25, .25, 0), mS(.5)), glinty(o.item)); } }
+        if (o.item && ITEMS[o.item.id] && !o.mapE) { const yaw = Math.atan2(fx, fz), M = mc(mT(cx + fx * .04, cy, cz + fz * .04), mY(yaw), mZ(-(o.rot || 0) * PI / 4), mS(.5), mT(-.5, -.5, -.03)); emitItem(vb, o.item.id, isFlatItem(o.item.id) ? M : mc(M, mT(.25, .25, 0), mS(.5)), glinty(o.item)); } }
       else if (o.kind === 'fall') { const bd = BLOCKS[o.id]; if (!bd) continue; setVL(sampleLight(o.x, o.y + .5, o.z)); emitBox(vb, [o.x - .5, o.y, o.z - .5], [o.x + .5, o.y + 1, o.z + .5], bd.side || [128, 128, 128], IDT); }
       else if (o.kind === 'tnt') { const fl = Math.floor((now - o.t0) / 250) % 2; setVL(fl ? VL_EMISSIVE : sampleLight(o.x, o.y + .5, o.z)); emitBox(vb, [o.x - .49, o.y, o.z - .49], [o.x + .49, o.y + .98, o.z + .49], fl ? [255, 255, 255] : [200, 50, 36], IDT); }
       else if (o.kind === 'orb') { const b = Math.sin(now / 300 + o.t0) * .06, sz = Math.min(.14, .05 + Math.log2(1 + (o.n || 1)) * .02), g = 180 + Math.sin(now / 160 + o.t0) * 60; setVL(VL_EMISSIVE); emitBox(vb, [o.x - sz, o.y + .1 + b - sz, o.z - sz], [o.x + sz, o.y + .1 + b + sz, o.z + sz], [140, Math.max(0, Math.min(255, g | 0)), 40], IDT); }
       else if (o.kind === 'bolt') { const age = (now - o.t0) / 1000; if (age > .5) continue; setVL(VL_EMISSIVE); let x = o.x, z = o.z, sd = o.seed; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
         for (let y = o.y + 70; y > o.y; y -= 3) { const nx = x + (rnd() - .5) * 1.6, nz = z + (rnd() - .5) * 1.6; for (let k = 0; k < 3; k++) { const t = k / 3, px = x + (nx - x) * t, pz = z + (nz - z) * t; emitBox(vb, [px - .09, y - 3 + t * 3, pz - .09], [px + .09, y - 2 + t * 3, pz + .09], [235, 235, 255], IDT); } x = nx; z = nz; } } }
-    for (const st of S.stands) { if (Math.hypot(st.x - p.x, st.z - p.z) > 48) continue; const k = 1 / 16, M = mc(mT(st.x, st.y, st.z), mY(st.face), mS(k)), T = (a, b, c) => ap(M, a, b, c), W = [150, 120, 80];
-      setVL(sampleLight(st.x, st.y + 1, st.z)); emitBox(vb, [-6, 0, -6], [6, 1, 6], [130, 130, 136], T); emitBox(vb, [-1, 1, -1], [1, 23, 1], W, T); emitBox(vb, [-6, 21, -1.5], [6, 24, 1.5], W, T); emitBox(vb, [-4, 12, -1], [4, 13, 1], W, T); emitBox(vb, [-1, 24, -1], [1, 31, 1], W, T);
+    for (const st of S.stands) { if (Math.hypot(st.x - p.x, st.z - p.z) > 48) continue; const k = st.small ? 1 / 32 : 1 / 16, M = mc(mT(st.x, st.y, st.z), mY(st.face), mS(k)), T = (a, b, c) => ap(M, a, b, c), W = [150, 120, 80];
+      setVL(sampleLight(st.x, st.y + 1, st.z)); if (!st.invis && !st.marker) { emitBox(vb, [-6, 0, -6], [6, 1, 6], [130, 130, 136], T); emitBox(vb, [-1, 1, -1], [1, 23, 1], W, T); emitBox(vb, [-6, 21, -1.5], [6, 24, 1.5], W, T); emitBox(vb, [-4, 12, -1], [4, 13, 1], W, T); emitBox(vb, [-1, 24, -1], [1, 31, 1], W, T); }
       const ab = (sl, mn, mx) => { const a = armOf(st.eq, sl); if (a) emitBox(vb, mn, mx, a.tint || ARCOL[a.mat], T); };
       ab(4, [-4.5, 23.5, -4.5], [4.5, 32.5, 4.5]); ab(3, [-4.5, 11.5, -2.5], [4.5, 24.5, 2.5]); ab(3, [-8.5, 12, -2.5], [-4.5, 24.5, 2.5]); ab(3, [4.5, 12, -2.5], [8.5, 24.5, 2.5]); ab(2, [-4.3, 2, -2.3], [4.3, 13, 2.3]); ab(1, [-4.5, -.2, -2.5], [4.5, 4, 2.5]);
       const h = st.eq[0] && toStack(st.eq[0]); if (h && ITEMS[h.id]) emitItem(vb, h.id, mc(M, mT(-7, 13, 2), mS(16), mX(PI / 2), mY(PI), mT(1 / 16, -.125, .1), dispM(dispOf(h.id).tp)), glinty(h)); }
@@ -888,7 +889,7 @@
   const H2 = t => StrataMC.compHTML(t);
   function renderTab() { const t = document.getElementById('mcTab'); if (!t || t.style.display === 'none') return; const L = [...S.names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
     const bars = p => p == null ? '' : p < 150 ? '▮▮▮▮▮' : p < 300 ? '▮▮▮▮▯' : p < 600 ? '▮▮▮▯▯' : p < 1000 ? '▮▮▯▯▯' : '▮▯▯▯▯';
-    t.innerHTML = (S.tabH ? `<div style="text-align:center;margin-bottom:6px">${H2(S.tabH)}</div>` : '') + `<div style="font-weight:700;margin-bottom:4px">Players online (${L.length})</div>` + L.map(([u, n]) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${n.replace(/</g, '&lt;')}</span><span style="color:#5f5;font-size:10px;letter-spacing:-1px">${bars(S.ping.get(u))}</span></div>`).join('') + (S.tabF ? `<div style="text-align:center;margin-top:6px">${H2(S.tabF)}</div>` : ''); }
+    t.innerHTML = (S.tabH ? `<div style="text-align:center;margin-bottom:6px">${H2(S.tabH)}</div>` : '') + `<div style="font-weight:700;margin-bottom:4px">Players online (${L.length})</div>` + L.map(([u, n]) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${tabName(u, n)}</span><span style="color:#5f5;font-size:10px;letter-spacing:-1px">${bars(S.ping.get(u))}</span></div>`).join('') + (S.tabF ? `<div style="text-align:center;margin-top:6px">${H2(S.tabF)}</div>` : ''); }
   function renderSide() { const el = document.getElementById('mcSide'); if (!el) return; const o = S.sideObj && S.objsb.get(S.sideObj); if (!o) { el.style.display = 'none'; return; }
     const rows = [...o.scores.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15); el.style.display = ''; el.innerHTML = `<div style="text-align:center;font-weight:700;margin-bottom:2px">${H2(o.title || S.sideObj)}</div>` + rows.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px"><span>${H2(k)}</span><span style="color:#f55">${v}</span></div>`).join(''); }
   function showTitle(a, v) { const box = hud2(), w = document.getElementById('mcTitle');
@@ -1114,7 +1115,7 @@
       if (!FOOD18.has(mc.id)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
 
     openInv() { if (mode === 'play') mcInvOpen(); },
-    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); objsDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
+    techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); objsDyn(vb); borderDyn(vb); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
     closeInv() { mcInvClose(true); },   // the only arrows in a compat world are the server's, moved by stepProj
     emitMob(vb, m) { const d = m.mc && CM[m.type];   // Strata's own model for a compat type without its pack texture (mooshroom -> cow, ...)
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
@@ -1239,7 +1240,205 @@
       teleport(id, x, y, z, yaw) { if (projMoved(id, x, y, z, true)) return; if (vehMoved(id, x, y, z, true, yaw)) return; { const o = S.objs.get(id); if (o) { o.x = x + S.OX; o.y = y; o.z = z + S.OZ; return; } } { const d = S.dr.get(id); if (d && d.q) { d.q.sx = x + S.OX; d.q.sy = y; d.q.sz = z + S.OZ; return; } } const m = S.ents.get(id); if (m) { m.tx = x + S.OX; m.ty = y; m.tz = z + S.OZ; m.tface = -yaw * Math.PI / 180; } },
       destroy(l) { for (const id of l) { projGone(id); vehGone(id); S.objs.delete(id); { const e = S.paint.get(id); if (e) { S.paint.delete(id); const i = (world.decor || []).indexOf(e); if (i >= 0) world.decor.splice(i, 1); } } const pe = S.ents.get(id); if (pe && pe.pl) { const k = S.players.indexOf(pe); if (k >= 0) S.players.splice(k, 1); S.ents.delete(id); const t = S.tags.get(id); if (t) { t.remove(); S.tags.delete(id); } } const d = S.dr.get(id); if (d) { if (d.q) { const k = drops.indexOf(d.q); if (k >= 0) drops.splice(k, 1); } S.dr.delete(id); } const m = S.ents.get(id); if (m) { S.ents.delete(id); const i = S.mobs.indexOf(m); if (i >= 0) S.mobs.splice(i, 1); const j = S.stands.indexOf(m); if (j >= 0) S.stands.splice(j, 1); if (m.dying != null) puff(m.x, m.y + .5, m.z, [235, 235, 235], 16, 1.6, .9, .1, .4); } } },
     };
-    return Hd;
+    extHandlers(Hd); return Hd;
+  }
+  // ==== Stage 19: elytra, shields, beds, names and holograms, teams, maps, trades, recipe book, advancements, world border, cooldowns, server packs (compat only) ====
+  const SECC = '0123456789abcdef', isEly = it => !!(it && it.id === 443 && (it.damage | 0) < 431);
+  const waitIdle = (fn, n) => { if (!S) return; if (S.waitAct == null) fn(); else if ((n || 0) < 40) setTimeout(() => waitIdle(fn, (n || 0) + 1), 100); };
+  const winIdx = i => S.win ? (i < 36 ? S.win.n + i - 9 : S.win.n + 27 + i - 36) : i;   // player-inventory slot (9..44) -> the open window's slot
+  // custom names (metadata 2) and their visibility (3): mobs, armour-stand holograms, NPCs
+  function nameMeta(eid, idx, kind, v) { const m = S.ents.get(eid); if (!m) return false;
+    if (idx === 2 && (kind === 'str' || kind === 'chat')) { m.cname = v ? String(v) : null; return true; }
+    if (idx === 3 && (kind === 'bool' || kind === 'byte')) { m.cvis = !!v; return true; }
+    return false; }
+  function standFlags(m, v) { m.small = !!(v & 1); m.marker = !!(v & 16); }
+  // scoreboard teams: prefix/suffix/colour on name tags and the tab list; "never" hides the tag (NPC plugins use it)
+  function team(t, mode, info, pl) { const T = S.teams = S.teams || new Map(), P = S.pteam = S.pteam || new Map();
+    if (mode === 1) { const o = T.get(t); if (o) for (const n of o.pl) if (P.get(n) === t) P.delete(n); T.delete(t); return; }
+    let o = T.get(t); if (!o) { o = { pl: new Set(), prefix: '', suffix: '', color: -1, vis: 'always' }; T.set(t, o); }
+    if (info) Object.assign(o, { prefix: info.prefix || '', suffix: info.suffix || '', color: info.color, vis: info.vis || 'always' });
+    if (pl) for (const n of pl) { if (mode === 4) { o.pl.delete(n); if (P.get(n) === t) P.delete(n); } else { o.pl.add(n); P.set(n, t); } }
+    renderTab(); }
+  const teamOf = n => S.pteam && S.teams && S.teams.get(S.pteam.get(n));
+  function teamHTML(n) { const o = teamOf(n); if (!o) return StrataMC.compHTML(n); return StrataMC.compHTML(o.prefix + (o.color >= 0 && o.color < 16 ? '§' + SECC[o.color] : '') + n + o.suffix); }
+  function tabName(u, n) { const d = S.disp && S.disp.get(u); return d || teamHTML(n); }
+  // what the floating tags show: players (team formatting, the below-name score) and named mobs / hologram stands
+  function tagItems() { const L = [];
+    for (const p of S.players) { const nm = S.names.get(p.uuid) || p.nm || ''; if (!nm || p.invis) continue; const o = teamOf(nm); if (o && /never|hideForOtherTeams/.test(o.vis)) continue;
+      let h = teamHTML(nm); if (p.cname && p.cvis) h = StrataMC.compHTML(p.cname); const bo = S.belowObj && S.objsb.get(S.belowObj); if (bo) h += `<div style="font-size:10px;margin-top:1px">${bo.scores.get(nm) || 0} ${StrataMC.compHTML(bo.title || '')}</div>`;
+      L.push({ k: p.eid, h, c: tagColor(nm), x: p.x, y: p.y + (p.sneak ? 2.05 : 2.3), z: p.z }); }
+    if (cam.mode !== 'fp' && S.o.name) L.push({ k: 'me', h: teamHTML(S.o.name), c: tagColor(S.o.name), x: player.x, y: player.y + 2.3, z: player.z });
+    for (const m of S.stands) if (m.cname && m.cvis) L.push({ k: m.eid, h: StrataMC.compHTML(m.cname), x: m.x, y: m.y + (m.marker ? 0 : m.small ? .99 : 1.98) + .5, z: m.z, holo: 1 });
+    for (const m of S.mobs) if (m.cname && (m.cvis || Math.hypot(m.x - player.x, m.z - player.z) < 6)) { let h = 1.8; try { h = mobBox(m).h; } catch (e) { /* unknown */ } L.push({ k: m.eid, h: StrataMC.compHTML(m.cname), x: m.x, y: m.y + h + .5, z: m.z }); }
+    return L; }
+  // death message, abilities, world border, item cooldowns
+  function combat(pid, text) { if (text) { S.deathMsg = text; toast(text); } }
+  function border(b) { const o = S.border = S.border || { x: 0, z: 0, r: 3e7, warnB: 5 }; const now = performance.now(), cur = borderR();
+    if (b.x != null) { o.x = b.x; o.z = b.z; } if (b.r != null) { if (b.ms > 0) { o.from = b.from != null ? b.from : cur; o.to = b.r; o.t0 = now; o.t1 = now + b.ms; } else { o.from = o.to = b.r; o.t1 = 0; } } if (b.warnB != null) o.warnB = b.warnB; }
+  function borderR() { const o = S.border; if (!o) return 3e7; if (!o.t1 || performance.now() >= o.t1) return o.to != null ? o.to : 3e7; const k = (performance.now() - o.t0) / (o.t1 - o.t0); return o.from + (o.to - o.from) * k; }
+  function borderDyn(vb) { const o = S.border; if (!o) return; const r = borderR(); if (r > 1e6) return; const cx = o.x + S.OX, cz = o.z + S.OZ, p = player, y0 = Math.floor(p.y) - 6, y1 = y0 + 18;
+    setVL(VL_EMISSIVE); const col = [70, 150, 255];
+    for (const [ax, sgn] of [[0, -1], [0, 1], [1, -1], [1, 1]]) { const e = (ax ? cz : cx) + sgn * r, pd = ax ? p.z : p.x; if (Math.abs(pd - e) > 28) continue; const along = ax ? p.x : p.z, lo = Math.max((ax ? cx : cz) - r, Math.floor(along) - 24), hi = Math.min((ax ? cx : cz) + r, Math.floor(along) + 24);
+      for (let a = Math.ceil(lo / 4) * 4; a <= hi; a += 4) { const mn = ax ? [a - .03, y0, e - .02] : [e - .02, y0, a - .03], mx = ax ? [a + .03, y1, e + .02] : [e + .02, y1, a + .03]; emitBox(vb, mn, mx, col, IDT); }
+      for (let yy = y0; yy <= y1; yy += 4) { const mn = ax ? [lo, yy - .03, e - .02] : [e - .02, yy - .03, lo], mx = ax ? [hi, yy + .03, e + .02] : [e + .02, yy + .03, hi]; emitBox(vb, mn, mx, col, IDT); } } }
+  function borderClamp() { const o = S.border; if (!o) return; const r = borderR() - .3; if (r > 1e6 || r <= 0) return; const cx = o.x + S.OX, cz = o.z + S.OZ, p = player;
+    if (p.x < cx - r) { p.x = cx - r; p.vx = Math.max(0, p.vx); } if (p.x > cx + r) { p.x = cx + r; p.vx = Math.min(0, p.vx); } if (p.z < cz - r) { p.z = cz - r; p.vz = Math.max(0, p.vz); } if (p.z > cz + r) { p.z = cz + r; p.vz = Math.min(0, p.vz); } }
+  function itemCooldownUI() { const now = performance.now(), cd = S.icd; if (!cd || !cd.size) return; const slots = document.querySelectorAll('#hotbar .slot');
+    for (let i = 0; i < 9 && i < slots.length; i++) { const it = S.slots[36 + i], c = it && cd.get(it.id), b = slots[i]; let ov = b.querySelector('.mcCd'); const k = c ? Math.max(0, (c.end - now) / c.dur) : 0;
+      if (k > 0) { if (!ov) { ov = document.createElement('i'); ov.className = 'mcCd'; ov.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:rgba(255,255,255,.45);pointer-events:none'; b.style.position = 'relative'; b.appendChild(ov); } ov.style.height = Math.round(k * 100) + '%'; } else if (ov) ov.remove(); }
+    for (const [id, c] of cd) if (c.end < now) cd.delete(id); }
+  // ---- maps: the MapColor palette, held-map HUD and maps in item frames ----
+  const MAPC = [0, 0x7FB238, 0xF7E9A3, 0xC7C7C7, 0xFF0000, 0xA0A0FF, 0xA7A7A7, 0x007C00, 0xFFFFFF, 0xA4A8B8, 0x976D4D, 0x707070, 0x4040FF, 0x8F7748, 0xFFFCF5, 0xD87F33, 0xB24CD8, 0x6699D8, 0xE5E533, 0x7FCC19, 0xF27FA5, 0x4C4C4C, 0x999999, 0x4C7F99, 0x7F3FB2, 0x334CB2, 0x664C33, 0x667F33, 0x993333, 0x191919, 0xFAEE4D, 0x5CDBD5, 0x4A80FF, 0x00D93A, 0x815631, 0x700200,
+    0xD1B1A1, 0x9F5224, 0x95576C, 0x706C8A, 0xBA8524, 0x677535, 0xA04D4E, 0x392923, 0x876B62, 0x575C5C, 0x7A4958, 0x4C3E5C, 0x4C3223, 0x4C522A, 0x8E3C2E, 0x251610];
+  const MAPSH = [180, 220, 255, 135];
+  function mapData(id, sc, icons, pat) { const M = S.maps = S.maps || new Map(); let m = M.get(id); if (!m) { const c = document.createElement('canvas'); c.width = c.height = 128; m = { c, g: c.getContext('2d'), img: null, ver: 0, icons: [] }; m.img = m.g.createImageData(128, 128); M.set(id, m); }
+    m.icons = icons || []; if (pat) { const d = m.img.data; for (let j = 0; j < pat.rows; j++) for (let i = 0; i < pat.cols; i++) { const v = pat.data[i + j * pat.cols], x = pat.x + i, y = pat.y + j; if (x > 127 || y > 127) continue; const o = (y * 128 + x) * 4, base = MAPC[v >> 2], s = MAPSH[v & 3];
+      if (!(v >> 2) || base == null) { d[o + 3] = 0; continue; } d[o] = ((base >> 16) & 255) * s / 255; d[o + 1] = ((base >> 8) & 255) * s / 255; d[o + 2] = (base & 255) * s / 255; d[o + 3] = 255; } m.g.putImageData(m.img, 0, 0); }
+    m.ver++; if (S.mapHud && S.mapHud.id === id) drawMapHud(); }
+  function drawMapTo(g, m, W) { g.clearRect(0, 0, W, W); g.fillStyle = '#e8dcb5'; g.fillRect(0, 0, W, W); g.imageSmoothingEnabled = false; g.drawImage(m.c, 0, 0, W, W);
+    for (const ic of m.icons) { const x = (ic.x + 128) / 256 * W, y = (ic.z + 128) / 256 * W, a = ic.dir * PI / 8; g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = ic.type === 0 ? '#fff' : ic.type === 1 ? '#3c3' : ic.type === 2 ? '#d33' : '#36f'; g.strokeStyle = '#000'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, -5); g.lineTo(3.5, 4); g.lineTo(0, 2); g.lineTo(-3.5, 4); g.closePath(); g.fill(); g.stroke(); g.restore(); } }
+  function drawMapHud() { const h = S.mapHud, m = h && S.maps && S.maps.get(h.id); if (!h) return; let el = document.getElementById('mcMapHud');
+    if (!el) { hud2(); el = document.createElement('canvas'); el.id = 'mcMapHud'; el.width = el.height = 256; el.style.cssText = 'position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 52px);width:150px;height:150px;border:4px solid #8a6b3f;border-radius:4px;background:#e8dcb5;image-rendering:pixelated;box-shadow:0 2px 8px #0008'; document.getElementById('mcHud2').appendChild(el); }
+    el.style.display = ''; if (m) drawMapTo(el.getContext('2d'), m, 256); }
+  function mapTick() { const h = held(), mc = h && h.mc, want = mc && mc.id === 358 ? (mc.damage | 0) : null;
+    if (want == null) { if (S.mapHud) { S.mapHud = null; const el = document.getElementById('mcMapHud'); if (el) el.style.display = 'none'; } }
+    else if (!S.mapHud || S.mapHud.id !== want) { S.mapHud = { id: want }; drawMapHud(); }
+    // filled maps in item frames show as a picture on the frame (Strata's poster decor)
+    const P = S.mapPost = S.mapPost || new Map(), now = performance.now();
+    for (const [eid, e] of P) { const o = S.objs.get(eid); if (!o || !o.mci || o.mci.id !== 358 || (o.mci.damage | 0) !== e.mapId) { const i = (world.decor || []).indexOf(e); if (i >= 0) world.decor.splice(i, 1); P.delete(eid); if (o) o.mapE = null; world.changed = true; } }
+    for (const o of S.objs.values()) { if (o.kind !== 'frame' || !o.mci || o.mci.id !== 358) continue; const id = o.mci.damage | 0, m = S.maps && S.maps.get(id); if (!m) continue; let e = P.get(o.eid);
+      if (e && e.ver === m.ver) continue; if (e && now - e.t < 2000) continue;
+      const c = document.createElement('canvas'); c.width = c.height = 128; drawMapTo(c.getContext('2d'), Object.assign({}, m, { icons: [] }), 128); const img = c.toDataURL();
+      if (!e) { const [fx, fz] = o.f, n = [fx, 0, fz]; e = { kind: 'poster', c: [o.x + .5 - fx * .455, o.y + .5, o.z + .5 - fz * .455], n, u: [n[2], 0, -n[0]], v: [0, 1, 0], w: .875, h: .875, img, cell: [o.x, o.y, o.z], fixU: 1, mapId: id };
+        world.decor = world.decor || []; world.decor.push(e); P.set(o.eid, e); o.mapE = e; } else { const i = world.decor.indexOf(e); e.img = img; if (i >= 0) { world.decor.splice(i, 1); world.decor.push(Object.assign({}, e)); P.set(o.eid, world.decor[world.decor.length - 1]); o.mapE = P.get(o.eid); } }
+      P.get(o.eid).ver = m.ver; P.get(o.eid).t = now; world.changed = true; } }
+  // ---- villager trades (MC|TrList / MC|TrSel) ----
+  function trades(wid, l) { if (S.win && S.win.id === wid) { S.win.trades = l; if (S.win.tsel == null) S.win.tsel = 0; mcInvRender(); } }
+  function tradeFill(i) { const W = S.win; if (!W || !W.trades || !W.trades[i]) return; S.client.api.trade(i); W.tsel = i; const t = W.trades[i];
+    for (const k of [0, 1]) if (W.slots[k]) mcClick(k, 'quick');
+    waitIdle(() => { for (const [k, want] of [[0, t.a], [1, t.b]]) { if (!want) continue; let src = -1; for (let j = 9; j <= 44; j++) if (S.slots[j] && same(S.slots[j], want)) { src = j; break; } if (src < 0) continue; mcClick(winIdx(src), 'stack'); mcClick(k, 'stack'); if (S.cursor) mcClick(winIdx(src), 'stack'); } mcInvRender(); }); }
+  // ---- recipe book (every version): the vanilla 1.12 recipes, filled into the grid with ordinary clicks ----
+  const cellOk = (c, it) => !!it && (typeof c === 'number' ? it.id === c : it.id === c[0] && (it.damage | 0) === c[1]);
+  const rcells = r => r[3] ? r[3].flat().filter(c => c != null) : r[4];
+  const rItem = (id, d, n) => ({ id, count: n, damage: d, raw: new Uint8Array([(id >> 8) & 255, id & 255, n, (d >> 8) & 255, d & 255, 0]) });
+  function rbCan(r, w) { if (r[3] ? (r[3].length > w || r[3].some(row => row.length > w)) : r[4].length > w * w) return false;
+    const pool = []; for (let i = 9; i <= 44; i++) if (S.slots[i]) pool.push({ it: S.slots[i], n: S.slots[i].count }); for (let i of gridSlots(S.win)) { const A = S.win ? S.win.slots : S.slots; if (A[i]) pool.push({ it: A[i], n: A[i].count }); }
+    for (const c of rcells(r)) { const p = pool.find(q => q.n > 0 && cellOk(c, q.it)); if (!p) return false; p.n--; } return true; }
+  function rbFill(r) { const W = S.win, w = W ? 3 : 2, A = W ? W.slots : S.slots;
+    for (const g of gridSlots(W)) if (A[g]) mcClick(g, 'quick');
+    waitIdle(() => { const cells = []; if (r[3]) r[3].forEach((row, y) => row.forEach((c, x) => { if (c != null) cells.push([1 + y * w + x, c]); })); else r[4].forEach((c, i) => cells.push([1 + i, c]));
+      for (const [g, c] of cells) { let src = -1; for (let i = 9; i <= 44; i++) if (cellOk(c, S.slots[i])) { src = i; break; } if (src < 0) break; const k = winIdx(src); mcClick(k, 'stack'); mcClick(g, 'one'); if (S.cursor) mcClick(k, 'stack'); }
+      mcInvRender(); }); }
+  function extInvRender(el, W, kind, top) {
+    let box = el.querySelector('#mcExt'); if (!box) { box = document.createElement('div'); box.id = 'mcExt'; box.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin:6px 0'; top.after(box); } box.innerHTML = '';
+    if (kind === 'trade' && W.trades) { const row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+      W.trades.forEach((t, i) => { const b = document.createElement('button'); b.className = 'ghost'; b.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 6px;' + (i === W.tsel ? 'outline:2px solid #ffd34d;' : '') + (t.off ? 'opacity:.45;' : '');
+        const ic = it => { const s = it && toStack(it); return s ? `<span class="islot" style="width:34px;height:34px;display:inline-grid">${slotHTML({ ...s, n: it.count })}</span>` : ''; };
+        b.innerHTML = ic(t.a) + (t.b ? '+' + ic(t.b) : '') + '→' + ic(t.out) + (t.off ? '<small>sold out</small>' : ''); b.title = mcName(t.out); b.addEventListener('click', () => tradeFill(i)); row.appendChild(b); });
+      box.appendChild(row); }
+    if (kind === 'player' || kind === 'craft3') { const w = kind === 'player' ? 2 : 3, hd = document.createElement('button'); hd.className = 'ghost'; hd.textContent = S.rb ? '📖 Hide recipes' : '📖 Recipe book'; hd.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px';
+      hd.addEventListener('click', () => { S.rb = !S.rb; mcInvRender(); }); box.appendChild(hd); if (!S.rb) return;
+      const q = document.createElement('input'); q.placeholder = 'Search recipes'; q.value = S.rbq || ''; q.style.cssText = 'font-size:13px;padding:4px 8px'; q.addEventListener('input', () => { S.rbq = q.value; clearTimeout(S.rbt); S.rbt = setTimeout(() => { mcInvRender(); const n = document.querySelector('#mcExt input'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); }); box.appendChild(q);
+      const list = document.createElement('div'); list.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;max-height:150px;overflow:auto'; const qq = (S.rbq || '').toLowerCase(), seen = new Set(); let n = 0;
+      for (const r of StrataMC.recipes || []) { const key = r[0] + ':' + r[1]; if (seen.has(key) || !rbCan(r, w)) continue; const it = rItem(r[0], r[1], r[2]), nm = mcName(it); if (qq && !nm.toLowerCase().includes(qq)) continue; seen.add(key); if (++n > 120) break;
+        const st = toStack(it), b = document.createElement('button'); b.className = 'islot'; b.innerHTML = slotHTML({ ...st, n: r[2] }); b.title = nm; b.setAttribute('aria-label', 'Craft ' + nm); b.addEventListener('click', () => rbFill(r)); list.appendChild(b); }
+      if (!n) list.innerHTML = '<small class="hint">Nothing you can craft here with what you carry' + (w === 2 ? ' (bigger recipes need a crafting table)' : '') + '.</small>'; box.appendChild(list); }
+  }
+  // ---- advancements (1.12): toasts and a list in the pause menu ----
+  function advancements(reset, add, rem, prog) { const A = S.adv = S.adv || new Map(); if (reset) A.clear(); const first = reset && !S.advInit; S.advInit = true;
+    for (const a of add) { const o = A.get(a.id); A.set(a.id, Object.assign(a, { prog: o ? o.prog : {} })); } for (const id of rem) A.delete(id);
+    for (const p of prog) { const a = A.get(p.id); if (!a) continue; const was = advDone(a); Object.assign(a.prog, p.c); if (!first && !was && advDone(a) && a.title && a.toast) toast((a.frame === 1 ? 'Challenge complete! ' : a.frame === 2 ? 'Goal reached! ' : 'Advancement made! ') + a.title); }
+    advButton(); }
+  const advDone = a => !!(a.req && a.req.length && a.req.every(g => g.some(c => a.prog[c] > 0)));
+  function advButton() { if (S.advBtn || !S.adv || !S.adv.size) return; const r = document.getElementById('resume'); if (!r) return; const b = document.createElement('button'); b.className = 'ghost'; b.id = 'mcAdvBtn'; b.textContent = 'Advancements'; b.addEventListener('click', advOpen); r.after(b); S.advBtn = b; }
+  function advOpen() { let el = document.getElementById('mcAdv'); if (!el) { el = document.createElement('div'); el.id = 'mcAdv'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.92);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:13px system-ui'; document.body.appendChild(el); }
+    const A = [...S.adv.values()].filter(a => a.title && !a.hidden), roots = A.filter(a => !a.parent || !S.adv.get(a.parent)), rootOf = a => { let x = a, n = 0; while (x.parent && S.adv.get(x.parent) && n++ < 50) x = S.adv.get(x.parent); return x.id; };
+    const tab = S.advTab && roots.some(r => r.id === S.advTab) ? S.advTab : roots[0] && roots[0].id; S.advTab = tab; try { S.client.api.advTab(tab); } catch (e) { /* old server */ }
+    const fr = ['', '◆ ', '★ '], items = A.filter(a => rootOf(a) === tab).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">Advancements</b><button class="ghost" id="mcAdvX">Close</button></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${roots.map(r => `<button class="ghost" data-t="${r.id.replace(/"/g, '')}" style="${r.id === tab ? 'outline:2px solid #ffd34d' : ''}">${r.title.replace(/</g, '&lt;')}</button>`).join('')}</div>` +
+      items.map(a => { const d = advDone(a), tot = a.req.length, got = a.req.filter(g => g.some(c => a.prog[c] > 0)).length; return `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;margin:3px 0;border-radius:8px;background:${d ? 'rgba(220,180,40,.22)' : 'rgba(255,255,255,.06)'}"><b style="width:18px">${d ? '✓' : ''}</b><div><div style="font-weight:600">${fr[a.frame] || ''}${a.title.replace(/</g, '&lt;')}</div><small style="opacity:.75">${(a.desc || '').replace(/</g, '&lt;')}${tot > 1 && !d ? ` (${got}/${tot})` : ''}</small></div></div>`; }).join('');
+    el.hidden = false; el.querySelector('#mcAdvX').onclick = () => { el.hidden = true; }; el.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { S.advTab = b.dataset.t; advOpen(); }); }
+  // ---- 1.12 bed colours (block entity "color") ----
+  function bedColour(x, y, z, c) { if (!S.world) return; const X = x + S.OX, Z = z + S.OZ; (S.bedCol = S.bedCol || new Map()).set(X + ',' + y + ',' + Z, c & 15); bedPaint(X, y, Z); }
+  function bedPaint(X, y, Z) { const c = S.bedCol && S.bedCol.get(X + ',' + y + ',' + Z); if (c == null) return; const bd = BLOCKS[world.get(X, y, Z)]; if (!bd || !bd.bed) return; const id = DYES[c][bd.bed.head ? 'bedH' : 'bedF'][bd.bed.fi]; if (id !== world.get(X, y, Z)) setBlock(X, y, Z, id); }
+  // ---- server resource packs: layered over the player's own pack for the session only ----
+  async function serverPack(buf, url) {
+    if (window.__mcServerPacks === false) return; toast('Loading the server resource pack...'); let rec;
+    try { rec = await importPack(new File([buf], decodeURIComponent((url.split(/[?#]/)[0].split('/').pop() || 'server').replace(/\.zip$/i, '')) + '.zip')); }
+    catch (e) { if (/No Minecraft/.test(e.message)) return; throw e; }
+    if (!S) return; if (!S.srvPack) S.packPrev = (PACK.on && PACK.rec) || null; const pv = S.packPrev;
+    const merged = pv ? Object.assign({}, rec, { name: rec.name, files: Object.assign({}, pv.files, rec.files), mcsnd: Object.assign({}, pv.mcsnd || {}, rec.mcsnd || {}), sounds: rec.sounds && Object.keys(rec.sounds).length ? rec.sounds : pv.sounds }) : rec;
+    S.srvPack = true; await window.applyPack(merged); toast('Server resource pack loaded'); }
+  // ---- chat: clickable commands, hover text and command suggestions (tab complete) ----
+  function chatHooks() { const st = document.createElement('style'); st.id = 'mcExtCss'; st.textContent = '.mcCmd{pointer-events:auto;text-decoration:underline dotted}#mcLog [title]{pointer-events:auto}#mcSug{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 4px}#mcSug button{font-size:12px;padding:3px 8px}'; document.head.appendChild(st);
+    S.onCmd = e => { const c = e.target.closest && e.target.closest('.mcCmd'); if (!c || !S) return; e.preventDefault(); e.stopPropagation(); const v = c.dataset.v || '';
+      if (c.dataset.a === 'r') { S.client.chat(v); } else { const i = document.getElementById('mcIn'), bar = document.getElementById('mcBar'); if (i) { if (bar) bar.hidden = false; i.value = v; i.focus(); } } };
+    document.addEventListener('click', S.onCmd, true);
+    const i = document.getElementById('mcIn'); if (!i) return;
+    S.onIn = () => { clearTimeout(S.tabT); const v = i.value; if (v[0] !== '/' || v.length < 2) { sug([]); return; } S.tabT = setTimeout(() => { if (S && i.value === v) { S.tabFor = v; S.client.api.tab(v); } }, 300); };
+    S.onKey = e => { if (e.key === 'Tab') { e.preventDefault(); const b = document.querySelector('#mcSug button'); if (b) b.click(); else S.client.api.tab(S.tabFor = i.value); } };
+    i.addEventListener('input', S.onIn); i.addEventListener('keydown', S.onKey); }
+  function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
+    el.innerHTML = ''; for (const m of list.slice(0, 12)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
+  function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
+    for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud']) { const e = document.getElementById(id); if (e) e.remove(); } }
+  // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
+  OVR.push('stepGlider');
+  IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
+    if (!ely) { p.gliding = false; return; }
+    if (p.onGround || p.inWater || p.climbing || p.mount) { if (p.gliding) { p.gliding = false; S.boostT = 0; } return; }
+    if (!p.gliding && input.jumpEdge && p.vy < 3) { p.gliding = true; input.jumpEdge = false; p.jumpBuf = 0; S.glideT = performance.now(); S.client.api.action(S.eid, 8, 0); }
+    if (!p.gliding) return; const f = input.mag > .1 ? Math.atan2(input.mx, input.mz) : p.face; p.face = angLerp(p.face, f, 1 - Math.exp(-3 * dt));
+    const boost = S.boostT > performance.now(), sp = boost ? 22 : 11, k = 1 - Math.exp(-(boost ? 3 : 1.4) * dt);
+    p.vx = lerp(p.vx, Math.sin(p.face) * sp, k); p.vz = lerp(p.vz, Math.cos(p.face) * sp, k); if (boost) p.vy = lerp(p.vy, 3, 1 - Math.exp(-3 * dt)); p.fallTop = p.y; };
+  { const uh = IMPL.useHeld; IMPL.useHeld = function () { const h = held(), mc = h && h.mc, a = S.client.api;
+      if (mc && mc.id === 401 && player.gliding) { a.place(-1, -1, -1, 255, mc, 0, 0, 0); S.boostT = performance.now() + 1400; return true; }   // firework boost
+      const off = V9() && S.slots[45], shMain = mc && mc.id === 442, shOff = !shMain && off && off.id === 442 && !(mc && (FOOD18.has(mc.id) || mc.id === 386 || mc.id === 387));
+      if (V9() && (shMain || shOff)) { if (S.block) { a.dig(5, 0, 0, 0, 0); S.block = false; toast('Shield lowered'); } else { a.useItem(shMain ? 0 : 1); S.block = true; toast('Shield raised - tap again to lower'); } return true; }
+      return uh.apply(this, arguments); }; }
+  // ---- other players: gliding, blocking / drawing a bow, sleeping; elytra wings and shields ----
+  function poseArms(pl, A) { if (pl.glide) { A.rArm = A.lArm = 0; A.rArmZ = -.35; A.lArmZ = .35; A.rLeg = A.lLeg = 0; }
+    const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null;
+    if (it && it.id === 442) { if (u & 2) A.lArm = -.95; else A.rArm = -.95; } else if (it && it.id === 261) { A.rArm = -PI / 2; A.lArm = -PI / 2 - .2; }
+    if (pl.sleep) A.rArm = A.lArm = A.rLeg = A.lLeg = 0; }
+  function sleepBase(pl, PX) { const s = pl.sleep; return mc(mT(s[0], s[1], s[2]), mY(s[3]), mX(-PI / 2), mS(PX)); }
+  function shieldOn(arm, x0) { const T = (a, b, c) => ap(arm, a, b, c); emitBox(dynVB, [x0 - 6, 2, 2], [x0 + 6, 20, 3.5], [150, 112, 70], T); emitBox(dynVB, [x0 - 1, 9, 3.5], [x0 + 1, 13, 4], [120, 120, 126], T); return true; }
+  function wings(pl, body) { if (!isEly(pl.eq[3])) return; const T = (a, b, c) => ap(body, a, b, c), c = [128, 128, 146];
+    if (pl.glide) { emitBox(dynVB, [-14, 10, -3], [-1, 23, -2.4], c, T); emitBox(dynVB, [1, 10, -3], [14, 23, -2.4], c, T); }
+    else { emitBox(dynVB, [-5, 3, -3.2], [0, 23, -2.4], c, T); emitBox(dynVB, [0, 3, -3.2], [5, 23, -2.4], c, T); } }
+  function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
+    m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
+  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+      for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
+      if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
+  function extHandlers(Hd) {
+    const o = { vmeta: Hd.vmeta, bmeta: Hd.bmeta, flags: Hd.flags, playerInfo: Hd.playerInfo, spawn: Hd.spawn, anim: Hd.anim, block: Hd.block, tile: Hd.tile, held: Hd.held, showObjective: Hd.showObjective, multi: Hd.multi };
+    Object.assign(Hd, {
+      vmeta(eid, idx, kind, v) { if (!S.world) return; if (nameMeta(eid, idx, kind, v)) return; const m = S.ents.get(eid), off = PV() >= 210 ? 1 : 0;
+        if (m && m.stand && idx === 10 + off && kind === 'byte') { standFlags(m, v); return; }
+        if (m && m.pl && idx === 5 + off && kind === 'byte') { m.useH = v; return; }   // hand states: 1 = using, 2 = off hand
+        o.vmeta(eid, idx, kind, v); },
+      smeta(eid, idx, v) { if (S.world) nameMeta(eid, idx, 'str', v); },
+      bmeta(id, idx, v, ty) { if (idx === 3 && ty === 0 && S.ents.get(id)) { nameMeta(id, 3, 'byte', v); return; } const m = S.ents.get(id); if (m && m.stand && idx === 10) { standFlags(m, v); return; } o.bmeta(id, idx, v, ty); },
+      flags(id, v) { if (id === S.eid) { S.glideOk = !!(v & 128); if (S.glideOk) S.glideT = 0; return; } const m = S.ents.get(id); if (m) { m.invis = !!(v & 32); if (m.pl) m.glide = !!(v & 128); } o.flags(id, v);
+        if (m && m.pl && PV() === 47) m.useH = v & 16 ? 1 : 0; },   // 1.8: flag 0x10 = eating / drinking / blocking with a sword
+      playerInfo(u, n, sk, ping, gm) { o.playerInfo(u, n, sk, ping, gm); if (n == null && ping == null) { if (S.disp) S.disp.delete(u); } },
+      dispName(u, t, html) { S.disp = S.disp || new Map(); if (t) S.disp.set(u, html); else S.disp.delete(u); renderTab(); },
+      spawn(e) { o.spawn(e); const m = S.ents.get(e.eid); if (m && m.pl) m.nm = S.names.get(e.uuid) || null; },
+      anim(id, a) { const m = S.ents.get(id); if (m && a === 2) m.sleep = null; o.anim(id, a); },
+      bed(eid, x, y, z) { if (S.world) bedPose(eid, x, y, z); },
+      block(x, y, z, st) { o.block(x, y, z, st); if (S.world && st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); },
+      tile(x, y, z, a, raw) { o.tile(x, y, z, a, raw); if (!S.world) return; let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
+        if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); },
+      held(n) { S.block = false; o.held(n); },
+      showObjective(pos, nm) { if (pos === 2) { S.belowObj = nm || null; return; } o.showObjective(pos, nm); },
+      team, map(id, sc, icons, pat) { if (S.world) mapData(id, sc, icons, pat); }, abilities(f, fly, walk) { S.abil = { f, fly, walk }; },
+      combat(pid, t) { if (pid === S.eid) combat(pid, t); }, border(b) { border(b); }, tabDone(l) { sug(l); },
+      cooldown(id, ticks) { const sid = id; (S.icd = S.icd || new Map()); if (ticks > 0) S.icd.set(sid, { end: performance.now() + ticks * 50, dur: ticks * 50 }); else S.icd.delete(sid); },
+      trades(wid, l) { trades(wid, l); }, bookOpen() { const h = held(); if (h && h.mc && (h.mc.id === 387 || h.mc.id === 386)) openMcBook(h); },
+      advancements(r, a, d, p) { advancements(r, a, d, p); }, serverPack(buf, url) { return serverPack(buf, url); },
+    });
   }
   function unloadKey(k) { S.store.delete(k); const ch = world && world.chunks.get(k); if (ch) { freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); world.chunks.delete(k); } }
   function belowId(x, y, z) { const a = S.store.get(ckey(x >> 4, z >> 4)); return a && y > 0 ? a[((y - 1) * CS + (z & 15)) * CS + (x & 15)] : 0; }
@@ -1254,13 +1453,13 @@
 
   function tick() {   // entity smoothing + our position to the server
     const now = performance.now(), dt = Math.min(.1, (now - (S.lastT || now)) / 1000); S.lastT = now; ensureGeneric();
-    if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4; p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
-      if (!p.inWater && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
+    if (S.world && player) { const p = player, sp = Math.hypot(p.vx, p.vz), cap = (p.crouch ? 1.4 : p.sprinting ? 5.7 : 4.4) * (S.abil && S.abil.walk > .1 ? S.abil.walk / .1 : 1); p.dashT = 0; p.dashCd = 1;   // stay inside Minecraft's speeds so servers don't rubber-band us
+      if (!p.inWater && !p.gliding && sp > cap) { const f = cap / sp; p.vx *= f; p.vz *= f; } }
     if (S.world && S.Hd && S.Hd.cur) { const k = ckey(Math.floor(player.x) >> 4, Math.floor(player.z) >> 4); if ((!S.store.has(k) || !world.chunks.has(k)) && (S.hold = (S.hold || 0) + dt) < 8) { player.vy = 0; player.vx = player.vz = 0; player.y = S.Hd.cur.y; player.fallTop = player.y; } else if (S.store.has(k)) S.hold = 0; }   // wait for the ground to arrive instead of falling through the void
     for (const m of S.players) { const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9; if (m.swingT > 0) m.swingT -= dt;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
     if (S.world && S.fx && Object.keys(S.fx).length && (S.fxT = (S.fxT || 0) + dt) > 1) { S.fxT = 0; effectHud(); }
-    if (S.world) { try { stepObjs(dt); cooldownUI(); } catch (e) { /* fx */ } stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
+    if (S.world) { try { stepObjs(dt); cooldownUI(); extTick(); } catch (e) { /* fx */ } stepProj(dt); const hc = document.getElementById('mcHunger'), hh = document.getElementById('hearts'); if (hc && hh && hc.hidden !== hh.hidden) hc.hidden = hh.hidden; }
     for (const m of S.mobs) { if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt); const dx = m.tx - m.x, dy = m.ty - m.y, dz = m.tz - m.z, d = Math.hypot(dx, dz), k = 1 - Math.exp(-14 * dt); m.x += dx * k; m.y += dy * k; m.z += dz * k; m.moving = d > .03; if (m.moving) m.phase += dt * 9;
       let da = m.tface - m.face; da = Math.atan2(Math.sin(da), Math.cos(da)); m.face += da * k; }
   }
@@ -1275,6 +1474,7 @@
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
+    try { chatHooks(); } catch (e) { /* ui */ }
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
@@ -1285,8 +1485,10 @@
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.removeEventListener('click', bookHooks.done, true); if (g) g.removeEventListener('click', bookHooks.sign, true); }
     if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
+    try { chatUnhook(s); } catch (e) { /* ui */ } window.__elytra = false;
     if (s.world) {
       for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
+      if (s.srvPack) { try { applyPack(s.packPrev); } catch (e) { /* pack */ } }
       document.body.classList.remove('mc-compat'); drops.length = 0; document.removeEventListener('pointerover', s.tip, true); document.removeEventListener('focusin', s.tip, true); for (const id of s.items) delete ITEMS[id]; window.__mcActive = false; window.__cmobs = null; window.__mcTimeCmd = null;
       for (const id of s.regs) { try { packUnassign(id); } catch (e) { /* none */ } BLOCKS[id] = undefined; LOPQ[id] = 0; LATT[id] = 0; TINT[id] = undefined; EMIT[id] = undefined; } BLOCKS.length = Math.min(BLOCKS.length, 8192);
       document.getElementById('pause').hidden = true; document.getElementById('hud').hidden = true; document.getElementById('loading').hidden = true;

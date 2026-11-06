@@ -182,3 +182,21 @@ Everything from the 1.8 stages now runs on every release up to 1.12.2 (block ids
 - New mobs with Minecraft geometry and pack textures (generated textures without a pack): shulker (lid opens with peek, 16 colours), polar bear, llama (4 colours), vex, evoker, vindicator (axe), illusioner, husk, stray, elder guardian, zombie villager; skeleton/zombie horses, donkeys and mules use the horse model with their textures; parrots use Strata's parrot with the 5 variants. Spectral arrows, dragon fireballs, shulker bullets and llama spit.
 - Test: `VER=<version> node test-world-multi.mjs` (1.8.8 ... 1.12.2) serves chunks with new blocks, that version's mobs, a player, a drop, a sign, a boss bar and a title; passes on 1.8.8, 1.9, 1.9.2, 1.9.4, 1.10.2, 1.11, 1.11.2, 1.12, 1.12.1, 1.12.2.
 - Not yet: elytra flight, shield blocking pose, recipe book, advancements, 1.12 bed colours.
+
+## Stage 19: plugin and server features, elytra, shields, recipe book (1.8 - 1.12.2)
+
+Everything here exists only while connected in compat mode and is removed on disconnect.
+
+- **Holograms and custom names**: entity metadata 2/3 (custom name, name visible) on mobs, players and armour stands. Invisible (flag 0x20) and marker stands draw no body, so plugin holograms show as floating text. Small stands draw at half size.
+- **Teams**: `scoreboard_team` / `teams` prefix, suffix and colour on name tags and the tab list; `nameTagVisibility: never` hides the tag (NPC plugins). Tab list display names (`player_info` action 3) and the below-name scoreboard slot. NPC player entities keep their name after the server removes them from the tab list.
+- **Chat**: `run_command` / `suggest_command` click events and `show_text` hover text. Command suggestions use `tab_complete` and appear above the chat box as you type a `/command` (Tab picks the first).
+- **Server resource packs**: `resource_pack_send` is accepted (3), downloaded through the relay (`http_get`, both the Node and Android relays) and layered over your own pack for the session, then reported loaded (0) or failed (2). Your own pack comes back on disconnect.
+- **Maps**: `map` packets with the 1.12 MapColor palette. A held filled map shows in the top right; a map in an item frame shows as a picture on the frame.
+- **Villager trades**: `MC|TrList` offers listed in the trade screen; tapping one sends `MC|TrSel` and moves the payment into the slots. `MC|BOpen` opens the held book.
+- **Recipe book** (every version): the vanilla 1.12 crafting recipes (`src/mc/recipes.json`, from minecraft-data, made by `tools/mctest/gen_recipes.mjs`). It lists what you can craft with what you carry, in the 2x2 grid or a crafting table, and fills the grid with ordinary window clicks.
+- **Elytra** (1.9+): wearing one, jump in mid-air to glide (Strata's glider physics, faster); sends `entity_action` 8. Using a firework while gliding boosts. Other players glide horizontally with wings.
+- **Shields** (1.9+): tap Use with a shield in either hand to raise it (`use_item`), tap again to lower it (dig status 5). Other players show the shield and the raised pose; bow-drawing pose too.
+- **Beds**: block 26 maps to Strata beds (facing and head/foot from the metadata), red by default, coloured from the 1.12 bed block entity. Players in a `bed` packet lie in it.
+- **Advancements** (1.12): toasts on completion and an Advancements list (by tab) in the pause menu.
+- **Other packets**: `world_border` (a grid wall near the edge and a movement clamp), `set_cooldown` (hotbar overlay), `abilities` (walk speed scales the speed cap), `combat_event` (the death message), `camera`.
+- Test: `tools/mctest/test-features.mjs` (VER=1.8.9 ... 1.12.2; needs `/tmp/claude-0/srvpack.zip`, any small pack with a stone texture).
