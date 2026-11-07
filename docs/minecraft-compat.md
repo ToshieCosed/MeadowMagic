@@ -203,3 +203,15 @@ Everything here exists only while connected in compat mode and is removed on dis
 - **Heads** (block 144): skeleton, wither, zombie, creeper and dragon heads as coloured heads with faces; player heads with the owner's skin (from the block entity's texture URL, or the owner's name). Floor rotation and wall mounting follow the block.
 - **Your own character**: lies flat with wings while gliding on an elytra, and shows a raised shield (hooks `__plTilt` / `__plPose` / `__plExtra` in Strata's `buildPlayerSkin`, set only in compat).
 - **Proxy server switches** (BungeeCord / Velocity): a second join or a respawn forgets the old server's entities, heads, map frames, border and cooldowns, like vanilla.
+
+## Stage 20: Forge servers (1.12.2) and mod ports
+
+Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here exists only in a Forge session.
+
+- **Joining**: Strata reads the server's mod list from its status ping, adds the `\0FML\0` marker to the handshake, and answers the FML handshake (protocol 2: `REGISTER`, `FML|HS` hello / mod list / registry data / acks, `FML|MP` multipart). The server's registries (`minecraft:blocks`, `minecraft:items`, `minecraft:entities`, ...) map the world's ids to names. Modded ids fill gaps anywhere in the table (Solar Flux gets 253), so blocks and items are recognised by registry name.
+- **Mod jars**: "Import mod jars" takes `.jar` files or a `.zip` of a mods folder and stores, per mod: block/item textures, blockstate + model JSON resolved to [side, top, bottom] textures (Forge `forge_marker` blockstates too) and box shapes from model elements, item textures, and `en_us.lang` names. They are layered over the player's pack for the session. Without jars, modded blocks are plain colours with readable names.
+- **Modded entities** arrive through FML's own spawn message (channel `FML`, discriminator 2) and show as the stand-in mob with the entity's name. Mod container screens arrive as FML `OpenGui`; the slot count comes with the window's items.
+- **Ports** (`PORTS` in engine.js): a mod's client half, keyed by mod id: `block(name, meta)` for blocks the mod draws in code, `payload[channel]` for its network messages, `gui(W, box)` for extra screen content, `tap` / `use` for client-opened screens.
+  - **Solar Flux Reborn 4.35r**: panels drawn 6/16 tall with base / top textures; the panel screen shows energy, generation, max and sun from the mod's long window properties (keys 0 capacity, 1 energy, 2 max generation, 3 transfer, 4 current generation, 5 sun as float bits).
+  - **Waystones 4.1.0**: two-block stone (meta & 8 = lower half); the known-waystones list (message 1), the server-opened selection (9) and the teleport effect (5); tapping an activated waystone, a warp stone or a warp scroll opens the destination list and sends `MessageTeleportToWaystone` (4).
+- Tests: `tools/mctest/test-forge-node.mjs` (handshake in Node) and `test-forge.mjs` (browser: imports the jars, joins a real Forge server, places modded blocks, opens the Solar Flux screen, Waystones list). The server folder used: Forge 14.23.5.2860 with Java 8.

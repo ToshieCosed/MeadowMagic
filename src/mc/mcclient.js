@@ -165,6 +165,28 @@
     }
     const HTTP = {}; let httpN = 0;
     function httpGet(url) { return new Promise((res, rej) => { const id = ++httpN; HTTP[id] = { res, rej }; ws.send(JSON.stringify({ type: 'http_get', id, url })); setTimeout(() => { if (HTTP[id]) { delete HTTP[id]; rej(new Error('timed out')); } }, 120000); }); }
+    // ---- Forge (FML protocol 2, 1.12.2): the handshake runs over plugin messages before the server sends Join Game ----
+    const F = { mods: o.forgeMods || [], reg: {}, parts: null };
+    const pay = (ch, w) => out('custom_payload', new W().str(ch).raw(w.out ? w.out() : w));
+    const hs = w => pay('FML|HS', w), ack = ph => hs(new W().b(255).b(ph));
+    function fml(ch, r) {
+      if (ch === 'REGISTER') { const chans = td.decode(r.u.subarray(r.p)).split('\0').filter(Boolean); F.chans = chans; pay('REGISTER', new W().raw(te.encode(chans.join('\0')))); return true; }
+      if (ch === 'FML|MP') { if (!F.parts) { F.parts = { ch: r.str(), n: r.b(), len: r.i32(), got: [] }; } else { r.b(); F.parts.got.push(r.u.slice(r.p)); if (F.parts.got.length >= F.parts.n - 1) { const all = new Uint8Array(F.parts.len); let o2 = 0; for (const g2 of F.parts.got) { all.set(g2.subarray(0, Math.min(g2.length, all.length - o2)), o2); o2 += g2.length; } const c2 = F.parts.ch; F.parts = null; fml(c2, new R(all, 0)); } } return true; }
+      if (ch === 'FML|HS') { const d = r.i8();
+        if (d === 0) { r.b(); status('Forge server: sending mod list (' + F.mods.length + ' mods)'); hs(new W().b(1).b(2)); const w = new W().b(2).vi(F.mods.length); for (const m of F.mods) w.str(m.modid).str(m.version); hs(w); }
+        else if (d === 2) { const n = r.vi(); F.serverMods = []; for (let i = 0; i < n; i++) F.serverMods.push({ modid: r.str(), version: r.str() }); ack(2); }
+        else if (d === 3) { const more = r.bool(), nm = r.str(), n = r.vi(), ids = {}; for (let i = 0; i < n; i++) { const k = r.str(); ids[r.vi()] = k; } const nd = r.vi(); for (let i = 0; i < nd; i++) r.str(); const no = r.vi(); for (let i = 0; i < no; i++) { r.str(); r.str(); }
+          F.reg[nm] = ids; if (!more) { if (H && H.forgeRegistries) try { H.forgeRegistries(F.reg, F.serverMods || F.mods); } catch (e) { /* engine */ } ack(3); } }
+        else if (d === -1) { const ph = r.b(); if (ph === 2) ack(4); else if (ph === 3) { ack(5); status('Forge handshake complete'); } }
+        return true; }
+      if (ch === 'FML') { const d = r.b();
+        if (d === 2 && H && H.modSpawn) { const eid = r.i32(), mod = r.str(), tid = r.i32(); r.skip(16); const x = r.f64(), y = r.f64(), z = r.f64(), yaw = ang(r.i8()), pitch = ang(r.i8()); H.modSpawn({ eid, mod, tid, x, y, z, yaw, pitch }); }
+        else if (d === 1 && H && H.modGui) { const wid = r.i32(), mod = r.str(), gid = r.i32(); H.modGui(wid, mod, gid, r.i32(), r.i32(), r.i32()); }
+        return true; }
+      if (ch === 'FORGE') return true;
+      if (H && H.modPayload) { try { if (H.modPayload(ch, r.u.slice(r.p))) return true; } catch (e) { status('Mod packet ' + ch + ' failed: ' + e.message); return true; } }
+      return F.chans && F.chans.includes(ch);   // a mod channel nothing here understands yet: swallow it
+    }
     function onLogin(name, r, body) {
       if (name === 'disconnect') return end(comp(r.str()));
       if (name === 'encryption_begin') {
@@ -205,7 +227,7 @@
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }
           if (LEG && H) { const eid = r.i32(), gm = r.b(), dim = P >= 108 ? r.i32() : r.i8(); sky = dim === 0; H.login && H.login({ eid, dimension: dim, gamemode: gm });
-            if (V9) out('settings', new W().str('en_US').b(o.viewDistance || 6).vi(0).bool(true).b(127).vi(1)); else out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str('vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
+            if (V9) out('settings', new W().str('en_US').b(o.viewDistance || 6).vi(0).bool(true).b(127).vi(1)); else out('settings', new W().str('en_US').b(o.viewDistance || 6).b(0).bool(true).b(127)); out('custom_payload', new W().str('MC|Brand').str(o.forge ? 'fml,forge' : 'vanilla')); }   // like the vanilla client; some anti-bot plugins drop clients that never send a brand
           return;
         case 'respawn': if (LEG && H) { const dim = r.i32(); sky = dim === 0; H.respawn && H.respawn(dim); } return;
         case 'update_time': if (LEG && H && H.time) { const age = r.i64(), tod = r.i64(); H.time(age, tod); } return;
@@ -327,7 +349,7 @@
         case 'set_cooldown': if (LEG && H && H.cooldown) { const it = r.vi(); H.cooldown(it, r.vi()); } return;
         case 'bed': if (LEG && H && H.bed) { const eid = r.vi(); const hi = r.d.getInt32(r.p), lo = r.d.getUint32(r.p + 4); r.p += 8; H.bed(eid, hi >> 6, ((lo >>> 26) | ((hi & 63) << 6)) & 0xfff, (lo << 6) >> 6); } return;
         case 'camera': if (LEG && H && H.camera) H.camera(r.vi()); return;
-        case 'custom_payload': if (LEG && H) { const ch = r.str();
+        case 'custom_payload': if (LEG && H) { const ch = r.str(); if (o.forge && fml(ch, r)) return;
             if (ch === 'MC|TrList' && H.trades) { const wid = r.i32(), n = r.b(), l = []; for (let i = 0; i < n; i++) { const a = slot18(r), out1 = slot18(r), b2 = r.bool() ? slot18(r) : null, off = r.bool(), uses = r.i32(), max = r.i32(); l.push({ a, out: out1, b: b2, off, uses, max }); } H.trades(wid, l); }
             else if (ch === 'MC|BOpen' && H.bookOpen) H.bookOpen(V9 && r.p < r.u.length ? r.vi() : 0);
             else if (ch === 'MC|Brand' && H.brand) H.brand(r.str());
@@ -390,7 +412,7 @@
       if (typeof e.data !== 'string') { onPacket(new Uint8Array(e.data)); return; }
       let m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.type === 'tcp_open_ok') {
-        const w = new W().vi(0).vi(P).str(o.host).u16(o.port).vi(2); ws.send(w.out()); loginStart();
+        const w = new W().vi(0).vi(P).str(o.host + (o.forge && LEG ? '\0FML\0' : '')).u16(o.port).vi(2); ws.send(w.out()); loginStart();   // Forge servers look for the FML marker
       } else if (m.type === 'mc_encrypt_ready') {
         const w = new W(); w.bytes(unb64(m.secret)); if (P === 759 || P === 760) w.bool(true); w.bytes(unb64(m.token)); out('encryption_begin', w);
       } else if (m.type === 'tcp_error' || m.type === 'mc_error') end(m.message || 'Connection failed.');
@@ -445,9 +467,16 @@
       tab: v47(text => out('tab_complete', V9 ? new W().str(text).bool(false).bool(false) : new W().str(text).bool(false))),
       trade: v47(i => out('custom_payload', new W().str('MC|TrSel').i32(i))),
       advTab: v47(id => P >= 335 ? out('advancement_tab', id ? new W().vi(0).str(id) : new W().vi(1)) : false),
+      modSend: v47((ch, bytes) => out('custom_payload', new W().str(ch).raw(bytes))),
       payload: v47((ch, bytes) => out('custom_payload', new W().str(ch).raw(bytes))),
     };
     return { chat, sendPos, api, close: () => end('Disconnected.'), get state() { return state; }, get joined() { return joined; } };
   }
-  g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, comp, compHTML, setIds: x => { IDS = x; }, W, R });
+  // server list ping through the relay: resolves with the status JSON (Forge servers include modinfo.modList)
+  function status(o) { return new Promise((res, rej) => { let ws; try { ws = new WebSocket(o.relay); } catch (e) { rej(e); return; } ws.binaryType = 'arraybuffer'; const t = setTimeout(() => { try { ws.close(); } catch (e) { /* closed */ } rej(new Error('status timed out')); }, 12000);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'tcp_open', host: o.host, port: o.port }));
+    ws.onerror = () => { clearTimeout(t); rej(new Error('relay unreachable')); };
+    ws.onmessage = e => { if (typeof e.data === 'string') { let m; try { m = JSON.parse(e.data); } catch (x) { return; } if (m.type === 'tcp_open_ok') { ws.send(new W().vi(0).vi(o.protocol).str(o.host + (o.forge ? '\0FML\0' : '')).u16(o.port).vi(1).out()); ws.send(new W().vi(0).out()); } else if (m.type === 'tcp_error' || m.type === 'tcp_closed') { clearTimeout(t); rej(new Error(m.message || 'closed')); } return; }
+      const r = new R(new Uint8Array(e.data), 0); if (r.vi() !== 0) return; clearTimeout(t); let j = null; try { j = JSON.parse(r.str()); } catch (x) { /* bad */ } try { ws.close(); } catch (x) { /* closed */ } res(j); }; }); }
+  g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, status, comp, compHTML, setIds: x => { IDS = x; }, W, R });
 })(typeof window !== 'undefined' ? window : globalThis);

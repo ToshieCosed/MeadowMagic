@@ -127,6 +127,7 @@
     def(id, name, col, col, 0, Object.assign({ opaque: false, lightOpaque: 0, shape: 1, decor: 1, noItem: 1, boxes }, extra || {})); post(id); S.vis.set(key, id); if (extra && extra.tex) texFor(id, extra.tex, extra.texF); return id;
   }
   function stateToId(st, below) {   // protocol 47: st = blockId<<4 | meta
+    if (S.forge) { const fb = S.forge.blocks[st >> 4]; if (fb && !fb.startsWith('minecraft:')) return modBlock(fb, st & 15); }   // Forge: modded ids fill gaps anywhere in the table, so go by registry name
     { const n = native(st >> 4, st & 15, below); if (n) return n; }
     let e = StrataMC.blocks18[st >> 4]; if (!e || e.k === 'skip') return 0;
     const v = e.v && e.v[st & 15]; if (v) e = v.k ? v : Object.assign({}, e, v);
@@ -159,6 +160,7 @@
       const nm = mc.id === 440 ? 'Arrow of ' + pe[0] : pe[0] === 'Water Bottle' ? (mc.id === 373 ? 'Water Bottle' : POT_IDS[mc.id] + 'Water Bottle') : /Potion$/.test(pe[0]) ? POT_IDS[mc.id] + pe[0] : POT_IDS[mc.id] + 'Potion of ' + pe[0];
       ITEMS[sid] = { name: nm, stack: e[2] || 1, mcCompat: 1, cat: 'compat', mcTex: mc.id === 438 ? 'potion_bottle_splash' : mc.id === 441 ? 'potion_bottle_lingering' : mc.id === 440 ? 'tipped_arrow_base' : 'potion_bottle_drinkable', mcName: e[0], potionCol: pe[1] }; S.items.push(sid); S.itemMap.set(key2, sid); return sid; }
     const key = mc.id + ':' + mc.damage, c = S.itemMap.get(key); if (c) return c;
+    if (S.forge) { const fi = S.forge.items[mc.id]; if (fi && !fi.startsWith('minecraft:')) { const sid = modItem(fi, mc); S.itemMap.set(key, sid); return sid; } }
     const it = StrataMC.items18[mc.id] || ['item' + mc.id, 'Item ' + mc.id, 64]; let sid = 0;
     if (mc.id < 256) { sid = native(mc.id, mc.damage, 0) || stateToId((mc.id << 4) | mc.damage, 0) || 0; if (sid && !ITEMS[sid]) { ITEMS[sid] = { name: it[1], stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } }
     else {
@@ -470,7 +472,7 @@
     'minecraft:anvil': { n: 3, kind: 'anvil' }, 'minecraft:brewing_stand': { n: 4, kind: 'brew' }, 'minecraft:beacon': { n: 1, kind: 'beacon' }, 'minecraft:villager': { n: 3, kind: 'trade' },
     'minecraft:dispenser': { kind: 'grid3' }, 'minecraft:dropper': { kind: 'grid3' }, 'minecraft:hopper': { kind: 'row' } };
   const WTITLE = { 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chest': 'Chest', 'container.chestDouble': 'Large Chest', 'container.enchant': 'Enchant', 'container.brewing': 'Brewing Stand', 'container.dispenser': 'Dispenser', 'container.dropper': 'Dropper', 'container.hopper': 'Item Hopper', 'container.repair': 'Repair & Name', 'container.beacon': 'Beacon', 'container.enderchest': 'Ender Chest' };
-  const winOff = () => S.win ? S.win.n : 9;                 // where the player's main inventory starts in the open window
+  const winOff = () => S.win ? (S.win.n || 0) : 9;                 // where the player's main inventory starts in the open window
   const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
   function mcInvEl() {
     let el = document.getElementById('mcInv'); if (el) return el;
@@ -540,7 +542,7 @@
     else if (kind === 'anvil') { mcSlot(top, 0, { lbl: 'Item' }); top.appendChild(Object.assign(document.createElement('span'), { className: 'mcArrow', textContent: '+' })); mcSlot(top, 1, { lbl: 'Add' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); anvilPanel(top, W); }
     else if (kind === 'trade') { mcSlot(top, 0, { lbl: 'Pay' }); mcSlot(top, 1, { lbl: 'Pay' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
     else { const g = grid(kind === 'grid3' ? 3 : Math.min(9, W.n)); for (let i = 0; i < W.n; i++) mcSlot(g, i); top.appendChild(g); }
-    try { extInvRender(el, W, kind, top); } catch (e) { console.error('compat inv', e); }
+    try { extInvRender(el, W, kind, top); if (W && /^forge:/.test(W.type || '')) portGui(W, el.querySelector('#mcExt')); } catch (e) { console.error('compat inv', e); }
     const off = winOff(), mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = '';
     for (let i = 0; i < 27; i++) mcSlot(mn, off + i); for (let i = 0; i < 9; i++) mcSlot(ht, off + 27 + i, { cls: i === inv.sel ? 'sel' : '' });
   }
@@ -1083,6 +1085,7 @@
     tryInteract(sx, sy) {
       const r = pick(sx, sy); if (!r || !reachOK(...r.hit)) return false; const h = held(), a = S.client.api;
       a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8);
+      { const b0 = BLOCKS[world.get(...r.hit)]; if (b0 && b0.modName && portTap(b0, r.hit)) { a.swing(); return true; } }
       // like the vanilla client: a usable item (food, drink, bow, shield, throwables, rod) on a block that doesn't react also uses the item
       const mc = h && h.mc, bd = BLOCKS[world.get(...r.hit)]; if (mc && (FOOD18.has(mc.id) || EDIBLE.has(mc.id) || DRINK.has(mc.id)) && !(bd && (bd.door || bd.bed || bd.seat || /chest|table|furnace|anvil|brew|ench|beacon|hopper|dispens|dropper|note|juke|door|gate|button|lever|repeat|compar|cake|sign|frame|bed|barrel|shulker|loom|lectern/i.test(bd.name || '')))) { if (IMPL.useHeld()) return true; }
       a.swing(); return true;
@@ -1141,7 +1144,7 @@
     for (const n of new Set(OVR)) { S.saved[n] = window[n]; window[n] = IMPL[n] ? IMPL[n] : function () {}; }
     window.__mcActive = true; window.__cmobs = S.mobs; window.__mcTimeCmd = w => { S.client.chat('/time set ' + w); toast('Asked the server to set the time to ' + w); };
     const meta = { id: 'mcompat', name: S.o.host, seedNum: 1, size: SIZE, height: HGT, gen: 'mcompat', sea: 63, gameMode: S.gm === 1 ? 'creative' : 'survival', mc: 1 };
-    enterPlay(meta, null); S.world = true; dimSet(S.dim); hud2();
+    enterPlay(meta, null); S.world = true; dimSet(S.dim); hud2(); if (S.o.forge && S.modRec) modPackApply().catch(e => console.error('mod textures', e));
     world.radius = 8; world.ready = () => true; player.maxHp = 20; player.hp = S.hp != null ? S.hp : 20; syncInv();
     world.generate = function (cx, cz) { if (!S.store.has(ckey(cx, cz))) return null; const ch = World.prototype.generate.call(this, cx, cz); return ch; };
     document.body.classList.add('mc-compat'); if(!document.getElementById('mcCompatCss')){ const st=document.createElement('style'); st.id='mcCompatCss'; st.textContent='body.mc-compat #wname,body.mc-compat #clock,body.mc-compat #invTabs,body.mc-compat .craftRow{display:none!important}body.mc-compat #actions{bottom:calc(env(safe-area-inset-bottom,0px) + 88px)!important}body.mc-compat #joyzone{bottom:84px;height:calc(50% - 84px)}body.mc-compat #hotbar{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:96vw}'; document.head.appendChild(st); }
@@ -1160,7 +1163,7 @@
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
       items(wid, l) { if (wid === 0) { const n = V9() ? 46 : 45; S.slots = l.slice(0, n); while (S.slots.length < n) S.slots.push(null); syncInv(); }
-        else if (S.win && wid === S.win.id) { S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
+        else if (S.win && wid === S.win.id) { if (S.win.n == null) S.win.n = Math.max(0, l.length - 36); S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
       trans(wid, act, ok) { onTrans(wid, act, ok); },
@@ -1371,7 +1374,7 @@
     if (window.__mcServerPacks === false) return; toast('Loading the server resource pack...'); let rec;
     try { rec = await importPack(new File([buf], decodeURIComponent((url.split(/[?#]/)[0].split('/').pop() || 'server').replace(/\.zip$/i, '')) + '.zip')); }
     catch (e) { if (/No Minecraft/.test(e.message)) return; throw e; }
-    if (!S) return; if (!S.srvPack) S.packPrev = (PACK.on && PACK.rec) || null; const pv = S.packPrev;
+    if (!S) return; if (S.packPrev === undefined) S.packPrev = (PACK.on && PACK.rec) || null; const pv = packBase();
     const merged = pv ? Object.assign({}, rec, { name: rec.name, files: Object.assign({}, pv.files, rec.files), mcsnd: Object.assign({}, pv.mcsnd || {}, rec.mcsnd || {}), sounds: rec.sounds && Object.keys(rec.sounds).length ? rec.sounds : pv.sounds }) : rec;
     S.srvPack = true; await window.applyPack(merged); toast('Server resource pack loaded'); }
   // ---- chat: clickable commands, hover text and command suggestions (tab complete) ----
@@ -1386,7 +1389,7 @@
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
     el.innerHTML = ''; for (const m of list.slice(0, 12)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
-    for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud']) { const e = document.getElementById(id); if (e) e.remove(); } }
+    for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
   OVR.push('stepGlider');
   IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
@@ -1398,6 +1401,7 @@
     p.vx = lerp(p.vx, Math.sin(p.face) * sp, k); p.vz = lerp(p.vz, Math.cos(p.face) * sp, k); if (boost) p.vy = lerp(p.vy, 3, 1 - Math.exp(-3 * dt)); p.fallTop = p.y; };
   const EDIBLE = new Set([260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400, 411, 412, 413, 423, 424, 432, 434, 436]), DRINK = new Set([373, 335]), ANYTIME = new Set([322, 432, 335, 373]);
   { const uh = IMPL.useHeld; IMPL.useHeld = function () { const h = held(), mc = h && h.mc, a = S.client.api;
+      { const pn = mc && S.forge && S.forge.items[mc.id]; if (pn && !pn.startsWith('minecraft:') && portUse(pn, mc)) { a.place(-1, -1, -1, 255, mc, 0, 0, 0); return true; } }
       if (mc && (EDIBLE.has(mc.id) || DRINK.has(mc.id))) { if (player.eating) return true;   // the server eats over 32 ticks; Strata shows it the same way
         if (!ANYTIME.has(mc.id) && S.food >= 20 && world.meta.gameMode !== 'creative') { toast("You're not hungry"); return true; }
         a.place(-1, -1, -1, 255, mc, 0, 0, 0); startEating(h.id, () => {}, DRINK.has(mc.id)); return true; }
@@ -1475,6 +1479,109 @@
     const F = S.far; S.far = new Map(); if (F) for (const c of F.values()) Hd.chunk(...c); }
   function forgetEntities(Hd) { const ids = new Set([...S.ents.keys(), ...S.objs.keys(), ...S.dr.keys(), ...S.veh.keys(), ...S.paint.keys(), ...S.pr.keys()]); try { Hd.destroy([...ids]); } catch (e) { /* partly gone */ }
     S.mobs.length = 0; S.players.length = 0; S.stands.length = 0; S.ents.clear(); if (S.skulls) S.skulls.clear(); if (S.mapPost) S.mapPost.clear(); S.border = null; S.icd = null; }
+  // ==== Forge servers (1.12.2): registries from the FML handshake, modded blocks / items / entities, mod jars as textures (compat + Forge only) ====
+  const hashCol = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; const c = [80 + (h & 127), 80 + ((h >> 7) & 127), 80 + ((h >> 14) & 127)]; return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); };
+  function forgeRegistries(reg, mods) { S.forge = { blocks: reg['minecraft:blocks'] || {}, items: reg['minecraft:items'] || {}, ents: reg['minecraft:entities'] || {}, mods: mods || [] }; S.forge.byName = new Map(); for (const [id, n] of Object.entries(S.forge.blocks)) S.forge.byName.set(n, +id); S.lut.fill(-1); }
+  const modOf = n => n.split(':')[0];
+  function modName(n) { const R = S.modRec, [mod, path] = n.split(':'), L = R && R.lang && R.lang[mod];
+    if (L) { for (const k of ['tile.' + mod + '.' + path + '.name', 'tile.' + n + '.name', 'item.' + mod + '.' + path + '.name', 'item.' + n + '.name', 'tile.' + path + '.name', 'item.' + path + '.name', 'block.' + mod + '.' + path + '.name']) if (L[k]) return L[k];
+      for (const pre of ['tile.', 'item.', '']) for (const k in L) if (k.startsWith(pre) && (k.endsWith('.' + path + '.name') || k.endsWith(':' + path + '.name'))) return L[k]; }
+    return path.replace(/[_.]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+  function modBlock(n, meta) { const pv = portBlock(n, meta), key = 'M' + n + (pv && pv.key != null ? '#' + pv.key : ''); if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
+    const R = S.modRec, col = (pv && pv.col) || hashCol(n), tex = (pv && pv.tex) || (R && R.blocks[n]), boxes = (pv && pv.boxes) || (R && R.shapes && R.shapes[n]);
+    def(id, modName(n), col, col, col, Object.assign({ noItem: 1 }, boxes ? { opaque: false, lightOpaque: 0, shape: 1, decor: 1, boxes } : {})); post(id); BLOCKS[id].modName = n; BLOCKS[id].modMeta = meta;
+    SPEC[id] = { h: 2, tool: null, req: 0 }; S.vis.set(key, id); if (tex) texFor(id, tex, ''); return id; }
+  function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
+    S.modIds = S.modIds || new Map(); let sid = S.modIds.get(n); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(n, sid);
+    const R = S.modRec, tx = R && R.items[n]; ITEMS[sid] = { name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }; S.items.push(sid); return sid; }
+  function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
+  function modSpawn(e) { if (!S.world || !S.forge) return; const nm = modEntName(e.mod, e.tid), x = e.x + S.OX, z = e.z + S.OZ;
+    const m = { mc: 1, eid: e.eid, type: 'mcgeneric', x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * PI / 180, tface: -e.yaw * PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: 0, flee: 0, magma: 0, eq: null, cname: modName(nm), modEnt: nm };
+    S.ents.set(e.eid, m); S.mobs.push(m); }
+  function modGui(wid, mod, gid) { mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); }   // slot count comes with the window's items
+  // ---- mod ports: per-mod client halves (block looks the mod draws in code, its screens and its network messages) ----
+  const nbtOf = b => { try { return nbtRead(b, 0)[0] || {}; } catch (e) { return {}; } };
+  const bbR = (b, p) => { const d = new DataView(b.buffer, b.byteOffset, b.byteLength); return { b, p, d, u8() { return this.b[this.p++]; }, i32() { const v = this.d.getInt32(this.p); this.p += 4; return v; }, i64() { const v = this.d.getBigInt64(this.p); this.p += 8; return v; }, bool() { return this.b[this.p++] !== 0; },
+    vi() { let v = 0, s = 0, x; do { x = this.b[this.p++]; v |= (x & 127) << s; s += 7; } while (x & 128); return v; }, str() { const n = this.vi(), t = new TextDecoder().decode(this.b.subarray(this.p, this.p + n)); this.p += n; return t; } }; };
+  const bbW = () => { const a = []; return { a, u8(x) { a.push(x & 255); return this; }, i32(n) { a.push((n >> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255); return this; }, i64(v) { v = BigInt.asUintN(64, BigInt(v)); for (let i = 7; i >= 0; i--) a.push(Number((v >> BigInt(i * 8)) & 255n)); return this; }, bool(x) { a.push(x ? 1 : 0); return this; },
+    str(s) { const u = new TextEncoder().encode(s); let n = u.length; do { let x = n & 127; n >>>= 7; if (n) x |= 128; a.push(x); } while (n); for (const x of u) a.push(x); return this; }, out() { return Uint8Array.from(a); } }; };
+  const unpos = v => { v = BigInt.asIntN(64, v); return [Number(v >> 38n), Number(BigInt.asIntN(12, (v >> 26n) & 0xFFFn)), Number(BigInt.asIntN(26, v & 0x3FFFFFFn))]; };
+  const fmtRF = v => { v = Number(v) || 0; return v >= 1e9 ? (v / 1e9).toFixed(2) + 'G' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e4 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v)); };
+  const PORTS = {
+    // Solar Flux Reborn: panels are drawn by the mod (base + top textures, 6/16 tall); the panel screen's energy numbers arrive as long "window properties" on the solarflux channel
+    solarflux: {
+      block(n) { const m = /^solarflux:solar_panel_(.+)$/.exec(n); if (!m) return null; const t = m[1], T = k => 'solarflux:blocks/solar_' + k + '_' + t; return { tex: [T('base'), T('topf'), T('base')], boxes: [[0, 0, 0, 1, .375, 1]], col: '#2b3f72' }; },
+      payload: { solarflux(b) { const t = nbtOf(b); if (t.k != null && S.win) { (S.win.sf = S.win.sf || {})[t.k | 0] = Number(t.v); mcInvRender(); } else if (t.SolarInfo) (S.sfInfo = S.sfInfo || {})[t.SolarInfo] = { gen: Number(t.MG), cap: Number(t.MC), tr: t.MT | 0 }; return true; } },
+      gui(W, box) { if (!/^forge:solarflux/.test(W.type)) return false; const v = W.sf || {}, cap = v[0] || 0, en = v[1] || 0, gen = v[4] || 0, max = v[2] || 0, sun = (() => { const d = new DataView(new ArrayBuffer(4)); d.setInt32(0, v[5] | 0); return d.getFloat32(0); })();
+        const el = document.createElement('div'); el.style.cssText = 'display:flex;flex-direction:column;gap:4px;font-size:13px';
+        el.innerHTML = `<div style="height:12px;border-radius:6px;background:rgba(0,0,0,.4);overflow:hidden"><i style="display:block;height:100%;width:${cap ? Math.min(100, en / cap * 100) : 0}%;background:linear-gradient(90deg,#d22,#fc3)"></i></div>
+          <div>Energy: <b>${fmtRF(en)}</b> / ${fmtRF(cap)} RF</div><div>Generating: <b>${fmtRF(gen)}</b> RF/t (max ${fmtRF(max)})</div><div>Sun: ${isFinite(sun) ? Math.round(Math.max(0, Math.min(1, sun)) * 100) : 0}%</div><small class="hint">Slots: upgrades, then a slot that charges items.</small>`;
+        box.appendChild(el); return true; } },
+    // Waystones: the stone is drawn by the mod (two blocks tall, meta & 8 = the lower half); the client opens the destination list itself and asks the server to teleport
+    waystones: {
+      block(n, meta) { if (n !== 'waystones:waystone') return null; const lo = (meta & 8) !== 0; return { key: lo ? 'lo' : 'hi', tex: ['stonebrick', 'stonebrick', 'stonebrick'], col: '#8e8e92', boxes: lo ? [[0, 0, 0, 1, .25, 1], [.125, .25, .125, .875, 1, .875]] : [[.125, 0, .125, .875, .7, .875], [.0625, .7, .0625, .9375, .9, .9375]] }; },
+      payload: { waystones(b) { const r = bbR(b, 0), d = r.u8(), entry = () => { const name = r.str(), dim = r.i32(), pos = unpos(r.i64()), global = r.bool(); return { name, dim, pos, global }; };
+        if (d === 1) { const n = (r.u8() << 8) | r.u8(), L = []; for (let i = 0; i < n; i++) L.push(entry()); S.ways = L; }
+        else if (d === 9) { const mode = r.u8(), hand = r.u8(), e = entry(); wayOpen(mode, hand, e); }
+        else if (d === 5 && S.world) { try { burst(player.x, player.y + 1, player.z, [190, 120, 255], 30, 3); sfx('portal', null, null, null, .6); } catch (e) { /* fx */ } }
+        return true; } },
+      tap(n, hit, meta) { if (n !== 'waystones:waystone') return false; if (player.crouch) return false; const lo = (meta & 8) !== 0, X = hit[0] - S.OX, Y = lo ? hit[1] : hit[1] - 1, Z = hit[2] - S.OZ;
+        const e = (S.ways || []).find(w => w.pos[0] === X && w.pos[1] === Y && w.pos[2] === Z); if (!e) return false;   // not activated yet: the server activates it from the right click
+        setTimeout(() => wayOpen(3, 0, e), 150); return true; },
+      use(n) { if (n === 'waystones:warp_stone') { wayOpen(2, 0, null); return true; } if (n === 'waystones:warp_scroll') { wayOpen(1, 0, null); return true; } return false; } },
+  };
+  function wayOpen(mode, hand, from) { const L = (S.ways || []).filter(w => !from || w.pos.join() !== from.pos.join()); let el = document.getElementById('mcWays');
+    if (!el) { el = document.createElement('div'); el.id = 'mcWays'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.9);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:14px system-ui'; document.body.appendChild(el); }
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">${from ? from.name.replace(/</g, '&lt;') : 'Waystones'}</b><button class="ghost" id="mcWaysX">Close</button></div>` + (L.length ? '' : '<p class="hint">No other waystones yet. Activate some by tapping them.</p>');
+    for (const w of L) { const b = document.createElement('button'); b.className = 'ghost'; b.style.cssText = 'display:block;width:100%;text-align:left;margin:4px 0;padding:10px'; b.innerHTML = `${w.global ? '🌐 ' : ''}<b>${w.name.replace(/</g, '&lt;')}</b> <small style="opacity:.7">${w.pos.join(', ')}${w.dim ? ' (dim ' + w.dim + ')' : ''}</small>`;
+      b.onclick = () => { const o = bbW().u8(4); const we = e => o.str(e.name).i32(e.dim).i64(posL(e.pos)).bool(e.global); we(w); o.u8(mode); if (mode === 1 || mode === 2) o.u8(hand); else if (mode === 3 && from) we(from); S.client.api.modSend('waystones', o.out()); el.hidden = true; }; el.appendChild(b); }
+    el.hidden = false; el.querySelector('#mcWaysX').onclick = () => { el.hidden = true; }; }
+  const posL = p => (BigInt(p[0] & 0x3FFFFFF) << 38n) | (BigInt(p[1] & 0xFFF) << 26n) | BigInt(p[2] & 0x3FFFFFF);
+  const portOf = n => PORTS[modOf(n)];
+  function portBlock(n, meta) { const P = portOf(n); return P && P.block ? P.block(n, meta) : null; }
+  function modPayload(ch, b) { for (const P of Object.values(PORTS)) if (P.payload && P.payload[ch]) return P.payload[ch](b); return false; }
+  function portGui(W, box) { for (const P of Object.values(PORTS)) if (P.gui && P.gui(W, box)) return; }
+  function portTap(bd, hit) { const P = portOf(bd.modName); return !!(P && P.tap && P.tap(bd.modName, hit, bd.modMeta | 0)); }
+  function portUse(n, mc) { const P = portOf(n); return !!(P && P.use && P.use(n, mc)); }
+  // the mod jars' textures layered over the player's own pack for the session (and under a server pack)
+  function packBase() { const pv = S.packPrev !== undefined ? S.packPrev : ((PACK.on && PACK.rec) || null), M = S.forge && S.modRec; if (!M) return pv;
+    if (!pv) return { name: 'Mods', files: Object.assign({}, M.files), sounds: {}, mcsnd: {} }; return Object.assign({}, pv, { files: Object.assign({}, pv.files, M.files) }); }
+  async function modPackApply() { if (!S || !S.modRec || S.modPackOn) return; if (S.packPrev === undefined) S.packPrev = (PACK.on && PACK.rec) || null; S.modPackOn = true; S.srvPack = true; PACK.worldId = 'mcompat-mods'; await window.applyPack(packBase()); PACK.worldId = 'mcompat-mods'; }   // the worldId stops Strata's per-world pack loader from clearing it
+  // ---- importing mod jars (or a zip of a mods folder): textures, blockstates/models -> [side, top, bottom], item textures, names ----
+  async function readJar(rec, z) { const names = [...z.files.keys()], want = names.filter(n => /^assets\/.+\.(png|json|lang|mcmeta)$/i.test(n) || /mcmod\.info$/i.test(n)), cache = new Map();
+    for (let i = 0; i < want.length; i += 64) await Promise.all(want.slice(i, i + 64).map(async n => cache.set(n, await z.read(n))));   // decompress in parallel batches: one by one is slow while the game draws
+    const zr = n => cache.get(n) || null, rd = async n => { const d = zr(n); return d && new TextDecoder().decode(d); };
+    const mods = []; { const mi = names.find(n => /(^|\/)mcmod\.info$/i.test(n)); if (mi) try { let j = JSON.parse((await rd(mi)).replace(/[\u0000-\u001f]+/g, ' ')); j = Array.isArray(j) ? j : j.modList || []; for (const m of j) if (m.modid) { mods.push(m.modid); rec.mods[m.modid] = m.version || ''; rec.modNames[m.modid] = m.name || m.modid; } } catch (e) { /* odd json */ } }
+    const json = async n => { try { return JSON.parse((await rd(n)).replace(/\/\/[^\n]*/g, '')); } catch (e) { return null; } }, models = {}, has = n => names.includes(n);
+    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
+      m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && /\.name$/.test(ln.slice(0, i).trim())) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
+    const modelOf = async (ref, kind) => { let [ns, p] = ref.includes(':') ? ref.split(':') : ['minecraft', ref]; if (!/^(block|item)s?\//.test(p)) p = kind + '/' + p; const k = ns + ':' + p; if (k in models) return models[k];
+      const f = 'assets/' + ns + '/models/' + p + '.json'; models[k] = has(f) ? await json(f) : null; return models[k]; };
+    const resolve = async (ref, kind) => { const T = {}; let el = null, cur = await modelOf(ref, kind), parent = cur ? null : ref, n = 0;
+      while (cur && n++ < 12) { Object.entries(cur.textures || {}).forEach(([k, v]) => { if (!(k in T)) T[k] = v; }); if (!el && cur.elements) el = cur.elements; parent = cur.parent || null; if (!parent) break; cur = await modelOf(parent, kind); if (!cur) break; }
+      const get = k => { let v = T[k], g = 0; while (typeof v === 'string' && v[0] === '#' && g++ < 8) v = T[v.slice(1)]; return typeof v === 'string' ? (v.includes(':') ? v : 'minecraft:' + v) : null; };
+      if (el && !T.all) { const f = (el[0] && el[0].faces) || {}, tx = d => f[d] && f[d].texture && f[d].texture[0] === '#' ? get(f[d].texture.slice(1)) : null; const s2 = tx('north') || tx('south') || tx('east'), t2 = tx('up'), b2 = tx('down'); const bx = el.length <= 12 && el.every(e => e.from && e.to) ? el.map(e => [e.from[0] / 16, e.from[1] / 16, e.from[2] / 16, e.to[0] / 16, e.to[1] / 16, e.to[2] / 16]) : null, full = bx && bx.length === 1 && bx[0].join() === '0,0,0,1,1,1';
+        if (s2 || t2) return { s: s2 || t2, t: t2 || s2, b: b2 || t2 || s2, layer: get('layer0'), parent, boxes: bx && !full && bx.every(q => q.every(v => v >= 0 && v <= 1)) ? bx : null }; }
+      const side = get('all') || get('side') || get('front') || get('texture') || get('particle'), top = get('all') || get('top') || get('end') || get('up') || side, bot = get('all') || get('bottom') || get('end') || get('down') || top;
+      return { s: side || top, t: top, b: bot, layer: get('layer0'), parent }; };
+    const local = t => !t ? null : t.split(':')[0] === 'minecraft' ? t.split('/').pop() : t;   // vanilla textures go by their plain name in Strata's pack layout
+    for (const n of names) { const m = n.match(/^assets\/([^/]+)\/blockstates\/([^/]+)\.json$/i); if (!m) continue; const bs = await json(n); if (!bs) continue; const reg = m[1] + ':' + m[2]; let model = null, tex = {};
+      if (bs.forge_marker) { const d = bs.defaults || {}; model = d.model || null; Object.assign(tex, d.textures || {}); const v = bs.variants || {}, first = v.normal || v.inventory || Object.values(v)[0]; const fv = Array.isArray(first) ? first[0] : first && typeof first === 'object' ? (first.model || first.textures ? first : Object.values(first)[0]) : null; if (fv) { if (fv.model) model = fv.model; Object.assign(tex, fv.textures || {}); } }
+      else if (bs.variants) { const v = bs.variants, first = v.normal || v[''] || Object.values(v)[0], fv = Array.isArray(first) ? first[0] : first; model = fv && fv.model; }
+      else if (bs.multipart) { const p0 = bs.multipart[0] && bs.multipart[0].apply; model = p0 && (Array.isArray(p0) ? p0[0].model : p0.model); }
+      let r = model ? await resolve(model, 'block') : null; if (Object.keys(tex).length) { const t0 = t => { let v = tex[t]; return v ? (v.includes(':') ? v : 'minecraft:' + v) : null; }; const s2 = t0('all') || t0('side') || t0('texture') || t0('particle'); if (s2) r = { s: s2, t: t0('all') || t0('top') || t0('end') || s2, b: t0('all') || t0('bottom') || t0('end') || s2 }; }
+      if (r && local(r.s)) rec.blocks[reg] = [local(r.s), local(r.t), local(r.b)]; if (r && r.boxes) (rec.shapes = rec.shapes || {})[reg] = r.boxes; }
+    for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/item\/([^/]+)\.json$/i); if (!m) continue; const reg = m[1] + ':' + m[2]; const r = await resolve(m[1] + ':item/' + m[2], 'item'); const t = r && (r.layer || (!rec.blocks[reg] && r.s));
+      if (t && local(t)) { rec.items[reg] = local(t); if (!rec.files['i/' + t] && rec.files['b/' + t]) rec.files['i/' + t] = rec.files['b/' + t]; } }
+    for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
+    return mods; }
+  const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
+  MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
+    for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
+      if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
+    await pdbT(PDB.put('mcmods', rec), true); return { mods: Object.keys(rec.mods), added: done, blocks: Object.keys(rec.blocks).length, items: Object.keys(rec.items).length }; };
+  MCE.modsInfo = async () => { const r = await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null); return r ? { mods: Object.keys(r.mods), blocks: Object.keys(r.blocks).length, items: Object.keys(r.items).length } : null; };
+  MCE.clearMods = () => pdbT(PDB.put('mcmods', null), true);
   function extHandlers(Hd) {
     const o = { login: Hd.login, respawn: Hd.respawn, chunk: Hd.chunk, unload: Hd.unload, vmeta: Hd.vmeta, bmeta: Hd.bmeta, flags: Hd.flags, playerInfo: Hd.playerInfo, spawn: Hd.spawn, anim: Hd.anim, block: Hd.block, tile: Hd.tile, held: Hd.held, showObjective: Hd.showObjective, multi: Hd.multi };
     Object.assign(Hd, {
@@ -1506,7 +1613,7 @@
       combat(pid, t) { if (pid === S.eid) combat(pid, t); }, border(b) { border(b); }, tabDone(l) { sug(l); },
       cooldown(id, ticks) { const sid = id; (S.icd = S.icd || new Map()); if (ticks > 0) S.icd.set(sid, { end: performance.now() + ticks * 50, dur: ticks * 50 }); else S.icd.delete(sid); },
       trades(wid, l) { trades(wid, l); }, bookOpen() { const h = held(); if (h && h.mc && (h.mc.id === 387 || h.mc.id === 386)) openMcBook(h); },
-      advancements(r, a, d, p) { advancements(r, a, d, p); }, serverPack(buf, url) { return serverPack(buf, url); },
+      advancements(r, a, d, p) { advancements(r, a, d, p); }, forgeRegistries(reg, mods) { forgeRegistries(reg, mods); }, modPayload(ch, b) { return modPayload(ch, b); }, modSpawn(e) { modSpawn(e); }, modGui(wid, mod, gid) { modGui(wid, mod, gid); }, serverPack(buf, url) { return serverPack(buf, url); },
     });
   }
   function unloadKey(k) { S.store.delete(k); const ch = world && world.chunks.get(k); if (ch) { freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); world.chunks.delete(k); } }
@@ -1536,7 +1643,7 @@
   MCE.dbg = () => S;
   MCE.start = function (o) {
     if (MCE.active) MCE.stop();
-    S = { o, store: new Map(), lut: new Int32Array(4096).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), tex: new Map(), objs: new Map(), bl: new Map(), stands: [], cracks: new Map(), crackDraw: [], objsb: new Map(), ping: new Map(), dim: 0, veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
+    S = { o, store: new Map(), lut: new Int32Array(65536).fill(-1), vis: new Map(), regs: [], next: 8192, saved: {}, mobs: [], ents: new Map(), names: new Map(), world: false, OX: 0, OZ: 0, slots: new Array(45).fill(null), cursor: null, action: 1, itemMap: new Map(), items: [], gm: 0, mcb: {}, dr: new Map(), pr: new Map(), tex: new Map(), objs: new Map(), bl: new Map(), stands: [], cracks: new Map(), crackDraw: [], objsb: new Map(), ping: new Map(), dim: 0, veh: new Map(), riding: null, paint: new Map(), beacons: new Set(), ench: new Set(), fx: {}, dig: null, players: [], skinInfo: new Map(), skinT: new Map(), tags: new Map() };
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.addEventListener('click', bookHooks.done, true); if (g) g.addEventListener('click', bookHooks.sign, true); }
     window.__mcActionBar = (t, html) => { hud2(); const b = document.getElementById('mcBarTxt'); b.innerHTML = html || ''; b.style.opacity = 1; clearTimeout(window.__mcABt); window.__mcABt = setTimeout(() => { b.style.opacity = 0; }, 2500); };
     MCE.active = true; MOB.mcgeneric = Object.assign({}, MOB.zombie, { name: 'Unknown mob' }); __skins.MODELS.mcgeneric = m => { const M = __skins.MODELS.zombie(m); M.tex = 'mcgeneric'; return M; }; cmStart(); const Hd = makeHandler(); Hd2.meta = (...a) => Hd.meta(...a); Hd2.sign = (...a) => Hd.sign(...a); S.tip = e => tipOf(e.target); document.addEventListener('pointerover', S.tip, true); document.addEventListener('focusin', S.tip, true);
@@ -1544,6 +1651,7 @@
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
+    if (o.forge) pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null).then(r => { if (!S || !r) return; S.modRec = r; if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
