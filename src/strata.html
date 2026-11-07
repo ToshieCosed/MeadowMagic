@@ -6070,7 +6070,7 @@ function packUI(){ const nm=document.getElementById('packName'); if(!nm) return;
 { const f=document.getElementById('packFile');
   document.getElementById('packImport').addEventListener('click',()=>{ if(!world||world.preview){ toast('Open a world first'); return; } f.value=''; f.click(); });
   f.addEventListener('change',async()=>{ const file=f.files&&f.files[0]; if(!file||!world) return; const info=document.getElementById('packInfo'); PACK.busy=true; info.textContent='Reading '+file.name+'…';
-    try{ const rec=await importPack(file); info.textContent='Building textures…'; const id=world.meta.id; const ok=await PDB.put(id,rec); PACK.worldId=id; await applyPack(rec); PACK.busy=false; packUI();
+    try{ const rec=await importPack(file); info.textContent='Building textures…'; let ok=true; if(window.__mcPackImport) await window.__mcPackImport(rec); else { const id=world.meta.id; ok=await Promise.race([PDB.put(id,rec),new Promise(r=>setTimeout(()=>r(undefined),4000))]); PACK.worldId=id; await applyPack(rec); } PACK.busy=false; packUI();
       toast(`Pack applied: ${rec.stats.used} textures${ok===undefined?' (this browser will forget it when the page closes)':''}`); }
     catch(e){ PACK.busy=false; info.textContent='Could not use that pack: '+(e&&e.message||e); } });
   document.getElementById('packRemove').addEventListener('click',async()=>{ if(!world) return; await PDB.del(world.meta.id); clearPack(); packRefresh(); toast('Back to the default textures'); }); }
@@ -11150,12 +11150,13 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function mcCatList() {   // every 1.8 item (and the colour variants of wool, dye, clay, glass) for the creative screen
     if (S.cat) return S.cat; const L = [], it = StrataMC.items18;
     for (const k in it) { const id = +k; if (id === 0) continue; if ([35, 159, 160, 171, 95, 351].includes(id)) for (let d = 0; d < 16; d++) L.push({ id, d }); else L.push({ id, d: 0 }); }
+    if (S.forge) { const have = new Set(L.map(e => e.id)); for (const [k, n] of Object.entries(S.forge.items)) if (!/^minecraft:/.test(n) && !have.has(+k)) L.push({ id: +k, d: 0, mod: n }); }   // modded items and blocks (Forge sessions)
     return (S.cat = L);
   }
   function mcCatRender() {
     const box = document.getElementById('mcCat'); if (!box) return; const q = (document.getElementById('mcCatQ').value || '').trim().toLowerCase(); box.innerHTML = ''; let n = 0;
     for (const e of mcCatList()) { const mcIt = { id: e.id, count: 1, damage: e.d, raw: new Uint8Array([(e.id >> 8) & 255, e.id & 255, 1, (e.d >> 8) & 255, e.d & 255, 0]) }, st = toStack(mcIt), nm = st && ITEMS[st.id] ? ITEMS[st.id].name : '';
-      if (q && !nm.toLowerCase().includes(q)) continue; if (++n > 400) break;
+      if (!st) continue; if (q && !(nm.toLowerCase().includes(q) || (e.mod && e.mod.includes(q)))) continue; if (++n > 400) break;
       const b = document.createElement('button'); b.className = 'islot'; b.innerHTML = slotHTML({ ...st, n: 1 }); b.title = nm; b.setAttribute('aria-label', 'Take ' + nm);
       b.addEventListener('click', () => { const stack = S.one ? 1 : Math.max(1, (StrataMC.items18[e.id] || [])[2] || 64); S.ccur = { ...mcIt, count: stack, raw: new Uint8Array([(e.id >> 8) & 255, e.id & 255, stack, (e.d >> 8) & 255, e.d & 255, 0]) }; mcInvRender(); });
       box.appendChild(b); }
@@ -11977,10 +11978,13 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     try { rec = await importPack(new File([buf], decodeURIComponent((url.split(/[?#]/)[0].split('/').pop() || 'server').replace(/\.zip$/i, '')) + '.zip')); }
     catch (e) { if (/No Minecraft/.test(e.message)) return; throw e; }
     if (!S) return; if (S.packPrev === undefined) S.packPrev = (PACK.on && PACK.rec) || null; const pv = packBase();
-    const merged = pv ? Object.assign({}, rec, { name: rec.name, files: Object.assign({}, pv.files, rec.files), mcsnd: Object.assign({}, pv.mcsnd || {}, rec.mcsnd || {}), sounds: rec.sounds && Object.keys(rec.sounds).length ? rec.sounds : pv.sounds }) : rec;
-    S.srvPack = true; await window.applyPack(merged); toast('Server resource pack loaded'); }
+    S.srvRec = rec; S.srvPack = true; await window.applyPack(packMerge(pv, rec)); toast('Server resource pack loaded'); }
+  function packMerge(pv, rec) { return pv ? Object.assign({}, rec, { name: rec.name, files: Object.assign({}, pv.files, rec.files), mcsnd: Object.assign({}, pv.mcsnd || {}, rec.mcsnd || {}), sounds: rec.sounds && Object.keys(rec.sounds).length ? rec.sounds : pv.sounds }) : rec; }
+  async function userPack(rec) {   // a pack picked from the pause menu while connected: it becomes the base under the mod textures and any server pack, and stays after leaving
+    S.packPrev = rec; let r = packBase(); if (S.srvRec) r = packMerge(r, S.srvRec);
+    S.srvPack = true; PACK.worldId = 'mcompat-mods'; await window.applyPack(Object.assign({}, r, { name: rec.name, desc: rec.desc, stats: rec.stats })); PACK.worldId = 'mcompat-mods'; }
   // ---- chat: clickable commands, hover text and command suggestions (tab complete) ----
-  function chatHooks() { const st = document.createElement('style'); st.id = 'mcExtCss'; st.textContent = '.mcCmd{pointer-events:auto;text-decoration:underline dotted}#mcLog [title]{pointer-events:auto}#mcSug{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 4px}#mcSug button{font-size:12px;padding:3px 8px}'; document.head.appendChild(st);
+  function chatHooks() { const st = document.createElement('style'); st.id = 'mcExtCss'; st.textContent = '.mcCmd{pointer-events:auto;text-decoration:underline dotted}#mcLog [title]{pointer-events:auto}#mcSug{position:absolute;left:0;right:0;bottom:100%;margin-bottom:4px;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;pointer-events:auto}#mcSug:empty{display:none}#mcSug button{flex:0 0 auto;font-size:12px;padding:3px 8px;background:rgba(0,0,0,.72)}'; document.head.appendChild(st);
     S.onCmd = e => { const c = e.target.closest && e.target.closest('.mcCmd'); if (!c || !S) return; e.preventDefault(); e.stopPropagation(); const v = c.dataset.v || '';
       if (c.dataset.a === 'r') { S.client.chat(v); } else { const i = document.getElementById('mcIn'), bar = document.getElementById('mcBar'); if (i) { if (bar) bar.hidden = false; i.value = v; i.focus(); } } };
     document.addEventListener('click', S.onCmd, true);
@@ -11989,7 +11993,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     S.onKey = e => { if (e.key === 'Tab') { e.preventDefault(); const b = document.querySelector('#mcSug button'); if (b) b.click(); else S.client.api.tab(S.tabFor = i.value); } };
     i.addEventListener('input', S.onIn); i.addEventListener('keydown', S.onKey); }
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
-    el.innerHTML = ''; for (const m of list.slice(0, 12)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
+    el.innerHTML = ''; const cur = (i.value.split(' ').pop() || '').toLowerCase(); for (const m of list.filter(m => !cur || String(m).toLowerCase().includes(cur.replace(/^\//, ''))).slice(0, 40)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.tabIndex = -1; b.textContent = m; b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('mousedown', e => e.preventDefault()); b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
     if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'peKeys', 'peTCss']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
@@ -12084,7 +12088,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     S.mobs.length = 0; S.players.length = 0; S.stands.length = 0; S.ents.clear(); if (S.skulls) S.skulls.clear(); if (S.mapPost) S.mapPost.clear(); S.border = null; S.icd = null; }
   // ==== Forge servers (1.12.2): registries from the FML handshake, modded blocks / items / entities, mod jars as textures (compat + Forge only) ====
   const hashCol = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; const c = [80 + (h & 127), 80 + ((h >> 7) & 127), 80 + ((h >> 14) & 127)]; return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); };
-  function forgeRegistries(reg, mods) { S.forge = { blocks: reg['minecraft:blocks'] || {}, items: reg['minecraft:items'] || {}, ents: reg['minecraft:entities'] || {}, mods: mods || [] }; S.forge.byName = new Map(); for (const [id, n] of Object.entries(S.forge.blocks)) S.forge.byName.set(n, +id); S.lut.fill(-1); }
+  function forgeRegistries(reg, mods) { S.forge = { blocks: reg['minecraft:blocks'] || {}, items: reg['minecraft:items'] || {}, ents: reg['minecraft:entities'] || {}, mods: mods || [] }; S.forge.byName = new Map(); for (const [id, n] of Object.entries(S.forge.blocks)) S.forge.byName.set(n, +id); S.lut.fill(-1); S.cat = null; }
   const modOf = n => n.split(':')[0];
   function modName(n) { const R = S.modRec, [mod, path] = n.split(':'), L = R && R.lang && R.lang[mod];
     if (L) { for (const k of ['tile.' + mod + '.' + path + '.name', 'tile.' + n + '.name', 'item.' + mod + '.' + path + '.name', 'item.' + n + '.name', 'tile.' + path + '.name', 'item.' + path + '.name', 'block.' + mod + '.' + path + '.name']) if (L[k]) return L[k];
@@ -12495,7 +12499,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const prev = o.onClose; o.world = Hd; o.viewDistance = 8;
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
-    try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
+    window.__mcPackImport = userPack; try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
     if (o.forge) pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null).then(r => { if (!S || !r) return; S.modRec = r; if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
@@ -12507,7 +12511,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.removeEventListener('click', bookHooks.done, true); if (g) g.removeEventListener('click', bookHooks.sign, true); }
     if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
-    try { chatUnhook(s); ownHooks(false); } catch (e) { /* ui */ } window.__elytra = false;
+    try { chatUnhook(s); ownHooks(false); } catch (e) { /* ui */ } window.__elytra = false; window.__mcPackImport = null;
     if (s.world) {
       for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
       if (s.srvPack) { try { applyPack(s.packPrev); } catch (e) { /* pack */ } }

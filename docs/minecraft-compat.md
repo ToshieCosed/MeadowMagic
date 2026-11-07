@@ -233,3 +233,8 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
 - **Compat inventory look**: one compact window in the middle like Strata's split view (no headings or hint text), slots sized to fit the screen (`--sl`), armour column with the off hand and swap beside the crafting grid, short tap-mode buttons (Stack / One / Send across). The creative item list is a side panel, off every time the inventory opens, shown only with the Creative toggle and only for your own inventory. The Transmutation Table scales to fit the screen.
 - ProjectE outputs: "Stack" takes a full stack (the mod's shift-click), "One" or a hold takes one; EMC is mirrored for both. Verified on the server with `/clear`.
 
+
+### 20c — fixes: resource packs with mods, modded creative items, command suggestions
+- A pack imported from the pause menu while connected (`window.__mcPackImport` → `userPack`) becomes the base pack. The mod textures and any server pack are merged on top of it, so mod blocks keep their textures. The pack stays applied after you disconnect. Outside compat mode, the pack write to the world store now times out after 4 s instead of hanging.
+- The creative list (`mcCatList`) now includes every non-`minecraft:` entry in the Forge item registry. Search matches both the display name and the registry name, such as `solarflux`.
+- Tab-complete suggestions (`#mcSug`) now sit in one scrollable row above the chat box instead of inside it, capped at 40 and filtered by the word being typed. Tapping a suggestion doesn't take focus from the text box, so you can keep typing.
