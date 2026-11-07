@@ -11995,7 +11995,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
     el.innerHTML = ''; const cur = (i.value.split(' ').pop() || '').toLowerCase(); for (const m of list.filter(m => !cur || String(m).toLowerCase().includes(cur.replace(/^\//, ''))).slice(0, 40)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.tabIndex = -1; b.textContent = m; b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('mousedown', e => e.preventDefault()); b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
-    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'peKeys', 'peTCss']) { const e = document.getElementById(id); if (e) e.remove(); } }
+    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'mcWb', 'peKeys', 'peTCss']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
   OVR.push('stepGlider');
   IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
@@ -12100,7 +12100,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     SPEC[id] = { h: 2, tool: null, req: 0 }; S.vis.set(key, id); if (tex) texFor(id, tex, ''); return id; }
   function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
     S.modIds = S.modIds || new Map(); let sid = S.modIds.get(n); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(n, sid);
-    const R = S.modRec, tx = R && R.items[n]; ITEMS[sid] = { name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }; S.items.push(sid); return sid; }
+    const R = S.modRec, P = portOf(n), tx = (P && P.icons && P.icons[n]) || (R && R.items[n]); ITEMS[sid] = { name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }; S.items.push(sid); return sid; }
   function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
   function modSpawn(e) { if (!S.world || !S.forge) return; const nm = modEntName(e.mod, e.tid), x = e.x + S.OX, z = e.z + S.OZ;
     const m = { mc: 1, eid: e.eid, type: 'mcgeneric', x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * PI / 180, tface: -e.yaw * PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: 0, flee: 0, magma: 0, eq: null, cname: modName(nm), modEnt: nm };
@@ -12144,7 +12144,37 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         const e = (S.ways || []).find(w => w.pos[0] === X && w.pos[1] === Y && w.pos[2] === Z); if (player.crouch) { setTimeout(() => wayName([X, Y, Z], e && e.name), 150); return true; } if (!e) return false;   // not activated yet: the server activates it from the right click
         setTimeout(() => wayOpen(3, 0, e), 150); return true; },
       use(n) { if (n === 'waystones:warp_stone') { wayOpen(2, 0, null); return true; } if (n === 'waystones:warp_scroll') { wayOpen(1, 0, null); return true; } return false; } },
+    // Warp Book: the book's page list is read from its own NBT and shown here (the mod opens it client side), a tap sends the page's index; naming a page sends the name
+    // network: channel "warpbook", byte discriminator: server <- 0 warp (int page index), 1 waypoint name (raw UTF-8); client <- 2 hyper waypoints (NBT), 3 warp effect (bool enter, int x, y, z)
+    warpbook: {
+      icons: { 'warpbook:warpbook': 'warpbook:items/warpbook', 'warpbook:unboundwarppage': 'warpbook:items/unboundwarppage', 'warpbook:boundwarppage': 'warpbook:items/boundwarppage', 'warpbook:hyperwarppage': 'warpbook:items/hyperboundwarppage',
+        'warpbook:playerwarppage': 'warpbook:items/playerpage', 'warpbook:deathlywarppage': 'warpbook:items/deathlywarppage', 'warpbook:warppage': 'warpbook:items/legacywarppage',
+        'warpbook:unboundwarppotion': 'potion_bottle_drinkable', 'warpbook:boundwarppotion': 'potion_bottle_drinkable', 'warpbook:playerwarppotion': 'potion_bottle_drinkable', 'warpbook:hyperwarppotion': 'potion_bottle_drinkable' },
+      payload: { warpbook(b) { const r = bbR(b, 0), d = r.u8();
+        if (d === 2) { try { const t = nbtRead(b, 1)[0] || {}; S.wbHyper = t.data || []; } catch (e) { /* bad nbt */ } }
+        else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); sfx('portal', null, null, null, .5); } catch (e) { /* fx */ } }
+        return true; } },
+      use(n, mc) { if (player.crouch) return false;   // sneaking: the server opens the book's page inventory (or binds a page to you)
+        if (n === 'warpbook:warpbook') { setTimeout(() => wbBook(mc), 120); return true; }
+        if (n === 'warpbook:unboundwarppage' || n === 'warpbook:unboundwarppotion') { setTimeout(() => wbName(), 120); return true; }
+        return false; } },
   };
+  function wbPageName(p) { const id = String(p.id || ''), t = p.tag || {};
+    if (/hyper/.test(id)) return t.hypername || 'Hyper page'; if (/player/.test(id)) return t.player ? 'To ' + t.player : 'Player page'; if (/deathly/.test(id)) return 'Last death';
+    return t.name || (t.posX != null ? [t.posX, t.posY, t.posZ].join(', ') : 'Warp page'); }
+  function wbBook(mc) { const t = itemTag(mc) || {}, L = t.WarpPages || []; let el = document.getElementById('mcWb');
+    if (!el) { el = document.createElement('div'); el.id = 'mcWb'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.9);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:14px system-ui'; document.body.appendChild(el); }
+    el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">Warp Book</b><button class="ghost" id="mcWbX">Close</button></div>' + (L.length ? '' : '<p class="hint">This book has no pages. Crouch and use it to put bound warp pages in.</p>');
+    L.forEach((p, i) => { const id = String(p.id || ''); if (/unbound/.test(id)) return; const tg = p.tag || {}, b = document.createElement('button'); b.className = 'ghost'; b.style.cssText = 'display:block;width:100%;text-align:left;margin:4px 0;padding:10px';
+      const where = tg.posX != null ? `${tg.posX}, ${tg.posY}, ${tg.posZ}${tg.dim ? ' (dim ' + tg.dim + ')' : ''}` : '';
+      b.innerHTML = `<b>${wbPageName(p).replace(/</g, '&lt;')}</b> <small style="opacity:.7">${where}</small>`; b.setAttribute('aria-label', 'Warp to ' + wbPageName(p));
+      b.onclick = () => { S.client.api.modSend('warpbook', bbW().u8(0).i32(i).out()); el.hidden = true; }; el.appendChild(b); });
+    el.hidden = false; el.querySelector('#mcWbX').onclick = () => { el.hidden = true; }; }
+  function wbName() { let el = document.getElementById('mcWayName'); if (!el) { wayName([0, 0, 0], ''); el = document.getElementById('mcWayName'); }
+    el.innerHTML = '<div style="background:#1b2028;padding:18px;border-radius:12px;min-width:260px;display:flex;flex-direction:column;gap:10px"><b>Name this waypoint</b><small class="hint">The page is bound to where you are standing.</small><input id="mcWayIn" maxlength="64" style="font-size:16px;padding:6px 8px"><div style="display:flex;gap:8px;justify-content:flex-end"><button class="ghost" id="mcWayC">Cancel</button><button class="primary" id="mcWayOk">Bind</button></div></div>';
+    const I = el.querySelector('#mcWayIn'); el.hidden = false; setTimeout(() => I.focus(), 50); el.querySelector('#mcWayC').onclick = () => { el.hidden = true; };
+    const ok = () => { const nm = I.value.trim(); if (!nm) { I.focus(); return; } S.client.api.modSend('warpbook', Uint8Array.from([1, ...new TextEncoder().encode(nm)])); el.hidden = true; toast('Bound a page to ' + nm); };
+    el.querySelector('#mcWayOk').onclick = ok; I.onkeydown = e => { if (e.key === 'Enter') ok(); }; }
   // ---- ComputerCraft (CC: Tweaked 1.89.2): terminals, keyboard and mouse, monitors in the world, turtles drawn from their model ----
   // network: channel "computercraft", byte discriminator then PacketBuffer data. client <- 11 computer data, 12 deleted, 13 terminal, 15 monitor; server <- 0 action, 1 queue event, 2 request, 3 key, 4 mouse
   const CC = { pal: ['#f0f0f0', '#f2b233', '#e57fd8', '#99b2f2', '#dede6c', '#7fcc19', '#f2b2cc', '#4c4c4c', '#999999', '#4c99b2', '#b266e5', '#3366cc', '#7f664c', '#57a64e', '#cc4c4c', '#111111'] };
@@ -12419,7 +12449,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
