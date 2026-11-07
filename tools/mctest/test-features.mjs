@@ -47,7 +47,7 @@ server.on('login', c => {
       tex ? { Owner: { type: 'compound', value: { Name: { type: 'string', value: 'Steve' }, Properties: { type: 'compound', value: { textures: { type: 'list', value: { type: 'compound', value: [{ Value: { type: 'string', value: Buffer.from(JSON.stringify({ textures: { SKIN: { url: tex } } })).toString('base64') } }] } } } } } } } : {}) } });
     skull(38, 48, 3, 'http://127.0.0.1:' + hport + '/skin.png'); skull(39, 48, 4);
     c.write('world_border', { action: 3, x: 40, z: 40, old_radius: 40, new_radius: 40, speed: 0, portalBoundary: 29999984, warning_time: 15, warning_blocks: 5 });
-    if (V9) c.write('set_cooldown', { itemID: 276, cooldownTicks: 200 });
+    if (V9) c.write('set_cooldown', { itemID: 276, cooldownTicks: 1200 });
     c.write('abilities', { flags: 4, flyingSpeed: .05, walkingSpeed: .1 });
     c.write('chat', { message: JSON.stringify({ text: 'Click ', extra: [{ text: '[spawn]', color: 'aqua', clickEvent: { action: 'run_command', value: '/spawn' }, hoverEvent: { action: 'show_text', value: 'Go to spawn' } }] }), position: 0 });
     c.write('resource_pack_send', { url: 'http://127.0.0.1:' + hport + '/pack.zip', hash: '' });

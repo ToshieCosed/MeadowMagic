@@ -19,7 +19,7 @@ await pg.fill('#mcHost', '127.0.0.1:' + SP); await pg.$eval('#mcGo', e => e.clic
 await pg.waitForFunction(() => typeof mode !== 'undefined' && mode === 'play', null, { timeout: 150000 }).catch(() => {}); await wait(5000);
 cmd('tp @a 0 4 0'); await wait(1500);
 const blocks = ['solarflux:solar_panel_1', 'solarflux:solar_panel_8', 'computercraft:computer', 'computercraft:peripheral', 'waystones:waystone', 'computercraft:turtle_expanded'];
-blocks.forEach((n, i) => cmd(`setblock ${2 + i} 4 2 ${n}${n === 'waystones:waystone' ? ' 8' : ''}`)); cmd('setblock 6 5 2 waystones:waystone 0'); cmd('give @a solarflux:solar_panel_1 3'); cmd('give @a computercraft:pocket_computer_advanced 1'); cmd('give @a waystones:warp_stone 1'); cmd('give @a computercraft:disk 1');
+blocks.forEach((n, i) => cmd(`setblock ${2 + i} 4 2 ${n}${n === 'waystones:waystone' ? ' 8' : ''}`)); cmd('setblock 6 5 2 waystones:waystone 0'); cmd('setblock 4 5 2 computercraft:peripheral 10'); cmd('give @a solarflux:solar_panel_1 3'); cmd('give @a computercraft:pocket_computer_advanced 1'); cmd('give @a waystones:warp_stone 1'); cmd('give @a computercraft:disk 1');
 await wait(4000); await pg.waitForFunction(() => PACK.on, null, { timeout: 30000 }).catch(() => {}); await wait(1500);
 const info = await pg.evaluate(blocks => { const S = StrataMCE.dbg(); const g = (x, y, z) => world.get(x + S.OX, y, z + S.OZ);
   return { dbg: [S.modPackOn, PACK.worldId, PACK.name, !!(S.modRec && Object.keys(S.modRec.files).length), S.o.forge], forge: !!S.forge, modRec: !!S.modRec, packOn: PACK.on, p: [Math.round(player.x - S.OX), Math.round(player.y), Math.round(player.z - S.OZ)],
@@ -37,12 +37,23 @@ const gui = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms =>
   const sent = []; const ms = S.client.api.modSend; S.client.api.modSend = (ch, b) => { sent.push([ch, Array.from(b).slice(0, 8)]); return ms(ch, b); };
   const bd = BLOCKS[wid]; r.tap = bd && bd.modName ? StrataMCE.dbg() && (function () { return true; })() : false; window.__wayHit = [6 + S.OX, 4, 2 + S.OZ];
   await W(50); return r; });
+const cc = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)), r = {};
+  r.tiles = S.cc ? [...S.cc.tiles.entries()].map(([k, v]) => k + '=' + v.inst) : []; r.turtles = S.cc ? S.cc.turtles.size : 0; r.turtleNoMesh = !!(BLOCKS[world.get(7 + S.OX, 4, 2 + S.OZ)] || {}).noMesh;
+  window.__ccl = []; { const o = S.Hd.modPayload; S.Hd.modPayload = (ch, b) => { if (ch === 'computercraft') window.__ccl.push(b[0] + ':' + b.length + ':' + Array.from(b.slice(1, 4)).join('.')); return o(ch, b); }; }
+  S.client.api.place(4, 4, 2, 1, null, 8, 16, 8); const txt = () => { const t = S.cc && S.cc.gui && S.cc.terms.get(S.cc.gui.inst); return t ? t.text.join('\n') : ''; };
+  for (let k = 0; k < 60 && !/CraftOS/.test(txt()); k++) await W(250); r.win = S.win && S.win.type; r.boot = txt().split('\n').filter(l => l.trim()).slice(0, 3); r.canvas = !!document.getElementById('ccCv');
+  const I = document.getElementById('ccIn'); for (const ch of 'monitor top hello') { I.value = ch; I.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ch })); await W(30); }
+  [...document.querySelectorAll('#ccKeys button')].find(b => b.textContent === 'Enter').click();
+  for (let k = 0; k < 40 && !(S.cc.mons.size && [...S.cc.mons.values()].some(t => /Hello/.test(t.text.join('')))); k++) await W(250);
+  r.typed = txt().split('\n').filter(l => l.trim()).slice(-3); r.mon = [...S.cc.mons.values()].map(t => t.text.join('|').replace(/\s+\|/g, '|').slice(0, 60)); await W(800); r.monPoster = (world.decor || []).filter(e => e.ccMon).length;
+  r.log = window.__ccl.slice(0, 20); r.gui = S.cc.gui; r.terms = [...S.cc.terms.keys()]; closeInv(); await W(300); return r; });
+await pg.evaluate(() => StrataMCE.dbg().client.api.place(4, 4, 2, 1, null, 8, 16, 8)); await wait(2500); await pg.screenshot({ path: '/tmp/forge-cc.png' }); await pg.evaluate(() => closeInv()); cmd('time set 1000');
 const way = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)); const sent = []; const ms = S.client.api.modSend; S.client.api.modSend = (ch, b) => { sent.push([ch, b.length]); };
   const bd = BLOCKS[world.get(...window.__wayHit)]; const ok = window.__portTapTest ? 0 : 0; // open the screen the way a tap would
   S.Hd.modPayload('waystones', Uint8Array.from([9, 3, 0, 4, 72, 111, 109, 101, 0, 0, 0, 0, ...(() => { const v = (BigInt(6) << 38n) | (BigInt(4) << 26n) | BigInt(2); const o = []; for (let i = 7; i >= 0; i--) o.push(Number((v >> BigInt(i * 8)) & 255n)); return o; })(), 0]));
   await W(200); const btns = [...document.querySelectorAll('#mcWays button')].map(b => b.textContent); const dest = [...document.querySelectorAll('#mcWays button')].find(b => /Mine/.test(b.textContent)); if (dest) dest.click(); await W(200); S.client.api.modSend = ms; return { btns, sent }; });
-await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 4.5 + S.OX; player.z = 4.5 + S.OZ; cam.zoom = 2.6; }); await wait(2500); await pg.screenshot({ path: '/tmp/forge.png' });
+await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 9.5 + S.OX; player.z = 2.5 + S.OZ; player.face = -Math.PI / 2; cam.zoom = 2; cam.photoHide = true; }); await wait(2500); await pg.screenshot({ path: '/tmp/forge.png' });
 await pg.$eval('#mcLeave', e => e.click()).catch(() => {}); await wait(1500); const after = await pg.evaluate(() => ({ active: StrataMCE.active, pack: PACK.on }));
-const res = { imported, modsLine, info, gui, way, after, errs: errs.slice(0, 5) };
-res.pass = gui.win && /solarflux/.test(gui.win[0]) && /Energy/.test(gui.ext || '') && gui.panelBoxes && gui.ways.length === 2 && way.sent.length === 1 && way.sent[0][0] === 'waystones' && info.forge && info.modRec && info.placed.every(p => p[1] > 0) && info.placed.filter(p => p[3]).length >= 4 && info.hot.length >= 3 && !errs.length && !after.active;
+const res = { imported, modsLine, info, gui, way, cc, after, errs: errs.slice(0, 5) };
+res.pass = cc.boot.some(l => /CraftOS/.test(l)) && cc.mon.some(t => /Hello/.test(t)) && cc.monPoster >= 1 && cc.turtles >= 1 && cc.turtleNoMesh && gui.win && /solarflux/.test(gui.win[0]) && /Energy/.test(gui.ext || '') && gui.panelBoxes && gui.ways.length === 2 && way.sent.length === 1 && way.sent[0][0] === 'waystones' && info.forge && info.modRec && info.placed.every(p => p[1] > 0) && info.placed.filter(p => p[3]).length >= 4 && info.hot.length >= 3 && !errs.length && !after.active;
 console.log(JSON.stringify(res, null, 1)); await b.close(); relay.kill(); cmd('stop'); await wait(4000); srv.kill(); process.exit(res.pass ? 0 : 1);

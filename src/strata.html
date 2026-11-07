@@ -1931,6 +1931,7 @@ function meshChunk(world,ch){
     if(bd.elevator){ setVLcell(x,y,z); PAT=PT.WOOL; emitBox(vbO,[wx,y,wz],[wx+1,y+1,wz+1],bd.side,IDT); PAT=0; setVL(VL_EMISSIVE); emitBox(vbO,[wx+.35,y+1,wz+.35],[wx+.65,y+1.01,wz+.65],[170,90,230],IDT); continue; }
     if(bd.tech){ setVLcell(x,y,z); techMesh(vbO,vbG,b,bd,wx,y,wz); continue; }
     if(bd.pot){ setVLcell(x,y,z); PAT=bd.ps|0; emitBox(vbO,[wx+.3125,y,wz+.3125],[wx+.6875,y+.375,wz+.6875],bd.side,IDT); PAT=0; emitBox(vbO,[wx+.375,y+.34,wz+.375],[wx+.625,y+.385,wz+.625],[96,64,42],IDT); if(bd.pot.plant) potPlant(vbL,wx,y,wz,bd.pot.plant,jit); continue; }
+    if(bd.noMesh) continue;   // drawn elsewhere (Minecraft-compat turtles)
     if(bd.shape&&!bd.door){ setVLcell(x,y,z); PAT=bd.ps|0; const c=bd.side;
       for(const q of bd.rboxes||bd.boxes){ const cb=CB; if(q[7]) CB=0; emitBox(vbO,[wx+q[0],y+q[1],wz+q[2]],[wx+q[3],y+q[4],wz+q[5]],q[6]||(q===bd.boxes[0]&&bd.slab?bd.top:c),IDT); CB=cb; } continue; }   // q[7]: this box keeps its colour (no pack texture)
     if(bd.door){ setVLcell(x,y,z); PAT=bd.ps|0; const q=bd.boxes[0], c=bd.side; emitBox(vbO,[wx+q[0],y+q[1],wz+q[2]],[wx+q[3],y+q[4],wz+q[5]],c,IDT); PAT=0;
@@ -10843,7 +10844,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function drawMcPlayers() {
     if (cam.photoHide) return; const keep = SKIN.tex, hurt = player.hurtT; player.hurtT = 9;
     for (const pl of S.players) if (pl.n > 0) { const L = Array.from(sampleLight(pl.x, pl.y + 1.2, pl.z)); SKIN.tex = pl.T && pl.T.tex || keep; drawSkinMesh(pl.buf, pl.n, L, 1, false); for (const a of pl.arm || []) { const e = __ENT[a.key]; if (!e) continue; SKIN.tex = e.tex; drawSkinMesh(a.B, a.n, L, 1, false); } }
-    SKIN.tex = keep; player.hurtT = hurt; try { drawSkulls(); } catch (e) { /* skin */ }
+    SKIN.tex = keep; player.hurtT = hurt;
   }
   function tagColor(nm) { let h = 0; for (const c of nm) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `hsl(${h % 360},80%,74%)`; }
   function tagLoop() {
@@ -11716,7 +11717,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
       if (m.mc) { try { mobExtras(vb, m); } catch (e) { if (!S.exErr) { S.exErr = 1; console.error('mob extras', e); } } } },
     drawHearts() { S.saved.drawHearts(); drawHunger(); },
-    drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) drawMcPlayers(); },
+    drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) { drawMcPlayers(); try { drawSkulls(); drawTurtles(); } catch (e) { /* skin */ } } },   // heads and turtles are world objects: drawn even with players hidden
     stepHealth(dt) { player.hurtT += dt; },
     stepDecay() {},
     dropHeld(all) { if (!held()) return; S.client.api.dig(all ? 3 : 4, 0, 0, 0, 0); S.client.api.swing(); },
@@ -11978,7 +11979,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
     el.innerHTML = ''; for (const m of list.slice(0, 12)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
-    for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays']) { const e = document.getElementById(id); if (e) e.remove(); } }
+    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
   OVR.push('stepGlider');
   IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
@@ -12011,7 +12012,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     else { emitBox(dynVB, [-5, 3, -3.2], [0, 23, -2.4], c, T); emitBox(dynVB, [0, 3, -3.2], [5, 23, -2.4], c, T); } }
   function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
     m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
-  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); monTick(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
       for (const pl of S.players) { const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null; if (it && (EDIBLE.has(it.id) || DRINK.has(it.id)) && (pl.crumbT = (pl.crumbT || 0) - 1) <= 0) { pl.crumbT = 6; const st = toStack(it); eatCrumbs(pl.x, pl.y, pl.z, pl.face, st && st.id, DRINK.has(it.id)); } }
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
@@ -12077,8 +12078,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       for (const pre of ['tile.', 'item.', '']) for (const k in L) if (k.startsWith(pre) && (k.endsWith('.' + path + '.name') || k.endsWith(':' + path + '.name'))) return L[k]; }
     return path.replace(/[_.]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
   function modBlock(n, meta) { const pv = portBlock(n, meta), key = 'M' + n + (pv && pv.key != null ? '#' + pv.key : ''); if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
-    const R = S.modRec, col = (pv && pv.col) || hashCol(n), tex = (pv && pv.tex) || (R && R.blocks[n]), boxes = (pv && pv.boxes) || (R && R.shapes && R.shapes[n]);
-    def(id, modName(n), col, col, col, Object.assign({ noItem: 1 }, boxes ? { opaque: false, lightOpaque: 0, shape: 1, decor: 1, boxes } : {})); post(id); BLOCKS[id].modName = n; BLOCKS[id].modMeta = meta;
+    const R = S.modRec, col = (pv && pv.col) || hashCol(n), tex = (pv && pv.tex) || (pv && pv.variant && R && R.variants && R.variants[n] && R.variants[n][pv.variant]) || (R && R.blocks[n]), boxes = (pv && pv.boxes) || (R && R.shapes && R.shapes[n]);
+    def(id, modName(n), col, col, col, Object.assign({ noItem: 1 }, boxes ? { opaque: false, lightOpaque: 0, shape: 1, decor: 1, boxes } : {})); post(id); BLOCKS[id].modName = n; BLOCKS[id].modMeta = meta; if (pv && pv.noMesh) BLOCKS[id].noMesh = 1;
     SPEC[id] = { h: 2, tool: null, req: 0 }; S.vis.set(key, id); if (tex) texFor(id, tex, ''); return id; }
   function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
     S.modIds = S.modIds || new Map(); let sid = S.modIds.get(n); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(n, sid);
@@ -12086,8 +12087,16 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
   function modSpawn(e) { if (!S.world || !S.forge) return; const nm = modEntName(e.mod, e.tid), x = e.x + S.OX, z = e.z + S.OZ;
     const m = { mc: 1, eid: e.eid, type: 'mcgeneric', x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * PI / 180, tface: -e.yaw * PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: 0, flee: 0, magma: 0, eq: null, cname: modName(nm), modEnt: nm };
+    { const ty = modEntType(nm); if (ty) m.type = ty; }
     S.ents.set(e.eid, m); S.mobs.push(m); }
-  function modGui(wid, mod, gid) { mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); }   // slot count comes with the window's items
+  // a mod creature's texture from its jar (textures/entity/...) on Strata's humanoid body when it uses the humanoid layout (64x64 / 64x32)
+  function modEntType(nm) { const [mod, path] = nm.split(':'), keys = Object.keys(window.__ENT || {}).filter(k => k.startsWith(mod + ':entity/')); if (!keys.length) return null;
+    const base = k => k.split('/').pop().replace(/\.png$/, ''), want = path.toLowerCase(), simp = v => v.replace(/^entity_?|_?entity$/g, '').replace(/[^a-z0-9]/g, '');
+    const key = keys.find(k => base(k) === want) || keys.find(k => simp(base(k)) === simp(want)) || keys.find(k => base(k).includes(simp(want)) || simp(want).includes(simp(base(k)))) || keys.find(k => k.includes('/' + want + '/'));
+    if (!key) return null; const ty = 'mod:' + key; if (MOB[ty]) return ty; const E = __ENT[key], hum = E.w === 64 && (E.h === 64 || E.h === 32); if (!hum) return null;   // other layouts belong to the mod's own model code: keep the stand-in
+    MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }); __skins.MODELS[ty] = m => { const M = __skins.MODELS.zombie(m); M.tex = key; return M; };
+    (S.modTypes = S.modTypes || []).push(ty); return ty; }
+  function modGui(wid, mod, gid, gx, gy, gz) { if (S.cc) S.cc.gui = null; mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); Object.assign(S.win, { gx, gy, gz }); if (S.cc) S.cc.gui = null; mcInvRender(); }   // slot count comes with the window's items
   // ---- mod ports: per-mod client halves (block looks the mod draws in code, its screens and its network messages) ----
   const nbtOf = b => { try { return nbtRead(b, 0)[0] || {}; } catch (e) { return {}; } };
   const bbR = (b, p) => { const d = new DataView(b.buffer, b.byteOffset, b.byteLength); return { b, p, d, u8() { return this.b[this.p++]; }, i32() { const v = this.d.getInt32(this.p); this.p += 4; return v; }, i64() { const v = this.d.getBigInt64(this.p); this.p += 8; return v; }, bool() { return this.b[this.p++] !== 0; },
@@ -12119,6 +12128,114 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         setTimeout(() => wayOpen(3, 0, e), 150); return true; },
       use(n) { if (n === 'waystones:warp_stone') { wayOpen(2, 0, null); return true; } if (n === 'waystones:warp_scroll') { wayOpen(1, 0, null); return true; } return false; } },
   };
+  // ---- ComputerCraft (CC: Tweaked 1.89.2): terminals, keyboard and mouse, monitors in the world, turtles drawn from their model ----
+  // network: channel "computercraft", byte discriminator then PacketBuffer data. client <- 11 computer data, 12 deleted, 13 terminal, 15 monitor; server <- 0 action, 1 queue event, 2 request, 3 key, 4 mouse
+  const CC = { pal: ['#f0f0f0', '#f2b233', '#e57fd8', '#99b2f2', '#dede6c', '#7fcc19', '#f2b2cc', '#4c4c4c', '#999999', '#4c99b2', '#b266e5', '#3366cc', '#7f664c', '#57a64e', '#cc4c4c', '#111111'] };
+  const ccS = () => S.cc = S.cc || { tiles: new Map(), terms: new Map(), mons: new Map(), monT: new Map(), turtles: new Map(), gone: [], posters: new Map() };
+  const pk = (x, y, z) => x + ',' + y + ',' + z;
+  async function ccTerm(r) {   // TerminalState: colour, compress, hasTerminal, width, height, length, data (gzip when compressed)
+    const colour = r.bool(), comp = r.bool(); if (!r.bool()) return null; const w = r.vi(), h = r.vi(), n = r.vi(); let d = r.b.slice(r.p, r.p + n); r.p += n;
+    if (comp) d = new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const q = bbR(d, 0), t = { w, h, colour, cx: q.i32(), cy: q.i32(), blink: q.bool(), text: [], fg: [], bg: [] }; const cc = q.u8(); t.cfg = cc & 15; t.cbg = (cc >> 4) & 15;
+    for (let y = 0; y < h; y++) { let s = '', f = [], b2 = []; for (let x = 0; x < w; x++) { s += String.fromCharCode(q.u8()); const c = q.u8(); f.push((c >> 4) & 15); b2.push(c & 15); } t.text.push(s); t.fg.push(f); t.bg.push(b2); }
+    t.pal = []; for (let i = 0; i < 16; i++) { if (q.p + 3 > d.length) { t.pal.push(CC.pal[i]); continue; } t.pal.push('#' + [q.u8(), q.u8(), q.u8()].map(v => v.toString(16).padStart(2, '0')).join('')); }
+    return t; }
+  function ccDraw(cv, t, cursor) { const cw = 6, ch = 9, s = 2, W = t.w * cw * s + 8, H = t.h * ch * s + 8; if (cv.width !== W) cv.width = W; if (cv.height !== H) cv.height = H; const g = cv.getContext('2d');
+    g.fillStyle = t.pal[15]; g.fillRect(0, 0, W, H); g.font = `${ch * s}px monospace`; g.textBaseline = 'top';
+    for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) { const X = 4 + x * cw * s, Y = 4 + y * ch * s, b = t.bg[y][x], f = t.fg[y][x], c = t.text[y][x];
+      if (b !== 15) { g.fillStyle = t.pal[b]; g.fillRect(X, Y, cw * s, ch * s); } if (c !== ' ' && c !== '\0') { g.fillStyle = t.pal[f]; g.save(); g.translate(X, Y); g.scale(cw * s / g.measureText('M').width, 1); g.fillText(c, 0, 0); g.restore(); } }
+    if (cursor && t.blink && (Date.now() >> 9) % 2 && t.cx >= 0 && t.cy >= 0 && t.cx < t.w && t.cy < t.h) { g.fillStyle = t.pal[t.cfg]; g.fillRect(4 + t.cx * cw * s, 4 + (t.cy * ch + ch - 2) * s, cw * s, 2 * s); } }
+  const ccNbtArgs = args => { const a = [10, 0, 0], str = (k, v) => { const u = new TextEncoder().encode(v); a.push(8, 0, k.length, ...new TextEncoder().encode(k), u.length >> 8, u.length & 255, ...u); };   // {len: int, "0": string, ...}
+    a.push(3, 0, 3, 108, 101, 110, (args.length >> 24) & 255, (args.length >> 16) & 255, (args.length >> 8) & 255, args.length & 255); args.forEach((v, i) => str(String(i), String(v))); a.push(0); return a; };
+  const ccSend = bytes => S.client.api.modSend('computercraft', Uint8Array.from(bytes));
+  const ccVi = (a, n) => { n >>>= 0; do { let x = n & 127; n >>>= 7; if (n) x |= 128; a.push(x); } while (n); return a; };
+  const ccEvent = (inst, ev, args) => { const a = ccVi([1], inst), u = new TextEncoder().encode(ev); ccVi(a, u.length); a.push(...u, ...ccNbtArgs(args || [])); ccSend(a); };
+  const ccKey = (inst, type, code) => ccSend(ccVi(ccVi([3], inst).concat([type]), code));
+  const ccMouse = (inst, type, btn, x, y) => ccSend(ccVi(ccVi(ccVi(ccVi([4], inst).concat([type]), btn), x), y));
+  const ccAction = (inst, a) => ccSend(ccVi(ccVi([0], inst), a));
+  // LWJGL 2 key codes for the keys CC programs listen to
+  const KEYS = { Enter: 28, Backspace: 14, Tab: 15, ArrowUp: 200, ArrowDown: 208, ArrowLeft: 203, ArrowRight: 205, Home: 199, End: 207, Delete: 211, PageUp: 201, PageDown: 209, Control: 29, Shift: 42, Alt: 56, ' ': 57, '-': 12, '=': 13, '[': 26, ']': 27, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, '\\': 43, '`': 41, Escape: 1 };
+  'qwertyuiop'.split('').forEach((c, i) => KEYS[c] = 16 + i); 'asdfghjkl'.split('').forEach((c, i) => KEYS[c] = 30 + i); 'zxcvbnm'.split('').forEach((c, i) => KEYS[c] = 44 + i); '1234567890'.split('').forEach((c, i) => KEYS[c] = 2 + i);
+  for (let i = 1; i <= 12; i++) KEYS['F' + i] = i <= 10 ? 58 + i : 86 + i - 10;
+  const keyOf = k => KEYS[k] != null ? KEYS[k] : KEYS[String(k).toLowerCase()];
+  PORTS.computercraft = {
+    block(n, meta) {
+      if (/^computercraft:turtle/.test(n)) return { key: 't', noMesh: 1, boxes: [[2 / 16, 2 / 16, 2 / 16, 14 / 16, 14 / 16, 13 / 16]], col: '#b8a46a' };
+      if (n === 'computercraft:peripheral') { const v = meta === 10 ? 'monitor' : meta === 12 ? 'advanced_monitor' : meta === 11 ? 'printer_empty' : meta === 13 ? 'speaker' : meta >= 2 && meta <= 5 ? 'disk_drive_empty' : 'wireless_modem_off'; return { key: v, variant: 'facing=north,variant=' + v }; }
+      return null; },
+    payload: { computercraft(b) { const r = bbR(b, 0), d = r.u8(), C = ccS();
+      if (d === 13) { const inst = r.vi(); ccTerm(r).then(t => { if (!S || !t) return; C.terms.set(inst, t); if (C.gui && C.gui.inst === inst) ccRedraw(); }); }
+      else if (d === 15) { const pos = unpos(r.i64()); ccTerm(r).then(t => { if (!S || !t) return; C.mons.set(pk(...pos), t); monDirty(pos); }); }
+      else if (d === 11) { const inst = r.vi(), st = r.vi(); C.state = C.state || new Map(); C.state.set(inst, st); if (C.gui && C.gui.inst === inst) ccRedraw(); }
+      else if (d === 12) { const inst = r.vi(); C.terms.delete(inst); }
+      return true; } },
+    gui(W, box) { const m = /^forge:computercraft:(\d+)$/.exec(W.type || ''); if (!m) return false; const gid = +m[1]; if (![101, 103, 106, 110].includes(gid)) return false; ccPanel(W, box, gid); return true; },
+    tile(x, y, z, tag) { const C = ccS(), X = x + S.OX, Z = z + S.OZ, k = pk(X, y, Z);
+      if (tag.instanceID != null) { C.tiles.set(pk(x, y, z), { inst: tag.instanceID | 0, label: tag.label || '', on: !!tag.on, id: tag.computerID }); }
+      if (tag.leftUpgrade != null || tag.fuelLevel != null || tag.direction != null) turtleTile(X, y, Z, tag);
+      if (tag.xIndex != null) { C.monT.set(pk(x, y, z), { xi: tag.xIndex | 0, yi: tag.yIndex | 0, w: tag.width | 0 || 1, h: tag.height | 0 || 1, dir: (tag.monitorDir != null ? tag.monitorDir : tag.dir) | 0, x, y, z }); if (!tag.xIndex && !tag.yIndex) monDirty([x, y, z]); } },
+  };
+  // the computer screen: lives inside the open window (computer, turtle with its inventory, pocket computer)
+  function ccPanel(W, box, gid) { const C = ccS(); if (W.gx == null) return; let inst = C.gui && C.gui.wid === W.id ? C.gui.inst : null;
+    if (inst == null) { if (gid === 106) { const h = held(), t = h && h.mc && itemTag(h.mc); inst = t && t.instanceID != null ? t.instanceID | 0 : -1; } else if (gid === 110) inst = W.gx | 0; else { const ti = C.tiles.get(pk(W.gx, W.gy, W.gz)); inst = ti ? ti.inst : -1; }
+      C.gui = { wid: W.id, inst, gid }; if (inst >= 0) ccSend(ccVi([2], inst)); }
+    let el = C.ui; if (!el) { el = C.ui = document.createElement('div'); el.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:stretch';
+      el.innerHTML = '<canvas id="ccCv" style="width:100%;image-rendering:pixelated;border-radius:6px;border:3px solid #c6c6a4;background:#111;touch-action:none"></canvas><input id="ccIn" autocapitalize="off" autocomplete="off" spellcheck="false" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px" aria-label="Computer keyboard"><div id="ccKeys" style="display:flex;flex-wrap:wrap;gap:4px"></div><small class="hint" id="ccHint"></small>';
+      const keys = el.querySelector('#ccKeys'), I = el.querySelector('#ccIn'), cv = el.querySelector('#ccCv'), cur = () => C.gui && C.gui.inst;
+      const btn = (label, fn, title) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = label; b.title = title || label; b.style.cssText = 'font-size:12px;padding:5px 9px'; b.onclick = e => { e.preventDefault(); fn(b); }; keys.appendChild(b); return b; };
+      const tapKey = code => { ccKey(cur(), 0, code); setTimeout(() => ccKey(cur(), 2, code), 60); };
+      btn('⌨ Type', () => I.focus(), 'Open the keyboard'); btn('Enter', () => tapKey(28)); btn('⌫', () => tapKey(14), 'Backspace'); btn('Tab', () => tapKey(15)); btn('↑', () => tapKey(200)); btn('↓', () => tapKey(208)); btn('←', () => tapKey(203)); btn('→', () => tapKey(205));
+      const ctl = btn('Ctrl', b => { C.ctrl = !C.ctrl; b.style.outline = C.ctrl ? '2px solid #ffd34d' : ''; ccKey(cur(), C.ctrl ? 0 : 2, 29); });
+      btn('Terminate', () => ccEvent(cur(), 'terminate', []), 'Stop the running program (Ctrl+T)'); btn('Reboot', () => ccAction(cur(), 2)); btn('Shut down', () => ccAction(cur(), 1)); btn('Turn on', () => ccAction(cur(), 0));
+      I.addEventListener('keydown', e => { const k = e.key; if (k === 'Unidentified' || k === 'Process') return; const code = keyOf(k); if (code == null) return; if (k.length > 1 || e.ctrlKey) e.preventDefault(); ccKey(cur(), e.repeat ? 1 : 0, code);
+        if (e.ctrlKey && /^[a-z]$/i.test(k)) return; if (k.length === 1 && !e.ctrlKey) { C.sentChar = k; ccEvent(cur(), 'char', [k]); } });
+      I.addEventListener('keyup', e => { const code = keyOf(e.key); if (code != null) ccKey(cur(), 2, code); });
+      I.addEventListener('input', e => { const v = I.value; I.value = ''; if (e.inputType === 'deleteContentBackward') { tapKey(14); return; } for (const ch of v) { if (C.sentChar === ch) { C.sentChar = null; continue; } const code = keyOf(ch); if (code != null) ccKey(cur(), 0, code); ccEvent(cur(), 'char', [ch]); if (code != null) ccKey(cur(), 2, code); } });
+      I.addEventListener('paste', e => { const t = (e.clipboardData && e.clipboardData.getData('text')) || ''; if (t) { e.preventDefault(); ccEvent(cur(), 'paste', [t.slice(0, 512)]); } });
+      const cell = e => { const t = C.terms.get(cur()); if (!t) return null; const r = cv.getBoundingClientRect(), x = Math.floor(((e.clientX - r.left) / r.width * cv.width - 4) / 12) + 1, y = Math.floor(((e.clientY - r.top) / r.height * cv.height - 4) / 18) + 1; return [Math.max(1, Math.min(t.w, x)), Math.max(1, Math.min(t.h, y))]; };
+      cv.addEventListener('pointerdown', e => { const c = cell(e); if (!c) return; C.drag = c; ccMouse(cur(), 0, e.button === 2 ? 2 : 1, c[0], c[1]); });
+      cv.addEventListener('pointermove', e => { if (!C.drag) return; const c = cell(e); if (c && (c[0] !== C.drag[0] || c[1] !== C.drag[1])) { C.drag = c; ccMouse(cur(), 1, 1, c[0], c[1]); } });
+      cv.addEventListener('pointerup', e => { const c = cell(e) || C.drag; if (c) ccMouse(cur(), 2, 1, c[0], c[1]); C.drag = null; I.focus(); });
+      cv.addEventListener('wheel', e => { const c = cell(e); if (c) { e.preventDefault(); ccMouse(cur(), 3, e.deltaY > 0 ? 1 : -1, c[0], c[1]); } }, { passive: false });
+      C.blinkT = setInterval(() => { if (S && S.cc && S.cc.gui && document.getElementById('ccCv')) ccRedraw(); }, 500); }
+    box.appendChild(el); ccRedraw(); }
+  function ccRedraw() { const C = S.cc, cv = document.getElementById('ccCv'); if (!C || !cv || !C.gui) return; const t = C.terms.get(C.gui.inst), hint = document.getElementById('ccHint');
+    if (t) ccDraw(cv, t, true); else { cv.width = 306 * 2; cv.height = 171 * 2; const g = cv.getContext('2d'); g.fillStyle = '#111'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#ccc'; g.font = '22px monospace'; g.fillText(C.gui.inst < 0 ? 'No computer here' : 'Connecting...', 20, 40); }
+    if (hint) { const st = C.state && C.state.get(C.gui.inst); hint.textContent = st === 0 ? 'The computer is off. Tap Turn on.' : 'Tap the screen to click (advanced computers), ⌨ Type for the keyboard.'; } }
+  // monitors: the terminal drawn onto the wall's front as a picture (Strata's poster decor), at most a few times a second
+  const FACE = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
+  function monDirty(pos) { const C = ccS(); (C.monQ = C.monQ || new Set()).add(pk(...pos)); }
+  function monTick() { const C = S.cc; if (!C || !C.monQ || !C.monQ.size || !S.world) return; const now = performance.now(); if (now - (C.monT0 || 0) < 250) return; C.monT0 = now;
+    for (const k of [...C.monQ]) { C.monQ.delete(k); const t = C.mons.get(k), mt = C.monT.get(k); if (!t || !mt) continue; const f = FACE[mt.dir % 6]; if (!f || f[1]) continue;
+      const cv = document.createElement('canvas'); ccDraw(cv, t, false); const img = cv.toDataURL(), F = [f[0], 0, f[2]], R = [F[2], 0, -F[0]], X = mt.x + S.OX, Z = mt.z + S.OZ;
+      const c = [X + .5 + F[0] * .505 + R[0] * (mt.w - 1) / 2, mt.y + .5 + (mt.h - 1) / 2, Z + .5 + F[2] * .505 + R[2] * (mt.w - 1) / 2]; world.decor = world.decor || [];
+      const old = C.posters.get(k); if (old) { const i = world.decor.indexOf(old); if (i >= 0) world.decor.splice(i, 1); }
+      const e = { kind: 'poster', c, n: F, u: R, v: [0, 1, 0], w: mt.w - .25, h: mt.h - .25, img, cell: [X, mt.y, Z], fixU: 1, ccMon: k }; world.decor.push(e); C.posters.set(k, e); world.changed = true; } }
+  // turtles: the turtle model's two boxes with the turtle texture, turned to face its direction, sliding when it moves
+  const TURTLE_EL = [{ from: [2, 2, 2], to: [14, 14, 13], faces: { down: [5.75, 2.75, 2.75, 0], up: [8.75, 0, 5.75, 2.75], north: [11.5, 5.75, 8.5, 2.75], south: [5.75, 5.75, 2.75, 2.75], west: [8.5, 5.75, 5.75, 2.75], east: [2.75, 5.75, 0, 2.75] } },
+    { from: [3, 6, 13], to: [13, 13, 15], faces: { down: [11.75, .5, 9.25, 0], up: [14.25, 0, 11.75, .5], south: [11.75, 2.25, 9.25, .5], west: [12.25, 2.25, 11.75, .5], east: [9.25, 2.25, 8.75, .5] } }];
+  const DIRYAW = { 2: 0, 5: -PI / 2, 3: -PI, 4: -PI * 1.5 };
+  function turtleTile(X, y, Z, tag) { const C = ccS(), k = pk(X, y, Z), bd = BLOCKS[world.get(X, y, Z)], adv = !!(bd && /advanced/.test(bd.modName || '')); let t = C.turtles.get(k); const now = performance.now();
+    if (!t) { t = { x: X, y, z: Z, adv, t0: now }; const g = C.gone.find(q => now - q.t < 1200 && Math.abs(q.x - X) + Math.abs(q.y - y) + Math.abs(q.z - Z) === 1); if (g) { t.from = [g.x, g.y, g.z]; t.yaw = g.yaw; C.gone.splice(C.gone.indexOf(g), 1); } C.turtles.set(k, t); }
+    const d = tag.direction != null ? tag.direction | 0 : 2; t.tyaw = DIRYAW[d] != null ? DIRYAW[d] : 0; if (t.yaw == null) t.yaw = t.tyaw; t.adv = adv || t.adv; }
+  function modelQuads(buf, n, M, els, tw) { const P = (a, b, c) => ap(M, a, b, c), Q = (u, v) => [u / 16, v / 16];
+    for (const e of els) { const [x0, y0, z0] = e.from, [x1, y1, z1] = e.to, F = e.faces;
+      const corners = { north: [[x1, y1, z0], [x0, y1, z0], [x0, y0, z0], [x1, y0, z0]], south: [[x0, y1, z1], [x1, y1, z1], [x1, y0, z1], [x0, y0, z1]], west: [[x0, y1, z0], [x0, y1, z1], [x0, y0, z1], [x0, y0, z0]], east: [[x1, y1, z1], [x1, y1, z0], [x1, y0, z0], [x1, y0, z1]],
+        up: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], down: [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]] }, SH = { north: .8, south: .8, west: .7, east: .7, up: 1, down: .55 };
+      for (const f in F) { const [u0, v0, u1, v1] = F[f], uv = [Q(u0, v0), Q(u1, v0), Q(u1, v1), Q(u0, v1)], p = corners[f].map(q => P(q[0], q[1], q[2]));
+        for (const k of [0, 1, 2, 0, 2, 3]) { buf[n++] = p[k][0]; buf[n++] = p[k][1]; buf[n++] = p[k][2]; buf[n++] = uv[k][0]; buf[n++] = uv[k][1]; buf[n++] = SH[f]; } } }
+    return n; }
+  function texFromPack(key) { const C = ccS(); C.tex = C.tex || {}; if (C.tex[key] !== undefined) return C.tex[key]; const bm = PACK.img && PACK.img['b/' + key]; if (!bm) return null;
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bm);
+    for (const [k2, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k2, v); gl.activeTexture(gl.TEXTURE0); return (C.tex[key] = t); }
+  function drawTurtles() { const C = S.cc; if (!C || !C.turtles.size) return; const keep = SKIN.tex, now = performance.now(), p = player;
+    for (const [k, t] of C.turtles) { const bd = BLOCKS[world.get(t.x, t.y, t.z)]; if (!bd || !/^computercraft:turtle/.test(bd.modName || '')) { C.turtles.delete(k); C.gone.push({ x: t.x, y: t.y, z: t.z, yaw: t.yaw, t: now }); continue; }
+      if (Math.hypot(t.x - p.x, t.z - p.z) > 56) continue; const tex = texFromPack(t.adv ? 'computercraft:blocks/turtle_advanced' : 'computercraft:blocks/turtle'); if (!tex) continue;
+      let d = t.tyaw - t.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); t.yaw += d * .2; const a = t.from ? Math.min(1, (now - t.t0) / 400) : 1; if (a >= 1) t.from = null;
+      const x = t.from ? t.from[0] + (t.x - t.from[0]) * a : t.x, y = t.from ? t.from[1] + (t.y - t.from[1]) * a : t.y, z = t.from ? t.from[2] + (t.z - t.from[2]) * a : t.z;
+      const M = mc(mT(x + .5, y, z + .5), mY(t.yaw), mS(1 / 16), mT(-8, 0, -8)); t.buf = t.buf || new Float32Array(11 * 6 * 6); const n = modelQuads(t.buf, 0, M, TURTLE_EL);
+      SKIN.tex = tex; drawSkinMesh(t.buf, n / 6, Array.from(sampleLight(x + .5, y + .5, z + .5)), 1, false); }
+    SKIN.tex = keep; }
   function wayOpen(mode, hand, from) { const L = (S.ways || []).filter(w => !from || w.pos.join() !== from.pos.join()); let el = document.getElementById('mcWays');
     if (!el) { el = document.createElement('div'); el.id = 'mcWays'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.9);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:14px system-ui'; document.body.appendChild(el); }
     el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">${from ? from.name.replace(/</g, '&lt;') : 'Waystones'}</b><button class="ghost" id="mcWaysX">Close</button></div>` + (L.length ? '' : '<p class="hint">No other waystones yet. Activate some by tapping them.</p>');
@@ -12142,7 +12259,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const zr = n => cache.get(n) || null, rd = async n => { const d = zr(n); return d && new TextDecoder().decode(d); };
     const mods = []; { const mi = names.find(n => /(^|\/)mcmod\.info$/i.test(n)); if (mi) try { let j = JSON.parse((await rd(mi)).replace(/[\u0000-\u001f]+/g, ' ')); j = Array.isArray(j) ? j : j.modList || []; for (const m of j) if (m.modid) { mods.push(m.modid); rec.mods[m.modid] = m.version || ''; rec.modNames[m.modid] = m.name || m.modid; } } catch (e) { /* odd json */ } }
     const json = async n => { try { return JSON.parse((await rd(n)).replace(/\/\/[^\n]*/g, '')); } catch (e) { return null; } }, models = {}, has = n => names.includes(n);
-    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
+    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^entity\//.test(m[2])) rec.files['e/' + key] = d;   /* creature textures (Strata's skinned mob renderer) */
+        if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
       m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && /\.name$/.test(ln.slice(0, i).trim())) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
     const modelOf = async (ref, kind) => { let [ns, p] = ref.includes(':') ? ref.split(':') : ['minecraft', ref]; if (!/^(block|item)s?\//.test(p)) p = kind + '/' + p; const k = ns + ':' + p; if (k in models) return models[k];
       const f = 'assets/' + ns + '/models/' + p + '.json'; models[k] = has(f) ? await json(f) : null; return models[k]; };
@@ -12159,6 +12277,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       else if (bs.variants) { const v = bs.variants, first = v.normal || v[''] || Object.values(v)[0], fv = Array.isArray(first) ? first[0] : first; model = fv && fv.model; }
       else if (bs.multipart) { const p0 = bs.multipart[0] && bs.multipart[0].apply; model = p0 && (Array.isArray(p0) ? p0[0].model : p0.model); }
       let r = model ? await resolve(model, 'block') : null; if (Object.keys(tex).length) { const t0 = t => { let v = tex[t]; return v ? (v.includes(':') ? v : 'minecraft:' + v) : null; }; const s2 = t0('all') || t0('side') || t0('texture') || t0('particle'); if (s2) r = { s: s2, t: t0('all') || t0('top') || t0('end') || s2, b: t0('all') || t0('bottom') || t0('end') || s2 }; }
+      if (bs.variants && !bs.forge_marker) { const V = rec.variants = rec.variants || {}; let nv = 0; for (const [vk, vv] of Object.entries(bs.variants)) { if (nv++ > 160) break; const mv = Array.isArray(vv) ? vv[0] : vv; if (!mv || !mv.model) continue; const r2 = await resolve(mv.model, 'block'); if (r2 && local(r2.s)) (V[reg] = V[reg] || {})[vk] = [local(r2.s), local(r2.t), local(r2.b)]; } }
       if (r && local(r.s)) rec.blocks[reg] = [local(r.s), local(r.t), local(r.b)]; if (r && r.boxes) (rec.shapes = rec.shapes || {})[reg] = r.boxes; }
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/item\/([^/]+)\.json$/i); if (!m) continue; const reg = m[1] + ':' + m[2]; const r = await resolve(m[1] + ':item/' + m[2], 'item'); const t = r && (r.layer || (!rec.blocks[reg] && r.s));
       if (t && local(t)) { rec.items[reg] = local(t); if (!rec.files['i/' + t] && rec.files['b/' + t]) rec.files['i/' + t] = rec.files['b/' + t]; } }
@@ -12195,14 +12314,14 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       block(x, y, z, st) { o.block(x, y, z, st); if (!S.world) return; if (st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); if (st >> 4 === 144) skullMeta(x + S.OX, y, z + S.OZ, st & 15); else skullGone(x + S.OX, y, z + S.OZ); },
       multi(l) { o.multi(l); if (S.world) for (const b of l) { if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
       tile(x, y, z, a, raw) { o.tile(x, y, z, a, raw); if (!S.world) return; let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
-        if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); if (/skull$/i.test(String(tag.id || ''))) skullTile(x + S.OX, y, z + S.OZ, tag); },
+        if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); if (/skull$/i.test(String(tag.id || ''))) skullTile(x + S.OX, y, z + S.OZ, tag); if (S.forge && PORTS.computercraft && (tag.instanceID != null || tag.xIndex != null || tag.direction != null)) try { PORTS.computercraft.tile(x, y, z, tag); } catch (e) { /* odd tile */ } },
       held(n) { S.block = false; o.held(n); },
       showObjective(pos, nm) { if (pos === 2) { S.belowObj = nm || null; return; } o.showObjective(pos, nm); },
       team, map(id, sc, icons, pat) { if (S.world) mapData(id, sc, icons, pat); }, abilities(f, fly, walk) { S.abil = { f, fly, walk }; },
       combat(pid, t) { if (pid === S.eid) combat(pid, t); }, border(b) { border(b); }, tabDone(l) { sug(l); },
       cooldown(id, ticks) { const sid = id; (S.icd = S.icd || new Map()); if (ticks > 0) S.icd.set(sid, { end: performance.now() + ticks * 50, dur: ticks * 50 }); else S.icd.delete(sid); },
       trades(wid, l) { trades(wid, l); }, bookOpen() { const h = held(); if (h && h.mc && (h.mc.id === 387 || h.mc.id === 386)) openMcBook(h); },
-      advancements(r, a, d, p) { advancements(r, a, d, p); }, forgeRegistries(reg, mods) { forgeRegistries(reg, mods); }, modPayload(ch, b) { return modPayload(ch, b); }, modSpawn(e) { modSpawn(e); }, modGui(wid, mod, gid) { modGui(wid, mod, gid); }, serverPack(buf, url) { return serverPack(buf, url); },
+      advancements(r, a, d, p) { advancements(r, a, d, p); }, forgeRegistries(reg, mods) { forgeRegistries(reg, mods); }, modPayload(ch, b) { return modPayload(ch, b); }, modSpawn(e) { modSpawn(e); }, modGui(wid, mod, gid, x, y, z) { modGui(wid, mod, gid, x, y, z); }, serverPack(buf, url) { return serverPack(buf, url); },
     });
   }
   function unloadKey(k) { S.store.delete(k); const ch = world && world.chunks.get(k); if (ch) { freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); world.chunks.delete(k); } }
