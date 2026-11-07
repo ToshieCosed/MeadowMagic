@@ -11095,6 +11095,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function gridSlots(W) { const k = W ? W.kind : 'player'; return k === 'player' ? [1, 2, 3, 4] : k === 'craft3' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : []; }
   function mirror() { const W = S.win; if (!W) return; const o = W.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = W.slots[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = W.slots[o + 27 + i] || null; }
   function mcClick(k, how) {
+    if (S.win && S.forge) for (const P of Object.values(PORTS)) if (P.preClick) try { P.preClick(S.win, k); } catch (e) { /* port */ }
     if (S.waitAct != null) { (S.clickQ = S.clickQ || []).push([k, how]); return; }   // a resync is on its way: queue until the server answers
     const W = S.win, wid = W ? W.id : 0, cre = world.meta.gameMode === 'creative', A = W ? W.slots : S.slots, t = how || S.tap || 'stack';
     if (cre && S.ccur) {   // a creative item in hand: set the slot directly (player inventory only)
@@ -11120,7 +11121,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const el = document.getElementById('mcInv'); if (!el || el.hidden) return; if (S.win && S.win.kind === 'anvil' && document.activeElement && document.activeElement.closest && document.activeElement.closest('#mcTop')) S.win.focus = true; const W = S.win, top = el.querySelector('#mcTop'), cre = world.meta.gameMode === 'creative'; top.innerHTML = '';
     el.querySelector('#mcInvTitle').textContent = W ? WTITLE[W.title] || (W.title || 'Container').replace(/^container\./, '') : 'Inventory';
     const cur = S.ccur || S.cursor, cs = cur && toStack(cur); el.querySelector('#mcHold').innerHTML = cs ? `<small class="hint">Holding</small> ${slotHTML({ ...cs, n: 1 }).replace(/<span class="dur".*$/, '')} <small></small>` : '<small class="hint">Tap to pick up, tap again to put down. Hold a slot to move one item.</small>';
-    if (cs) el.querySelector('#mcHold small:last-child').textContent = mcName(cur) + (cur.count > 1 ? ' x' + cur.count : '');
+    if (cs) el.querySelector('#mcHold small:last-child').textContent = mcName(cur) + (cur.count > 1 ? ' x' + cur.count : '') + (S.pe && emcOf(cur) ? ' · EMC ' + fmtEmc(emcOf(cur)) : '');
     el.querySelector('#mcCre').hidden = !cre; el.querySelector('#mcCatBox').hidden = !(cre && S.cre); if (cre && S.cre) mcCatRender();
     const kind = W ? W.kind : 'player';
     if (kind === 'player') { const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); if (V9()) { mcSlot(arm, 45, { lbl: 'Off hand' }); const sb = document.createElement('button'); sb.className = 'ghost'; sb.textContent = 'Swap hands'; sb.style.cssText = 'font-size:11px;padding:4px 6px'; sb.addEventListener('click', () => { S.client.api.swapHands(); const a = S.slots[36 + inv.sel], b = S.slots[45]; S.slots[36 + inv.sel] = b; S.slots[45] = a; syncInv(); }); arm.appendChild(sb); } top.appendChild(arm);
@@ -11717,7 +11718,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       if (d && d.base && !__skins.modelFor(m)) { const t = m.type; m.type = d.base; try { S.saved.emitMob(vb, m); } finally { m.type = t; } } else S.saved.emitMob(vb, m);
       if (m.mc) { try { mobExtras(vb, m); } catch (e) { if (!S.exErr) { S.exErr = 1; console.error('mob extras', e); } } } },
     drawHearts() { S.saved.drawHearts(); drawHunger(); },
-    drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) { drawMcPlayers(); try { drawSkulls(); drawTurtles(); drawWaystones(); } catch (e) { /* skin */ } } },   // heads and turtles are world objects: drawn even with players hidden
+    drawPlayerSkin(show) { S.saved.drawPlayerSkin(show); if (S && S.world) { drawMcPlayers(); try { drawSkulls(); drawTurtles(); drawWaystones(); drawDrawn(); } catch (e) { /* skin */ } } },   // heads and turtles are world objects: drawn even with players hidden
     stepHealth(dt) { player.hurtT += dt; },
     stepDecay() {},
     dropHeld(all) { if (!held()) return; S.client.api.dig(all ? 3 : 4, 0, 0, 0, 0); S.client.api.swing(); },
@@ -11753,7 +11754,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
       items(wid, l) { if (wid === 0) { const n = V9() ? 46 : 45; S.slots = l.slice(0, n); while (S.slots.length < n) S.slots.push(null); syncInv(); }
-        else if (S.win && wid === S.win.id) { if (S.win.n == null) S.win.n = Math.max(0, l.length - 36); S.win.slots = l.slice(); const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
+        else if (S.win && wid === S.win.id) { if (S.win.n == null) S.win.n = Math.max(0, l.length - 36); S.win.slots = l.slice(); if (S.pe) try { peOutputs(); } catch (e) { /* port */ } const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
       trans(wid, act, ok) { onTrans(wid, act, ok); },
@@ -11979,7 +11980,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
     el.innerHTML = ''; for (const m of list.slice(0, 12)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = m; b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
-    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName']) { const e = document.getElementById(id); if (e) e.remove(); } }
+    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'peKeys']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
   OVR.push('stepGlider');
   IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
@@ -12012,7 +12013,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     else { emitBox(dynVB, [-5, 3, -3.2], [0, 23, -2.4], c, T); emitBox(dynVB, [0, 3, -3.2], [5, 23, -2.4], c, T); } }
   function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
     m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
-  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); monTick(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); monTick(); if (S.forge && (S.ext2 & 3) === 0) peKeysUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
       for (const pl of S.players) { const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null; if (it && (EDIBLE.has(it.id) || DRINK.has(it.id)) && (pl.crumbT = (pl.crumbT || 0) - 1) <= 0) { pl.crumbT = 6; const st = toStack(it); eatCrumbs(pl.x, pl.y, pl.z, pl.face, st && st.id, DRINK.has(it.id)); } }
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
@@ -12276,6 +12277,67 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     for (let i = 0; i < d.data.length; i += 4) { d.data[i] = d.data[i] * r / 255; d.data[i + 1] = d.data[i + 1] * gg / 255; d.data[i + 2] = d.data[i + 2] * b / 255; } g.putImageData(d, 0, 0);
     const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
     for (const [k2, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k2, v); gl.activeTexture(gl.TEXTURE0); return (C.tex[ck] = t); }
+  // ---- blocks a port draws itself: positions tracked from chunks and block changes, drawn each frame ----
+  const drawnIds = () => { if (!S.forge) return null; if (S.drawnIds) return S.drawnIds; const m = new Map(); for (const [n, id] of S.forge.byName) { const P = portOf(n); if (P && P.draw && P.draws && P.draws.test(n)) m.set(id, n); } return (S.drawnIds = m); };
+  function drawnSet(X, y, Z, id, meta) { const D = drawnIds(); const k = pk(X, y, Z); S.drawn = S.drawn || new Map(); if (D && D.has(id)) S.drawn.set(k, { x: X, y, z: Z, n: D.get(id), meta }); else S.drawn.delete(k); }
+  function drawnScan(sx, sz, sections) { const D = drawnIds(); if (!D || !D.size) return; const X0 = sx * 16, Z0 = sz * 16; if (S.drawn) for (const [k, q] of S.drawn) if (q.x >> 4 === sx && q.z >> 4 === sz) S.drawn.delete(k);
+    for (const sec of sections) { const b = sec.blocks; for (let j = 0; j < 4096; j++) { const v = b[j] >> 4; if (D.has(v)) drawnSet(X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15), v, b[j] & 15); } } }
+  function drawDrawn() { if (!S.drawn || !S.drawn.size) return; const keep = SKIN.tex, p = player; for (const q of S.drawn.values()) { if (Math.hypot(q.x - p.x, q.z - p.z) > 56) continue; const P = portOf(q.n); if (P && P.draw) P.draw(q); } SKIN.tex = keep; }
+  // ---- ProjectE (PE1.4.1): EMC values, knowledge and the Transmutation Table, machine readouts, tool keys, chest-shaped blocks ----
+  // channel "projecte": client <- 0 EMC values, 4 knowledge, 8 knowledge cleared, 10 / 11 window int / long; server <- 1 key press, 7 search update (output slot), 9 gem mode
+  const peS = () => S.pe = S.pe || { emc: new Map(), know: [], total: 0, filter: '', page: 0 };
+  const itemId = name => { if (!S.forge) return -1; if (!S.forge.itemByName) { S.forge.itemByName = new Map(); for (const [id, n] of Object.entries(S.forge.items)) S.forge.itemByName.set(n, +id); } const v = S.forge.itemByName.get(name); return v == null ? -1 : v; };
+  const emcOf = it => { if (!it || !S.pe) return 0; const E = S.pe.emc; return E.get(it.id + ':' + (it.damage | 0)) || E.get(it.id + ':0') || 0; };
+  const fmtEmc = v => { v = Number(v) || 0; return v >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v.toLocaleString(); };
+  const PE_FUEL = /^(minecraft:(coal|redstone|redstone_block|coal_block|gunpowder|glowstone_dust|blaze_powder|glowstone)|projecte:(item\.pe_fuel|fuel|fuel_block|alchemical_coal|mobius_fuel|aeternalis_fuel).*)$/;
+  const peFuel = it => { const n = S.forge && S.forge.items[it.id]; return !!n && (PE_FUEL.test(n) || /^projecte:.*fuel/.test(n)); };
+  const KEYS_PE = [['Armor', 0], ['Charge', 1], ['Extra', 2], ['Fire', 3], ['Mode', 4]];
+  const CHEST_BOX = [[0, 19, 1, 6, 1, 0, 0, 0, 14, 10, 14], [0, 0, 1, 7, 15, 0, -5, -14, 14, 5, 14], [0, 0, 8, 7, 15, -1, -2, -15, 2, 4, 1]];   // u v, rotation point, box from, size (vanilla ModelChest)
+  const HYAW = [0, -PI / 2, PI, PI / 2];   // horizontal index: south, west, north, east
+  function peOutputs() { const W = S.win, P = S.pe; if (!W || !P || !/^forge:projecte:(2|14)$/.test(W.type || '')) return; const lock = W.slots[8], lockE = lock ? emcOf(lock) : 0; let L = P.know.slice().sort((a, b) => emcOf(b) - emcOf(a));
+    const q = P.filter.toLowerCase(), same = (a, b) => a && b && a.id === b.id && (a.damage | 0) === (b.damage | 0);
+    L = L.filter(it => { const e = emcOf(it); if (lock) { if (e > lockE || same(it, lock)) return false; } else if (P.total < e) return false; return !q || mcName(it).toLowerCase().includes(q); });
+    L = L.slice(P.page * 12); const mat = [], fuel = []; if (lock && lockE <= P.total && P.know.some(k => same(k, lock))) (peFuel(lock) ? fuel : mat).push(lock);
+    for (const it of L) { if (peFuel(it)) { if (fuel.length < 4) fuel.push(it); } else if (mat.length < 12) mat.push(it); }
+    for (let i = 0; i < 16; i++) { const it = i < 12 ? mat[i] : fuel[i - 12]; W.slots[11 + i] = it ? rItem(it.id, it.damage | 0, 1) : null; } P.more = L.length > 12; }
+  PORTS.projecte = {
+    draws: /^projecte:(condenser_mk[12]|alchemical_chest)$/,
+    block(n, meta) {
+      if (n === 'projecte:matter_block') return { key: meta & 1, tex: Array(3).fill(meta & 1 ? 'projecte:blocks/rm' : 'projecte:blocks/dm') };
+      if (n === 'projecte:fuel_block') return { key: meta % 3, tex: Array(3).fill('projecte:blocks/fuels_' + (meta % 3)) };
+      if (n === 'projecte:interdiction_torch') return { boxes: [[7 / 16, 0, 7 / 16, 9 / 16, 10 / 16, 9 / 16]], tex: Array(3).fill('projecte:blocks/interdiction_torch'), col: '#d9a340' };
+      if (this.draws.test(n)) return { noMesh: S.modRec && S.modRec.files['b/projecte:blocks/' + (n === 'projecte:alchemical_chest' ? 'alchemy_chest' : n === 'projecte:condenser_mk2' ? 'condenser_mk2' : 'condenser')] ? 1 : 0, boxes: [[1 / 16, 0, 1 / 16, 15 / 16, 14 / 16, 15 / 16]], col: '#5a3d7a' };
+      return null; },
+    draw(q) { const key = 'projecte:blocks/' + (q.n === 'projecte:alchemical_chest' ? 'alchemy_chest' : q.n === 'projecte:condenser_mk2' ? 'condenser_mk2' : 'condenser'), tex = texFromPack(key), bm = PACK.img && PACK.img['b/' + key]; if (!tex || !bm) return;
+      const M = mc(mT(q.x + .5, q.y, q.z + .5), mY(HYAW[q.meta & 3]), mS(1 / 16), mT(-8, 0, -8)); q.buf = q.buf || new Float32Array(3 * 6 * 6 * 6); let n = 0;
+      for (const b of CHEST_BOX) { const X0 = b[2] + b[5], Y0 = b[3] + b[6], Z0 = b[4] + b[7]; n = mrBox(q.buf, n, M, X0, 16 - (Y0 + b[9]), 16 - (Z0 + b[10]), b[8], b[9], b[10], b[0], b[1], bm.width, bm.height); }
+      SKIN.tex = tex; drawSkinMesh(q.buf, n / 6, Array.from(sampleLight(q.x + .5, q.y + .5, q.z + .5)), 1, false); },
+    payload: { projecte(b) { const r = bbR(b, 0), d = r.u8(), P = peS();
+      if (d === 0) { const n = r.vi(); for (let i = 0; i < n; i++) { const id = r.vi(), dm = r.vi(); P.emc.set(id + ':' + dm, Number(r.i64())); } }
+      else if (d === 4) { const t = nbtOf(b.subarray(1)); P.total = Number(t.transmutationEmc || 0); P.know = (t.knowledge || []).map(k => ({ id: itemId(String(k.id || '')), damage: k.Damage | 0, count: 1 })).filter(k => k.id >= 0); peOutputs(); mcInvRender(); }
+      else if (d === 8) { P.know = []; P.total = 0; peOutputs(); mcInvRender(); }
+      else if (d === 10 || d === 11) { const wid = r.u8(), prop = r.d.getInt16(r.p); r.p += 2; const v = d === 10 ? r.vi() : Number(r.i64()); if (S.win && S.win.id === wid) { (S.win.pe = S.win.pe || {})[prop] = v; mcInvRender(); } }
+      return true; } },
+    gui(W, box) { const m = /^forge:projecte:(\d+)$/.exec(W.type || ''); if (!m) return false; const gid = +m[1], P = peS(), v = W.pe || {}, el = document.createElement('div'); el.style.cssText = 'display:flex;flex-direction:column;gap:6px;font-size:13px';
+      if (gid === 2 || gid === 14) {
+        el.innerHTML = `<div><b>EMC: ${fmtEmc(P.total)}</b> · ${P.know.length} items learned</div><div style="display:flex;gap:6px;align-items:center"><input id="peQ" placeholder="Search learned items" value="${P.filter.replace(/"/g, '&quot;')}" style="flex:1;font-size:13px;padding:4px 8px"><button class="ghost" id="pePrev">◀</button><small>page ${P.page + 1}</small><button class="ghost" id="peNext">▶</button></div><small class="hint">Slots: 1-8 inputs, 9 lock (only show items up to its EMC), 10 burn to learn and add its EMC, 11 unlearn, then 12 matter and 4 fuel you can take.</small>`;
+        const qi = el.querySelector('#peQ'); qi.oninput = () => { P.filter = qi.value; P.page = 0; clearTimeout(P.qt); P.qt = setTimeout(() => { peOutputs(); mcInvRender(); const n2 = document.getElementById('peQ'); if (n2) { n2.focus(); n2.setSelectionRange(n2.value.length, n2.value.length); } }, 250); };
+        el.querySelector('#pePrev').onclick = () => { if (P.page > 0) { P.page--; peOutputs(); mcInvRender(); } }; el.querySelector('#peNext').onclick = () => { if (P.more) { P.page++; peOutputs(); mcInvRender(); } };
+        setTimeout(() => { const bt = document.querySelectorAll('#mcTop .islot'); const lb = ['In', 'In', 'In', 'In', 'In', 'In', 'In', 'In', 'Lock', 'Burn', 'Unlearn']; bt.forEach((b2, i) => { if (i < 11) b2.title = lb[i]; else b2.title = i < 23 ? 'Take (matter)' : 'Take (fuel)'; if (i >= 11) b2.style.outline = '1px solid rgba(180,120,255,.6)'; if (i === 8 || i === 9) b2.style.outline = '1px solid #ffd34d'; }); }, 0); }
+      else if (gid === 3) el.innerHTML = `<div>Condensing: <b>${fmtEmc(v[0] || 0)}</b> / ${fmtEmc(v[1] || 0)} EMC</div><small class="hint">The first slot is the target item to make.</small>`;
+      else if (gid >= 6 && gid <= 8) el.innerHTML = `<div>Stored: <b>${fmtEmc(v[1] || 0)}</b> EMC · Sun level ${v[0] || 0}/16</div><div>Charging: ${Math.round((v[2] || 0) / 80)}% · Fuel upgrade: ${Math.round((v[3] || 0) / 80)}%</div>`;
+      else if (gid >= 9 && gid <= 11) el.innerHTML = `<div>Stored: <b>${fmtEmc(v[0] || 0)}</b> EMC</div><div>Charging: ${Math.round((v[1] || 0) / 80)}% · Burning input: ${Math.round((v[2] || 0) / 80)}%</div>`;
+      else return false; box.appendChild(el); return true; },
+    preClick(W, k) { if (!/^forge:projecte:(2|14)$/.test(W.type || '')) return; const P = peS(), after = () => setTimeout(() => { if (S && S.win === W) { peOutputs(); mcInvRender(); } }, 0);
+      if (k === 9 && S.cursor) { const it = S.cursor, e = emcOf(it); if (e) { P.total += e * (S.tap === 'one' ? 1 : it.count); if (!P.know.some(q => q.id === it.id && (q.damage | 0) === (it.damage | 0))) P.know.push({ id: it.id, damage: it.damage | 0, count: 1 }); setTimeout(() => { if (W.slots[9]) W.slots[9] = null; after(); }, 0); } return; }   // the burn slot consumes on both sides
+      if (k === 10 && S.cursor) { const it = S.cursor; P.know = P.know.filter(q => !(q.id === it.id && (q.damage | 0) === (it.damage | 0))); after(); return; }
+      if (k === 8) { after(); return; }
+      if (k < 11 || k > 26 || !W.slots[k]) return; if (!S.cursor || same(S.cursor, W.slots[k])) { P.total = Math.max(0, P.total - emcOf(W.slots[k])); after(); } const it = W.slots[k], o = bbW().u8(7).i32(k - 11); const raw = it.raw || rItem(it.id, it.damage | 0, 1).raw; o.a.push(...raw); S.client.api.modSend('projecte', o.out()); },
+  };
+  function peKeysUI() { const h = held(), n = h && h.mc && S.forge && S.forge.items[h.mc.id], show = !!n && /^projecte:/.test(n) && mode === 'play'; let el = document.getElementById('peKeys');
+    if (!show) { if (el) el.hidden = true; return; } if (!el) { hud2(); el = document.createElement('div'); el.id = 'peKeys'; el.style.cssText = 'position:absolute;right:max(10px,env(safe-area-inset-right));bottom:calc(env(safe-area-inset-bottom) + 230px);display:flex;flex-direction:column;gap:4px;pointer-events:auto';
+      for (const [lab, k] of KEYS_PE) { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = lab; b.style.cssText = 'font-size:11px;padding:4px 8px;background:rgba(40,20,60,.7)'; b.onclick = e => { e.stopPropagation(); S.client.api.modSend('projecte', bbW().u8(1).i32(k).out()); }; el.appendChild(b); }
+      document.getElementById('mcHud2').appendChild(el); } el.hidden = false; }
   function wayOpen(mode, hand, from) { const L = (S.ways || []).filter(w => !from || w.pos.join() !== from.pos.join()); let el = document.getElementById('mcWays');
     if (!el) { el = document.createElement('div'); el.id = 'mcWays'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.9);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:14px system-ui'; document.body.appendChild(el); }
     el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">${from ? from.name.replace(/</g, '&lt;') : 'Waystones'}</b><button class="ghost" id="mcWaysX">Close</button></div>` + (L.length ? '' : '<p class="hint">No other waystones yet. Activate some by tapping them.</p>');
@@ -12337,7 +12399,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       login(p) { if (S.joinedOnce && S.world) { forgetEntities(Hd); Hd.respawn(p.dimension); } S.joinedOnce = true; o.login(p);
         if (!S.placeHook && S.client) { const op = S.client.api.place; S.client.api.place = (...a) => { S.lastPlace = performance.now(); const h = held(); S.lastPlaceItem = h && h.mc; return op(...a); }; S.placeHook = 1; } },
       respawn(dim) { if (S.world) forgetEntities(Hd); if (S.far) S.far.clear(); o.respawn(dim); },
-      chunk(cx, cz, sections, gu) { if (S.world && !inRange(cx + (S.OX >> 4), cz + (S.OZ >> 4))) { const F = S.far = S.far || new Map(), k = cx + ',' + cz; F.delete(k); F.set(k, [cx, cz, sections, gu]); if (F.size > 200) F.delete(F.keys().next().value); return; }   // outside the window: keep it for a re-centre
+      chunk(cx, cz, sections, gu) { if (S.world && S.forge && inRange(cx + (S.OX >> 4), cz + (S.OZ >> 4))) try { drawnScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ }
+        if (S.world && !inRange(cx + (S.OX >> 4), cz + (S.OZ >> 4))) { const F = S.far = S.far || new Map(), k = cx + ',' + cz; F.delete(k); F.set(k, [cx, cz, sections, gu]); if (F.size > 200) F.delete(F.keys().next().value); return; }   // outside the window: keep it for a re-centre
         o.chunk(cx, cz, sections, gu); if (S.world) try { skullScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ } },
       unload(cx, cz) { o.unload(cx, cz); const sx = cx + (S.OX >> 4), sz = cz + (S.OZ >> 4); if (S.skulls) for (const [k, q] of S.skulls) if (q.x >> 4 === sx && q.z >> 4 === sz) S.skulls.delete(k); },
       vmeta(eid, idx, kind, v) { if (!S.world) return; if (nameMeta(eid, idx, kind, v)) return; const m = S.ents.get(eid), off = PV() >= 210 ? 1 : 0;
@@ -12354,9 +12417,10 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       anim(id, a) { const m = S.ents.get(id); if (m && a === 2) m.sleep = null; o.anim(id, a); },
       bed(eid, x, y, z) { if (S.world) bedPose(eid, x, y, z); },
       block(x, y, z, st) { o.block(x, y, z, st); if (!S.world) return; if (st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); if (st >> 4 === 144) skullMeta(x + S.OX, y, z + S.OZ, st & 15); else skullGone(x + S.OX, y, z + S.OZ);
+        if (S.forge) drawnSet(x + S.OX, y, z + S.OZ, st >> 4, st & 15);
         const wb = S.forge && S.forge.byName.get('waystones:waystone'); if (wb != null && st >> 4 === wb) { wayTrack(x + S.OX, y, z + S.OZ, st & 15); const li = S.lastPlaceItem, ln = li && S.forge.items[li.id];
           if ((st & 8) && ln === 'waystones:waystone' && performance.now() - (S.lastPlace || 0) < 3000) { S.lastPlace = 0; setTimeout(() => wayName([x, y, z], ''), 200); } } },
-      multi(l) { o.multi(l); if (S.world) for (const b of l) { if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
+      multi(l) { o.multi(l); if (S.world) for (const b of l) { if (S.forge) drawnSet(b.x + S.OX, b.y, b.z + S.OZ, b.state >> 4, b.state & 15); if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
       tile(x, y, z, a, raw) { o.tile(x, y, z, a, raw); if (!S.world) return; let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
         if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); if (/skull$/i.test(String(tag.id || ''))) skullTile(x + S.OX, y, z + S.OZ, tag); if (S.forge && PORTS.computercraft && (tag.instanceID != null || tag.xIndex != null || tag.direction != null)) try { PORTS.computercraft.tile(x, y, z, tag); } catch (e) { /* odd tile */ } },
       held(n) { S.block = false; o.held(n); },
