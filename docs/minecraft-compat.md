@@ -229,4 +229,5 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
     - Holding a ProjectE item shows Armor / Charge / Extra / Fire / Mode buttons for the mod's keys.
     - Condensers and the alchemical chest are drawn from vanilla's chest model boxes with their 64x64 textures and facing; matter and fuel blocks pick their texture by meta; the interdiction torch is torch-shaped.
 - `drawnScan` / `drawnSet` / `drawDrawn`: ports list block names in `draws` and get a `draw(q)` call per placed block each frame.
+    - The Transmutation Table / Tablet screen is laid out like the mod's GUITransmutation: its `textures/gui/transmute.png` background (228x196, imported as `g/projecte:gui/transmute`), every slot (the 27 container slots and the player's inventory and hotbar) at the container's own coordinates, the title, the EMC label and value, the search field at (88, 8), the `<` / `>` page buttons at (125, 100) / (193, 100), and the diagonal "Learned!" / "Unlearned" flash after burning or unlearning. Scaled to the panel's width. Jars imported before this need importing again for the texture.
 
