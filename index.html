@@ -11716,7 +11716,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
     stepArrows() {},
-    async applyPack(rec) { await S.saved.applyPack(rec); if (S && S.forge) { for (const P of Object.values(PORTS)) if (P.packed) try { P.packed(); } catch (e) { /* icons */ } if (S.modIds) for (const id of S.modIds.values()) delete iconCache[id]; } if (S) for (const [id, [x, f]] of S.tex) try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, f); } catch (e) { /* no pack */ } if (world) for (const ch of world.chunks.values()) ch.dirty = true; },
+    async applyPack(rec) { await S.saved.applyPack(rec); sndCache.clear(); if (S && S.forge) { for (const P of Object.values(PORTS)) if (P.packed) try { P.packed(); } catch (e) { /* icons */ } if (S.modIds) for (const id of S.modIds.values()) delete iconCache[id]; } if (S) for (const [id, [x, f]] of S.tex) try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, f); } catch (e) { /* no pack */ } if (world) for (const ch of world.chunks.values()) ch.dirty = true; },
     stepVehicles(dt) { const k = 1 - Math.exp(-12 * dt); for (const v of S.veh.values()) { v.x += (v.sx - v.x) * k; v.y += (v.sy - v.y) * k; v.z += (v.sz - v.z) * k; let d = v.syaw - v.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw += d * k; }
       for (const o of S.objs.values()) if (o.kind === 'bobber') { o.x += (o.sx - o.x) * k; o.y += (o.sy - o.y) * k; o.z += (o.sz - o.z) * k; } },
     stepRide(dt) { const v = player.mount; if (!v || !v.mc) return S.saved.stepRide(dt);
@@ -12142,7 +12142,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       payload: { waystones(b) { const r = bbR(b, 0), d = r.u8(), entry = () => { const name = r.str(), dim = r.i32(), pos = unpos(r.i64()), global = r.bool(); return { name, dim, pos, global }; };
         if (d === 1) { const n = (r.u8() << 8) | r.u8(), L = []; for (let i = 0; i < n; i++) L.push(entry()); S.ways = L; }
         else if (d === 9) { const mode = r.u8(), hand = r.u8(), e = entry(); wayOpen(mode, hand, e); }
-        else if (d === 5 && S.world) { try { burst(player.x, player.y + 1, player.z, [190, 120, 255], 30, 3); sfx('portal', null, null, null, .6); } catch (e) { /* fx */ } }
+        else if (d === 5 && S.world) { try { burst(player.x, player.y + 1, player.z, [190, 120, 255], 30, 3); soundHere('block.portal.travel'); } catch (e) { /* fx */ } }
         return true; } },
       tap(n, hit, meta) { if (n !== 'waystones:waystone') return false; const lo = (meta & 8) !== 0, X = hit[0] - S.OX, Y = lo ? hit[1] : hit[1] - 1, Z = hit[2] - S.OZ;
         const e = (S.ways || []).find(w => w.pos[0] === X && w.pos[1] === Y && w.pos[2] === Z); if (player.crouch) { setTimeout(() => wayName([X, Y, Z], e && e.name), 150); return true; } if (!e) return false;   // not activated yet: the server activates it from the right click
@@ -12156,7 +12156,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         'warpbook:unboundwarppotion': 'potion_bottle_drinkable', 'warpbook:boundwarppotion': 'potion_bottle_drinkable', 'warpbook:playerwarppotion': 'potion_bottle_drinkable', 'warpbook:hyperwarppotion': 'potion_bottle_drinkable' },
       payload: { warpbook(b) { const r = bbR(b, 0), d = r.u8();
         if (d === 2) { try { const t = nbtRead(b, 1)[0] || {}; S.wbHyper = t.data || []; } catch (e) { /* bad nbt */ } }
-        else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); mcSound(enter ? 'warpbook:arrive' : 'warpbook:depart', x + .5, y + .5, z + .5, 1, 1); } catch (e) { /* fx */ } }
+        else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); soundHere(enter ? 'warpbook:arrive' : 'warpbook:depart'); } catch (e) { /* fx */ } }
         return true; } },
       label(n, mc) { if (!/warp(page|potion)$/.test(n) || /unbound/.test(n)) return null; return wbPageName({ id: n, tag: itemTag(mc) || {} }); },
       packed() { const I = PACK.img, base = I && I['i/warpbook:items/unboundwarppage'], sym = I && I['i/warpbook:items/pagesymbol']; if (!base || !sym) return;   // the mod tints a paper layer and a symbol layer; the unbound page is the tinted paper
@@ -12170,6 +12170,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         return false; } },
   };
   function modUse(mc) { const n = S.forge && S.forge.items[mc.id]; return !!n && !n.startsWith('minecraft:') && !S.forge.byName.has(n); }   // a modded item (not a block): a right click is sent so the mod's server side can act
+  function soundHere(name) { try { mcSound(name, player.x, player.y + 1, player.z, 1, 1); } catch (e) { /* audio */ } }   // a sound the mod plays on the client at the player
   function wbPageName(p) { const id = String(p.id || ''), t = p.tag || {};
     if (/hyper/.test(id)) return t.hypername || 'Hyper page'; if (/player/.test(id)) return t.player ? 'To ' + t.player : 'Player page'; if (/deathly/.test(id)) return 'Last death';
     return t.name || (t.posX != null ? [t.posX, t.posY, t.posZ].join(', ') : 'Warp page'); }
@@ -12410,7 +12411,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     top.appendChild(box); }
   function peKeysUI() { const h = held(), n = h && h.mc && S.forge && S.forge.items[h.mc.id], show = !!n && /^projecte:/.test(n) && mode === 'play'; let el = document.getElementById('peKeys');
     if (!show) { if (el) el.hidden = true; return; } if (!el) { hud2(); el = document.createElement('div'); el.id = 'peKeys'; el.style.cssText = 'position:absolute;right:max(10px,env(safe-area-inset-right));bottom:calc(env(safe-area-inset-bottom) + 230px);display:flex;flex-direction:column;gap:4px;pointer-events:auto';
-      for (const [lab, k] of KEYS_PE) { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = lab; b.style.cssText = 'font-size:11px;padding:4px 8px;background:rgba(40,20,60,.7)'; b.onclick = e => { e.stopPropagation(); S.client.api.modSend('projecte', bbW().u8(1).i32(k).out()); }; el.appendChild(b); }
+      for (const [lab, k] of KEYS_PE) { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = lab; b.style.cssText = 'font-size:11px;padding:4px 8px;background:rgba(40,20,60,.7)'; b.onclick = e => { e.stopPropagation(); S.client.api.modSend('projecte', bbW().u8(1).i32(k).out()); if (k === 1) { const hn = (held() && held().mc && S.forge.items[held().mc.id]) || ''; if (/stone|matter|ring|amulet|catalyst|lens|eye|star|katar|hammer|pick|shovel|axe|sword|hoe|shears|zero|swrg|arcana|ignition/.test(hn)) soundHere(player.crouch ? 'projecte:item.peuncharge' : 'projecte:item.pecharge'); } }; el.appendChild(b); }
       document.getElementById('mcHud2').appendChild(el); } el.hidden = false; }
   function wayOpen(mode, hand, from) { const L = (S.ways || []).filter(w => !from || w.pos.join() !== from.pos.join()); let el = document.getElementById('mcWays');
     if (!el) { el = document.createElement('div'); el.id = 'mcWays'; el.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(8,10,14,.9);color:#eee;overflow:auto;padding:max(16px,env(safe-area-inset-top)) 16px 24px;font:14px system-ui'; document.body.appendChild(el); }
@@ -12546,7 +12547,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     window.__mcPackImport = userPack; try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
-    if (o.forge) pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null).then(r => { if (!S || !r) return; S.modRec = r; if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
+    if (o.forge) pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null).then(r => { if (!S || !r) return; S.modRec = r; if (!r.sndmap) setTimeout(() => toast('Re-import your mod jars on the connect screen to hear the mods\' own sounds'), 4000); if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
