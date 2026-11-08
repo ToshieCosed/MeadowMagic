@@ -506,7 +506,7 @@
     b.addEventListener('click', () => { if (longed) { longed = false; return; } mcClick(k); }); parent.appendChild(b); return b;
   }
   // Minecraft's own name for an item (Strata items stand in for many of them, but the labels should say what the server says)
-  const mcName = it => { const e = StrataMC.items18[it.id]; const v = VARIANT[e && e[0]]; return (v && v(it.damage | 0)[1]) || (e && e[1]) || (ITEMS[toStack(it).id] || {}).name || 'Item'; };
+  const mcName = it => { { const pn = S.forge && S.forge.items[it.id], P = pn && !pn.startsWith('minecraft:') && portOf(pn), L = P && P.label && P.label(pn, it); if (L) return L; const t = it.raw && it.raw.length > 6 && itemTag(it), dn = t && t.display && t.display.Name; if (dn) return String(dn).replace(/\u00a7./g, ''); } const e = StrataMC.items18[it.id]; const v = VARIANT[e && e[0]]; return (v && v(it.damage | 0)[1]) || (e && e[1]) || (ITEMS[toStack(it).id] || {}).name || 'Item'; };
   const maxOf = it => ((StrataMC.items18[it.id] || [])[2]) || 64;
   const same = (a, b) => !!(a && b && a.id === b.id && (a.damage | 0) === (b.damage | 0) && (a.raw ? a.raw.length : 0) === (b.raw ? b.raw.length : 0) && (!a.raw || a.raw.slice(5).every((v, i) => v === b.raw[5 + i])));
   const withN = (it, n) => { if (!it || n <= 0) return null; const raw = it.raw ? new Uint8Array(it.raw) : new Uint8Array([(it.id >> 8) & 255, it.id & 255, n, ((it.damage | 0) >> 8) & 255, (it.damage | 0) & 255, 0]); raw[2] = n; return Object.assign({}, it, { count: n, raw }); };
@@ -1099,7 +1099,7 @@
       a.place(r.hit[0] - S.OX, r.hit[1], r.hit[2] - S.OZ, faceOf(r), h && h.mc || null, 8, 8, 8);
       { const b0 = BLOCKS[world.get(...r.hit)]; if (b0 && b0.modName && portTap(b0, r.hit)) { a.swing(); return true; } }
       // like the vanilla client: a usable item (food, drink, bow, shield, throwables, rod) on a block that doesn't react also uses the item
-      const mc = h && h.mc, bd = BLOCKS[world.get(...r.hit)]; if (mc && (FOOD18.has(mc.id) || EDIBLE.has(mc.id) || DRINK.has(mc.id)) && !(bd && (bd.door || bd.bed || bd.seat || /chest|table|furnace|anvil|brew|ench|beacon|hopper|dispens|dropper|note|juke|door|gate|button|lever|repeat|compar|cake|sign|frame|bed|barrel|shulker|loom|lectern/i.test(bd.name || '')))) { if (IMPL.useHeld()) return true; }
+      const mc = h && h.mc, bd = BLOCKS[world.get(...r.hit)]; if (mc && (FOOD18.has(mc.id) || EDIBLE.has(mc.id) || DRINK.has(mc.id) || modUse(mc)) && !(bd && (bd.modName || bd.door || bd.bed || bd.seat || /chest|table|furnace|anvil|brew|ench|beacon|hopper|dispens|dropper|note|juke|door|gate|button|lever|repeat|compar|cake|sign|frame|bed|barrel|shulker|loom|lectern/i.test(bd.name || '')))) { if (IMPL.useHeld()) return true; }
       a.swing(); return true;
     },
     pickEntity(sx, sy) { const [o, d] = camRay(sx, sy); let best = null, bt = Infinity;
@@ -1122,7 +1122,7 @@
     wallAt(nx, nz, dy) { return window.__mcClimb ? S.saved.wallAt(nx, nz, dy) : false; },   // Strata's wall-climbing, off by default in Minecraft mode (servers see it as flying)
     buildPlayerSkin() { S.saved.buildPlayerSkin(); if (S && S.world) buildMcPlayers(); },
     stepArrows() {},
-    async applyPack(rec) { await S.saved.applyPack(rec); if (S) for (const [id, [x, f]] of S.tex) try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, f); } catch (e) { /* no pack */ } if (world) for (const ch of world.chunks.values()) ch.dirty = true; },
+    async applyPack(rec) { await S.saved.applyPack(rec); if (S && S.forge) { for (const P of Object.values(PORTS)) if (P.packed) try { P.packed(); } catch (e) { /* icons */ } if (S.modIds) for (const id of S.modIds.values()) delete iconCache[id]; } if (S) for (const [id, [x, f]] of S.tex) try { packAssign(id, { s: x[0], t: x[1], b: x[2] }, f); } catch (e) { /* no pack */ } if (world) for (const ch of world.chunks.values()) ch.dirty = true; },
     stepVehicles(dt) { const k = 1 - Math.exp(-12 * dt); for (const v of S.veh.values()) { v.x += (v.sx - v.x) * k; v.y += (v.sy - v.y) * k; v.z += (v.sz - v.z) * k; let d = v.syaw - v.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); v.yaw += d * k; }
       for (const o of S.objs.values()) if (o.kind === 'bobber') { o.x += (o.sx - o.x) * k; o.y += (o.sy - o.y) * k; o.z += (o.sz - o.z) * k; } },
     stepRide(dt) { const v = player.mount; if (!v || !v.mc) return S.saved.stepRide(dt);
@@ -1130,7 +1130,7 @@
       if (input.crouchToggle) { input.crouchToggle = false; S.client.api.steer(0, 0, 2); if (V9()) { S.client.api.sneak(S.eid, true); setTimeout(() => { if (S) S.client.api.sneak(S.eid, false); }, 150); } } },   // 2 = unmount; the server answers with attach_entity -1
     useHeld() {   // tapping the air: open books, otherwise use the item like a right click (eat, drink, throw, bow, rod)
       const h = held(), mc = h && h.mc; if (!mc) return false; if (mc.id === 386 || mc.id === 387) return openMcBook(h);
-      if (!FOOD18.has(mc.id)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
+      if (!FOOD18.has(mc.id) && !modUse(mc)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
 
     openInv() { if (mode === 'play') mcInvOpen(); },
     techDyn(vb, p) { S.saved.techDyn(vb, p); try { compatDyn(vb); enchantDyn(vb); objsDyn(vb); borderDyn(vb); skullDyn(vb); if (S.cc) for (const t of S.cc.turtles.values()) if (t.dx != null && (t.left || t.right)) turtleUpgrades(t, t.dx, t.dy, t.dz); } catch (e) { if (!S.dynErr) { S.dynErr = 1; console.error('compat dyn', e); } } },
@@ -1557,18 +1557,25 @@
     // Warp Book: the book's page list is read from its own NBT and shown here (the mod opens it client side), a tap sends the page's index; naming a page sends the name
     // network: channel "warpbook", byte discriminator: server <- 0 warp (int page index), 1 waypoint name (raw UTF-8); client <- 2 hyper waypoints (NBT), 3 warp effect (bool enter, int x, y, z)
     warpbook: {
-      icons: { 'warpbook:warpbook': 'warpbook:items/warpbook', 'warpbook:unboundwarppage': 'warpbook:items/unboundwarppage', 'warpbook:boundwarppage': 'warpbook:items/boundwarppage', 'warpbook:hyperwarppage': 'warpbook:items/hyperboundwarppage',
-        'warpbook:playerwarppage': 'warpbook:items/playerpage', 'warpbook:deathlywarppage': 'warpbook:items/deathlywarppage', 'warpbook:warppage': 'warpbook:items/legacywarppage',
+      icons: { 'warpbook:warpbook': 'warpbook:items/warpbook', 'warpbook:unboundwarppage': 'warpbook:items/unboundwarppage', 'warpbook:boundwarppage': 'warpbook:gen/bound', 'warpbook:hyperwarppage': 'warpbook:gen/hyper',
+        'warpbook:playerwarppage': 'warpbook:gen/player', 'warpbook:deathlywarppage': 'warpbook:items/deathlywarppage', 'warpbook:warppage': 'warpbook:items/legacywarppage',
         'warpbook:unboundwarppotion': 'potion_bottle_drinkable', 'warpbook:boundwarppotion': 'potion_bottle_drinkable', 'warpbook:playerwarppotion': 'potion_bottle_drinkable', 'warpbook:hyperwarppotion': 'potion_bottle_drinkable' },
       payload: { warpbook(b) { const r = bbR(b, 0), d = r.u8();
         if (d === 2) { try { const t = nbtRead(b, 1)[0] || {}; S.wbHyper = t.data || []; } catch (e) { /* bad nbt */ } }
         else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); sfx('portal', null, null, null, .5); } catch (e) { /* fx */ } }
         return true; } },
-      use(n, mc) { if (player.crouch) return false;   // sneaking: the server opens the book's page inventory (or binds a page to you)
+      label(n, mc) { if (!/warp(page|potion)$/.test(n) || /unbound/.test(n)) return null; return wbPageName({ id: n, tag: itemTag(mc) || {} }); },
+      packed() { const I = PACK.img, base = I && I['i/warpbook:items/unboundwarppage'], sym = I && I['i/warpbook:items/pagesymbol']; if (!base || !sym) return;   // the mod tints a paper layer and a symbol layer; the unbound page is the tinted paper
+        for (const [k, c] of [['bound', '#098c76'], ['player', '#8e0000'], ['hyper', '#09aa38']]) { const w = base.width, h = base.height, cv = document.createElement('canvas'), t = document.createElement('canvas'); cv.width = t.width = w; cv.height = t.height = h;
+          const g = t.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(sym, 0, 0, w, h); g.globalCompositeOperation = 'multiply'; g.fillStyle = c; g.fillRect(0, 0, w, h); g.globalCompositeOperation = 'destination-in'; g.drawImage(sym, 0, 0, w, h);
+          const G = cv.getContext('2d'); G.imageSmoothingEnabled = false; G.drawImage(base, 0, 0); G.drawImage(t, 0, 0); I['i/warpbook:gen/' + k] = cv; } },
+      use(n, mc) { if (/warp(page|cluster)$/.test(n) && !/unbound/.test(n)) return true;   // a bound page warps on a right click, crouching or not
+        if (player.crouch) return false;   // sneaking: the server opens the book's page inventory (or binds a page to you)
         if (n === 'warpbook:warpbook') { setTimeout(() => wbBook(mc), 120); return true; }
         if (n === 'warpbook:unboundwarppage' || n === 'warpbook:unboundwarppotion') { setTimeout(() => wbName(), 120); return true; }
         return false; } },
   };
+  function modUse(mc) { const n = S.forge && S.forge.items[mc.id]; return !!n && !n.startsWith('minecraft:') && !S.forge.byName.has(n); }   // a modded item (not a block): a right click is sent so the mod's server side can act
   function wbPageName(p) { const id = String(p.id || ''), t = p.tag || {};
     if (/hyper/.test(id)) return t.hypername || 'Hyper page'; if (/player/.test(id)) return t.player ? 'To ' + t.player : 'Player page'; if (/deathly/.test(id)) return 'Last death';
     return t.name || (t.posX != null ? [t.posX, t.posY, t.posZ].join(', ') : 'Warp page'); }
@@ -1859,7 +1866,7 @@
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
