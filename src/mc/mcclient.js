@@ -279,7 +279,7 @@
         case 'set_passengers': if (LEG && H && H.passengers) { const v = r.vi(), n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.passengers(v, l); } return;
         case 'boss_bar': if (LEG && H && H.boss) { const u = Array.from(r.u.subarray(r.p, r.p + 16), x => x.toString(16).padStart(2, '0')).join(''); r.p += 16; const a = r.vi(), d = {};
           if (a === 0) { d.title = r.str(); d.hp = r.f32(); d.color = r.vi(); d.div = r.vi(); d.flags = r.b(); } else if (a === 2) d.hp = r.f32(); else if (a === 3) d.title = r.str(); else if (a === 4) { d.color = r.vi(); d.div = r.vi(); } else if (a === 5) d.flags = r.b(); H.boss(u, a, d); } return;
-        case 'sound_effect': if (LEG && H && H.sound && SND) { const id = r.vi(); r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(), pi = P >= 210 ? r.f32() : r.b() / 63; H.sound(SND[id] || '', x, y, z, v, pi); } return;
+        case 'sound_effect': if (LEG && H && H.sound && SND) { const id = r.vi(); r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(), pi = P >= 210 ? r.f32() : r.b() / 63; H.sound(SND[id] || '#' + id, x, y, z, v, pi); } return;
         case 'entity_velocity': if (LEG && H && H.velocity) { const eid = r.vi(); H.velocity(eid, r.i16() / 8000, r.i16() / 8000, r.i16() / 8000); } return;
         case 'entity_status': if (LEG && H && H.status) { const eid = r.d.getInt32(r.p); r.p += 4; H.status(eid, r.i8()); } return;
         case 'update_sign': if (LEG && H && H.sign) {

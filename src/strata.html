@@ -10381,7 +10381,7 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
         case 'set_passengers': if (LEG && H && H.passengers) { const v = r.vi(), n = r.vi(), l = []; for (let i = 0; i < n; i++) l.push(r.vi()); H.passengers(v, l); } return;
         case 'boss_bar': if (LEG && H && H.boss) { const u = Array.from(r.u.subarray(r.p, r.p + 16), x => x.toString(16).padStart(2, '0')).join(''); r.p += 16; const a = r.vi(), d = {};
           if (a === 0) { d.title = r.str(); d.hp = r.f32(); d.color = r.vi(); d.div = r.vi(); d.flags = r.b(); } else if (a === 2) d.hp = r.f32(); else if (a === 3) d.title = r.str(); else if (a === 4) { d.color = r.vi(); d.div = r.vi(); } else if (a === 5) d.flags = r.b(); H.boss(u, a, d); } return;
-        case 'sound_effect': if (LEG && H && H.sound && SND) { const id = r.vi(); r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(), pi = P >= 210 ? r.f32() : r.b() / 63; H.sound(SND[id] || '', x, y, z, v, pi); } return;
+        case 'sound_effect': if (LEG && H && H.sound && SND) { const id = r.vi(); r.vi(); const x = r.i32() / 8, y = r.i32() / 8, z = r.i32() / 8, v = r.f32(), pi = P >= 210 ? r.f32() : r.b() / 63; H.sound(SND[id] || '#' + id, x, y, z, v, pi); } return;
         case 'entity_velocity': if (LEG && H && H.velocity) { const eid = r.vi(); H.velocity(eid, r.i16() / 8000, r.i16() / 8000, r.i16() / 8000); } return;
         case 'entity_status': if (LEG && H && H.status) { const eid = r.d.getInt32(r.p); r.p += 4; H.status(eid, r.i8()); } return;
         case 'update_sign': if (LEG && H && H.sign) {
@@ -10793,6 +10793,9 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   const SNDMAP = { 'random.bow': 'bowShoot', 'random.bowhit': 'arrowHit', 'random.pop': 'pop', 'random.eat': 'eat', 'random.burp': 'burp', 'liquid.splash': 'splash', 'random.door_open': 'doorOpen', 'random.door_close': 'doorClose', 'random.chestopen': 'chestOpen', 'random.chestclosed': 'chestClose', 'creeper.primed': 'ignite', 'fire.ignite': 'ignite', 'random.explode': 'fall', 'game.player.hurt': 'hurt', 'game.neutral.hurt': 'hurt', 'game.hostile.hurt': 'hurt', 'game.player.die': 'hurt', 'game.hostile.die': 'hurt', 'random.orb': 'orb' };
   const DIGB = { stone: 'STONE', grass: 'GRASS', gravel: 'GRAVEL', sand: 'SAND', wood: 'PLANKS', cloth: 'WOOL', glass: 'GLASS', snow: 'SNOW' };
   function mcSound(name, X, y, Z, vol, pitch) {
+    if (name[0] === '#' && S.forge) name = S.forge.sounds[name.slice(1)] || '';   // a sound id the vanilla table doesn't have: the Forge registry names it
+    if (S.forge && /:/.test(name) && !/^minecraft:/.test(name)) { const L = S.modRec && S.modRec.sndmap && S.modRec.sndmap[name]; if (L && L.length) playMcSound(L[Math.random() * L.length | 0], X, y, Z, vol, pitch); return; }
+    name = name.replace(/^minecraft:/, ''); if (!name || name[0] === '#') return;
     if (V9()) name = snd19(name);
     { const n = /^note\.(\w+)$/.exec(name); if (n) { const ok = playMcSound('note/' + n[1], X, y, Z, vol, pitch); playNote(n[1], pitch, X, y, Z, vol, ok); return; } }
     if (playMcSound(SNDPATH[name] || name.replace(/\./g, '/'), X, y, Z, vol, pitch)) return;   // the resource pack's own sound when it has one
@@ -11065,7 +11068,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   const winOff = () => S.win ? (S.win.n || 0) : 9;                 // where the player's main inventory starts in the open window
   const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
   // compat inventory look (like Strata's split view): one compact window in the middle, slots sized to fit the screen, no headings; the creative list is a side panel
-  const MCVAN = '#mcInv{position:fixed;inset:0;z-index:7;background:rgba(0,0,0,.3);--sl:clamp(26px,min(calc((100vw - 40px)/9.6),calc((100vh - 240px)/7.4)),46px)}#mcInv.side{--sl:clamp(20px,min(calc((100vw - 34vw - 44px)/9.6),calc((100vh - 240px)/7.4)),42px)}'
+  const MCVAN = 'body:has(#mcInv:not([hidden])) #mcTabBtn,body:has(#mcInv:not([hidden])) #peKeys{visibility:hidden}#mcInv{position:fixed;inset:0;z-index:7;background:rgba(0,0,0,.3);--sl:clamp(26px,min(calc((100vw - 40px)/9.6),calc((100vh - 240px)/7.4)),46px)}#mcInv.side{--sl:clamp(20px,min(calc((100vw - 34vw - 44px)/9.6),calc((100vh - 240px)/7.4)),42px)}'
     + '#mcInv .mcCard{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:calc(100vw - 16px);max-height:calc(100% - 16px);overflow:auto;background:rgba(24,33,42,.94);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 8px 30px rgba(0,0,0,.45)}#mcInv.side .mcCard{left:calc((100vw - 34vw) / 2)}'
     + '#mcInv header{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0;border:0}#mcInv header h2{margin:0;font-size:13px;flex:1 1 auto}#mcInv header button{padding:4px 10px;font-size:12px;border-radius:8px}#mcInv #mcTap button{padding:3px 8px;font-size:11px}#mcInv #mcHold{font-size:11px;flex-basis:100%;order:9;min-height:0}'
     + '#mcInv .mcBody{padding:0!important;gap:6px!important;overflow:visible!important}#mcInv h3{display:none}#mcInv .grid9{display:grid;grid-template-columns:repeat(9,var(--sl));gap:2px}#mcInv #mcHot{margin-top:4px}'
@@ -12088,7 +12091,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     S.mobs.length = 0; S.players.length = 0; S.stands.length = 0; S.ents.clear(); if (S.skulls) S.skulls.clear(); if (S.mapPost) S.mapPost.clear(); S.border = null; S.icd = null; }
   // ==== Forge servers (1.12.2): registries from the FML handshake, modded blocks / items / entities, mod jars as textures (compat + Forge only) ====
   const hashCol = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; const c = [80 + (h & 127), 80 + ((h >> 7) & 127), 80 + ((h >> 14) & 127)]; return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); };
-  function forgeRegistries(reg, mods) { S.forge = { blocks: reg['minecraft:blocks'] || {}, items: reg['minecraft:items'] || {}, ents: reg['minecraft:entities'] || {}, mods: mods || [] }; S.forge.byName = new Map(); for (const [id, n] of Object.entries(S.forge.blocks)) S.forge.byName.set(n, +id); S.lut.fill(-1); S.cat = null; }
+  function forgeRegistries(reg, mods) { S.forge = { blocks: reg['minecraft:blocks'] || {}, items: reg['minecraft:items'] || {}, ents: reg['minecraft:entities'] || {}, sounds: reg['minecraft:soundevents'] || {}, mods: mods || [] }; S.forge.byName = new Map(); for (const [id, n] of Object.entries(S.forge.blocks)) S.forge.byName.set(n, +id); S.lut.fill(-1); S.cat = null; }
   const modOf = n => n.split(':')[0];
   function modName(n) { const R = S.modRec, [mod, path] = n.split(':'), L = R && R.lang && R.lang[mod];
     if (L) { for (const k of ['tile.' + mod + '.' + path + '.name', 'tile.' + n + '.name', 'item.' + mod + '.' + path + '.name', 'item.' + n + '.name', 'tile.' + path + '.name', 'item.' + path + '.name', 'block.' + mod + '.' + path + '.name']) if (L[k]) return L[k];
@@ -12152,7 +12155,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         'warpbook:unboundwarppotion': 'potion_bottle_drinkable', 'warpbook:boundwarppotion': 'potion_bottle_drinkable', 'warpbook:playerwarppotion': 'potion_bottle_drinkable', 'warpbook:hyperwarppotion': 'potion_bottle_drinkable' },
       payload: { warpbook(b) { const r = bbR(b, 0), d = r.u8();
         if (d === 2) { try { const t = nbtRead(b, 1)[0] || {}; S.wbHyper = t.data || []; } catch (e) { /* bad nbt */ } }
-        else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); sfx('portal', null, null, null, .5); } catch (e) { /* fx */ } }
+        else if (d === 3 && S.world) { const enter = r.bool(), x = r.i32() + S.OX, y = r.i32(), z = r.i32() + S.OZ; try { burst(x + .5, y + 1, z + .5, [170, 90, 255], enter ? 40 : 24, 3); mcSound(enter ? 'warpbook:arrive' : 'warpbook:depart', x + .5, y + .5, z + .5, 1, 1); } catch (e) { /* fx */ } }
         return true; } },
       label(n, mc) { if (!/warp(page|potion)$/.test(n) || /unbound/.test(n)) return null; return wbPageName({ id: n, tag: itemTag(mc) || {} }); },
       packed() { const I = PACK.img, base = I && I['i/warpbook:items/unboundwarppage'], sym = I && I['i/warpbook:items/pagesymbol']; if (!base || !sym) return;   // the mod tints a paper layer and a symbol layer; the unbound page is the tinted paper
@@ -12388,7 +12391,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function guiUrl(key) { const C = S.guiUrls = S.guiUrls || {}; if (C[key] !== undefined) return C[key]; const d = S.modRec && S.modRec.files['g/' + key]; return (C[key] = d ? URL.createObjectURL(new Blob([d], { type: 'image/png' })) : null); }
   function peTable(W, el) { const top = el.querySelector('#mcTop'), P = peS(); top.innerHTML = ''; for (const id of ['#mcMain', '#mcHot']) { const g = el.querySelector(id); if (g && g.parentNode) g.parentNode.style.display = 'none'; }
     const sc = Math.max(1, Math.min(3, (innerWidth - 40) / 228, (innerHeight - 110) / 196)), px = v => Math.round(v * sc) + 'px', url = guiUrl('projecte:gui/transmute');
-    const box = document.createElement('div'); box.id = 'peT'; box.style.cssText = `position:relative;width:${px(228)};height:${px(196)};margin:0 auto;image-rendering:pixelated;font:${px(8)}/1 "Courier New",monospace;color:#404040;` + (url ? `background:url(${url}) 0 0/${px(256)} ${px(256)} no-repeat` : 'background:#c6c6c6;border-radius:6px');
+    const box = document.createElement('div'); box.id = 'peT'; box.style.cssText = `--sl:${px(16)};position:relative;width:${px(228)};height:${px(196)};margin:0 auto;image-rendering:pixelated;font:${px(8)}/1 "Courier New",monospace;color:#404040;` + (url ? `background:url(${url}) 0 0/${px(256)} ${px(256)} no-repeat` : 'background:#c6c6c6;border-radius:6px');
     const txt = (t, x, y, extra) => { const s2 = document.createElement('span'); s2.textContent = t; s2.style.cssText = `position:absolute;left:${px(x)};top:${px(y)};white-space:nowrap;pointer-events:none;${extra || ''}`; box.appendChild(s2); };
     txt('Transmutation', 6, 8); txt('EMC:', 6, 92); txt(fmtEmc(P.total), 6, 102);
     const now = performance.now(); if (now - (P.learnT || 0) < 3000) 'Learned!'.split('').forEach((c, i) => txt(c, [98, 99, 100, 101, 102, 103, 104, 107][i], 30 + i * 8, 'color:#2b6a2b;font-weight:700'));
@@ -12423,7 +12426,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function portUse(n, mc) { const P = portOf(n); return !!(P && P.use && P.use(n, mc)); }
   // the mod jars' textures layered over the player's own pack for the session (and under a server pack)
   function packBase() { const pv = S.packPrev !== undefined ? S.packPrev : ((PACK.on && PACK.rec) || null), M = S.forge && S.modRec; if (!M) return pv;
-    if (!pv) return { name: 'Mods', files: Object.assign({}, M.files), sounds: {}, mcsnd: {} }; return Object.assign({}, pv, { files: Object.assign({}, pv.files, M.files) }); }
+    if (!pv) return { name: 'Mods', files: Object.assign({}, M.files), sounds: {}, mcsnd: Object.assign({}, M.mcsnd || {}) }; return Object.assign({}, pv, { files: Object.assign({}, pv.files, M.files), mcsnd: Object.assign({}, pv.mcsnd || {}, M.mcsnd || {}) }); }
   async function modPackApply() { if (!S || !S.modRec || S.modPackOn) return; if (S.packPrev === undefined) S.packPrev = (PACK.on && PACK.rec) || null; S.modPackOn = true; S.srvPack = true; PACK.worldId = 'mcompat-mods'; await window.applyPack(packBase()); PACK.worldId = 'mcompat-mods'; }   // the worldId stops Strata's per-world pack loader from clearing it
   // ---- importing mod jars (or a zip of a mods folder): textures, blockstates/models -> [side, top, bottom], item textures, names ----
   async function readJar(rec, z) { const names = [...z.files.keys()], want = names.filter(n => /^assets\/.+\.(png|json|lang|mcmeta)$/i.test(n) || /mcmod\.info$/i.test(n)), cache = new Map();
@@ -12434,6 +12437,11 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^entity\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d;   /* creature textures (Strata's skinned mob renderer) */
         if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
       m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && /\.name$/.test(ln.slice(0, i).trim())) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
+    { rec.mcsnd = rec.mcsnd || {}; rec.sndmap = rec.sndmap || {}; let bytes = 0;   // sounds: sounds.json events -> the ogg files (played by Minecraft mode's pack sound player)
+      for (const n of names) { const m = n.match(/^assets\/([^/]+)\/sounds\.json$/i); if (!m) continue; const j = await json(n); if (!j) continue;
+        for (const [ev, def] of Object.entries(j)) { const L = []; for (const e of (def && def.sounds) || []) { const nm = typeof e === 'string' ? e : e && e.type !== 'event' && e.name; if (!nm) continue; const [ns, pth] = nm.includes(':') ? nm.split(':') : [m[1], nm]; const key = ns + ':' + pth;
+            if (!rec.mcsnd[key] && bytes < 30e6) { const d = await z.read('assets/' + ns + '/sounds/' + pth + '.ogg'); if (d) { rec.mcsnd[key] = d; bytes += d.byteLength; } } if (rec.mcsnd[key]) L.push(key); }
+          if (L.length) rec.sndmap[m[1] + ':' + ev] = L; } } }
     const modelOf = async (ref, kind) => { let [ns, p] = ref.includes(':') ? ref.split(':') : ['minecraft', ref]; if (!/^(block|item)s?\//.test(p)) p = kind + '/' + p; const k = ns + ':' + p; if (k in models) return models[k];
       const f = 'assets/' + ns + '/models/' + p + '.json'; models[k] = has(f) ? await json(f) : null; return models[k]; };
     const resolve = async (ref, kind) => { const T = {}; let el = null, cur = await modelOf(ref, kind), parent = cur ? null : ref, n = 0;
@@ -12456,7 +12464,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
