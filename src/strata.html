@@ -11998,7 +11998,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function sug(list) { const i = document.getElementById('mcIn'); if (!i) return; let el = document.getElementById('mcSug'); if (!el) { el = document.createElement('div'); el.id = 'mcSug'; i.parentNode.insertBefore(el, i.parentNode.firstChild); }
     el.innerHTML = ''; const cur = (i.value.split(' ').pop() || '').toLowerCase(); for (const m of list.filter(m => !cur || String(m).toLowerCase().includes(cur.replace(/^\//, ''))).slice(0, 40)) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.tabIndex = -1; b.textContent = m; b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('mousedown', e => e.preventDefault()); b.addEventListener('click', () => { const w = i.value.split(' '); w[w.length - 1] = m; i.value = w.join(' ') + ' '; i.focus(); sug([]); }); el.appendChild(b); } }
   function chatUnhook(s) { document.removeEventListener('click', s.onCmd, true); const i = document.getElementById('mcIn'); if (i && s.onIn) { i.removeEventListener('input', s.onIn); i.removeEventListener('keydown', s.onKey); }
-    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'mcWb', 'peKeys', 'peTCss']) { const e = document.getElementById(id); if (e) e.remove(); } }
+    if (s.cc && s.cc.blinkT) clearInterval(s.cc.blinkT); for (const ty of s.modTypes || []) { delete MOB[ty]; delete __skins.MODELS[ty]; if (window.__ENT) delete __ENT[ty]; } for (const id of ['mcExtCss', 'mcSug', 'mcAdv', 'mcAdvBtn', 'mcMapHud', 'mcWays', 'mcWayName', 'mcWb', 'peKeys', 'peTCss']) { const e = document.getElementById(id); if (e) e.remove(); } }
   // ---- elytra (1.9+): Strata's glider physics, started with a jump in mid-air while wearing one ----
   OVR.push('stepGlider');
   IMPL.stepGlider = function (dt) { const p = player, ely = V9() && isEly(S.slots[6]); window.__elytra = ely;
@@ -12031,7 +12031,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     else { emitBox(dynVB, [-5, 3, -3.2], [0, 23, -2.4], c, T); emitBox(dynVB, [0, 3, -3.2], [5, 23, -2.4], c, T); } }
   function bedPose(eid, x, y, z) { const m = S.ents.get(eid); if (!m || !m.pl) return; const X = x + S.OX, Z = z + S.OZ, bd = BLOCKS[world.get(X, y, Z)], d = [[0, -1], [1, 0], [0, 1], [-1, 0]][bd && bd.bed ? bd.bed.fi : 2];
     m.sleep = [X + .5 + d[0] * .1 - d[0] * 1.55, y + .7, Z + .5 + d[1] * .1 - d[1] * 1.55, Math.atan2(-d[0], -d[1])]; m.sleepAt = [m.tx, m.tz]; }
-  function extTick() { if (!S || !S.world) return; try { borderClamp(); itemCooldownUI(); monTick(); if (S.forge && (S.ext2 & 3) === 0) peKeysUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
+  function extTick() { if (!S || !S.world) return; if (!player.mount && !!player.crouch !== !!S.sneakOn) { S.sneakOn = !!player.crouch; S.client.api.sneak(S.eid, S.sneakOn); }   // the server needs to know: sneak + right click is how many mods (and vanilla) tell a use apart from opening a block
+    try { borderClamp(); itemCooldownUI(); monTick(); if (S.forge && (S.ext2 & 3) === 0) peKeysUI(); if ((S.ext2 = (S.ext2 || 0) + 1) % 8 === 0) mapTick();
       for (const pl of S.players) { const u = pl.useH | 0, it = u & 1 ? (u & 2 ? pl.eq[5] : pl.eq[0]) : null; if (it && (EDIBLE.has(it.id) || DRINK.has(it.id)) && (pl.crumbT = (pl.crumbT || 0) - 1) <= 0) { pl.crumbT = 6; const st = toStack(it); eatCrumbs(pl.x, pl.y, pl.z, pl.face, st && st.id, DRINK.has(it.id)); } }
       for (const pl of S.players) if (pl.sleep && pl.sleepAt && Math.hypot(pl.tx - pl.sleepAt[0], pl.tz - pl.sleepAt[1]) > 1.5) pl.sleep = null;
       if (player.gliding && S.glideT && performance.now() - S.glideT > 1500 && !S.glideOk) { player.gliding = false; S.glideT = 0; toast('The server stopped the glide'); } } catch (e) { if (!S.extErr) { S.extErr = 1; console.error('compat ext', e); } } }
@@ -12110,11 +12111,12 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     { const ty = modEntType(nm); if (ty) m.type = ty; }
     S.ents.set(e.eid, m); S.mobs.push(m); }
   // a mod creature's texture from its jar (textures/entity/...) on Strata's humanoid body when it uses the humanoid layout (64x64 / 64x32)
-  function modEntType(nm) { const [mod, path] = nm.split(':'), keys = Object.keys(window.__ENT || {}).filter(k => k.startsWith(mod + ':entity/')); if (!keys.length) return null;
+  function modEntType(nm) { { const P = PORTS[nm.split(':')[0]], d = P && P.ent && P.ent(nm); if (d && window.__ENT && __ENT[d.tex]) { const ty = 'mod:' + nm; if (!MOB[ty]) { MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }, d.mob || {}); __skins.MODELS[ty] = m => Object.assign(d.model(m), { tex: d.tex }); __ENT[ty] = __ENT[d.tex]; (S.modTypes = S.modTypes || []).push(ty); } return ty; } }
+    const [mod, path] = nm.split(':'), keys = Object.keys(window.__ENT || {}).filter(k => k.startsWith(mod + ':entity/')); if (!keys.length) return null;
     const base = k => k.split('/').pop().replace(/\.png$/, ''), want = path.toLowerCase(), simp = v => v.replace(/^entity_?|_?entity$/g, '').replace(/[^a-z0-9]/g, '');
     const key = keys.find(k => base(k) === want) || keys.find(k => simp(base(k)) === simp(want)) || keys.find(k => base(k).includes(simp(want)) || simp(want).includes(simp(base(k)))) || keys.find(k => k.includes('/' + want + '/'));
     if (!key) return null; const ty = 'mod:' + key; if (MOB[ty]) return ty; const E = __ENT[key], hum = E.w === 64 && (E.h === 64 || E.h === 32); if (!hum) return null;   // other layouts belong to the mod's own model code: keep the stand-in
-    MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }); __skins.MODELS[ty] = m => { const M = __skins.MODELS.zombie(m); M.tex = key; return M; };
+    MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }); __skins.MODELS[ty] = m => { const M = __skins.MODELS.zombie(m); M.tex = key; return M; }; __ENT[ty] = __ENT[key];   // Strata's modelFor checks the type has a texture
     (S.modTypes = S.modTypes || []).push(ty); return ty; }
   function modGui(wid, mod, gid, gx, gy, gz) { if (S.cc) S.cc.gui = null; mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); Object.assign(S.win, { gx, gy, gz }); if (S.cc) S.cc.gui = null; mcInvRender(); }   // slot count comes with the window's items
   // ---- mod ports: per-mod client halves (block looks the mod draws in code, its screens and its network messages) ----
@@ -12167,7 +12169,46 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         if (n === 'warpbook:warpbook') { setTimeout(() => wbBook(mc), 120); return true; }
         if (n === 'warpbook:unboundwarppage' || n === 'warpbook:unboundwarppotion') { setTimeout(() => wbName(), 120); return true; }
         return false; } },
+    // Ender Mail: stamping a package (the mod's own screen, client side), naming a locker, the package controller's status, and the Ender Mailman drawn from the mod's model
+    // network: channel "endermail": server <- 0 stamp (int package x, y, z, delivery x, y, z, then the locker id as 12 bytes padded with spaces), 1 locker id (int x, y, z, 12 bytes)
+    endermail: {
+      block(n, meta) { return n === 'endermail:package' ? { key: meta < 6 ? 's' : 'u', variant: (meta < 6 ? 'facing=north,stamped=true' : 'facing=north,stamped=false') } : null; },   // meta: facing + 6 when not stamped yet
+      tap(n, hit, meta) { if (n !== 'endermail:package' || meta < 6 || player.crouch) return false; const h = held(), hn = h && h.mc && S.forge.items[h.mc.id]; if (hn !== 'endermail:stamp') return false;   // meta 8-11: not stamped yet
+        setTimeout(() => emStamp([hit[0] - S.OX, hit[1], hit[2] - S.OZ]), 120); return true; },
+      gui(W, box) { if (!/^forge:endermail:1$/.test(W.type)) return false; const el = document.createElement('div'); el.style.cssText = 'display:flex;gap:6px;align-items:center;font-size:13px;flex-wrap:wrap';
+        el.innerHTML = '<label for="emLk">Locker ID</label><input id="emLk" maxlength="12" style="font-size:16px;padding:4px 6px;width:9em" autocomplete="off"><button class="primary" id="emLkOk" type="button">Set ID</button><small class="hint" style="flex-basis:100%">Packages stamped with this ID are delivered into this locker.</small>';
+        const I = el.querySelector('#emLk'); I.addEventListener('keydown', e => e.stopPropagation()); el.querySelector('#emLkOk').onclick = () => { const id = I.value.trim(); if (!id) return; S.client.api.modSend('endermail', Uint8Array.from([1, ...bbW().i32(W.gx).i32(W.gy).i32(W.gz).out(), ...emId(id)])); toast('Locker ID set to ' + id); };
+        box.appendChild(el); return true; },
+      label(n, mc) { if (n !== 'endermail:package_controller') return null; const t = itemTag(mc) || {}, st = ['', 'Delivering', 'Delivered', 'Delivered to locker', 'Undeliverable', 'Too far to deliver'][t.State | 0];
+        return st ? 'Package Controller: ' + st + (t.DeliveryX != null ? ` (${t.DeliveryX}, ${t.DeliveryY}, ${t.DeliveryZ})` : '') : null; },
+      ent(nm) { if (nm !== 'endermail:ender_mailman') return null; return { tex: 'endermail:models/ender_mailman', mob: { h: 2.9 }, model: m => { const sw = m.moving ? Math.sin(m.phase) * .5 : 0;   // ModelEnderMailman: an enderman with a postman's hat and brim
+          return { k: .0625 * .925, parts: [P2([-4, 38, -4], [8, 8, 8], [0, 0]), P2([-4, 26, -2], [8, 12, 4], [32, 16]), P2([-4, 47, -4], [8, 3, 8], [0, 38]), P2([-5, 46, -9], [10, 1, 14], [0, 49]),
+            P2([-6, 8, -1], [2, 30, 2], [56, 0], { rot: [['x', -sw * .6, 37, 0]] }), P2([4, 8, -1], [2, 30, 2], [56, 0], { mir: 1, rot: [['x', sw * .6, 37, 0]] }),
+            P2([-3, 0, -1], [2, 30, 2], [56, 0], { rot: [['x', sw, 29, 0]] }), P2([1, 0, -1], [2, 30, 2], [56, 0], { mir: 1, rot: [['x', -sw, 29, 0]] })] }; } }; } },
+    // Elevator mod: Strata's own elevators (jump to go up, crouch to go down) find the target the way the mod's client does and ask the server to move you
+    // network: channel "elevatorid": server <- 0 teleport (int from x, y, z, to x, y, z); client <- 1 config (bool same colour only, int range, bool skip blocked elevators)
+    elevatorid: { payload: { elevatorid(b) { const r = bbR(b, 0); if (r.u8() === 1) S.elev = { same: r.bool(), range: r.i32(), skip: r.bool() }; return true; } } },
   };
+  const P2 = (p, s, uv, o) => Object.assign({ p, s, uv }, o || {});
+  const emId = id => { const a = [...new TextEncoder().encode(String(id))].slice(0, 12); while (a.length < 12) a.push(32); return a; };   // the mod reads exactly 12 bytes and trims them
+  function emStamp(pos) { let el = document.getElementById('mcWayName'); if (!el) { wayName([0, 0, 0], ''); el = document.getElementById('mcWayName'); }
+    el.innerHTML = '<div style="background:#1b2028;padding:18px;border-radius:12px;min-width:280px;display:flex;flex-direction:column;gap:10px"><b>Stamp this package</b><small class="hint">Where should the Ender Mailman deliver it? Give coordinates, or the ID of a locker.</small>'
+      + '<div style="display:flex;gap:6px">' + ['X', 'Y', 'Z'].map(k => `<input id="emS${k}" inputmode="numeric" placeholder="${k}" aria-label="Delivery ${k}" style="font-size:16px;padding:6px;width:5em">`).join('') + '</div><input id="emSL" maxlength="12" placeholder="Locker ID (optional)" style="font-size:16px;padding:6px 8px">'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="ghost" id="mcWayC">Cancel</button><button class="primary" id="mcWayOk">Deliver</button></div></div>';
+    el.hidden = false; el.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => e.stopPropagation())); setTimeout(() => el.querySelector('#emSX').focus(), 50); el.querySelector('#mcWayC').onclick = () => { el.hidden = true; };
+    el.querySelector('#mcWayOk').onclick = () => { const v = k => { const t = el.querySelector('#emS' + k).value.trim(); return /^-?\d+$/.test(t) ? +t : -1; }, lk = el.querySelector('#emSL').value.trim();
+      if (!lk && (v('X') === -1 || v('Z') === -1)) { el.querySelector('#emSX').focus(); return; }
+      S.client.api.modSend('endermail', Uint8Array.from([0, ...bbW().i32(pos[0]).i32(pos[1]).i32(pos[2]).i32(v('X')).i32(v('Y')).i32(v('Z')).out(), ...emId(lk)])); el.hidden = true; toast('Package stamped. Use a Package Controller on it to call the Ender Mailman');
+      { const bid = S.forge.byName.get('endermail:package'), X = pos[0] + S.OX, Z = pos[2] + S.OZ, b = BLOCKS[world.get(X, pos[1], Z)]; if (bid != null && b && b.modName === 'endermail:package') setBlock(X, pos[1], Z, lookup((bid << 4) | 2, 0)); } }; }   // the server stamps it from its network thread and doesn't send the change, so show it stamped here
+  OVR.push('elevatorUse');
+  IMPL.elevatorUse = function (dir) { if (!S || !S.forge) return false; const p = player, X = Math.floor(p.x), Z = Math.floor(p.z), isE = (x, y, z) => { const b = BLOCKS[world.get(x, y, z)]; return b && /^elevatorid:(dir_)?elevator_/.test(b.modName || '') ? b : null; };
+    let from = null; for (let i = 0, y = Math.floor(p.y - .5); i <= 2; i++, y--) if (isE(X, y, Z)) { from = y; break; } if (from == null) return false;
+    const fb = isE(X, from, Z), C = S.elev || { same: false, range: 256, skip: true };
+    for (let y = from + dir; Math.abs(y - from) <= C.range && y > 0 && y < world.H - 1; y += dir) { const b = isE(X, y, Z); if (!b) continue;
+      if (!world.solid(X, y + 1, Z) && !world.solid(X, y + 2, Z)) { if (C.same && b.modName.replace(/^elevatorid:(dir_)?/, '') !== fb.modName.replace(/^elevatorid:(dir_)?/, '')) continue;
+        S.client.api.modSend('elevatorid', bbW().u8(0).i32(X - S.OX).i32(from).i32(Z - S.OZ).i32(X - S.OX).i32(y).i32(Z - S.OZ).out()); return true; }
+      if (!C.skip) return false; }
+    return false; };
   function modUse(mc) { const n = S.forge && S.forge.items[mc.id]; return !!n && !n.startsWith('minecraft:') && !S.forge.byName.has(n); }   // a modded item (not a block): a right click is sent so the mod's server side can act
   function soundHere(name) { try { mcSound(name, player.x, player.y + 1, player.z, 1, 1); } catch (e) { /* audio */ } }   // a sound the mod plays on the client at the player
   function wbPageName(p) { const id = String(p.id || ''), t = p.tag || {};
@@ -12435,7 +12476,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const zr = n => cache.get(n) || null, rd = async n => { const d = zr(n); return d && new TextDecoder().decode(d); };
     const mods = []; { const mi = names.find(n => /(^|\/)mcmod\.info$/i.test(n)); if (mi) try { let j = JSON.parse((await rd(mi)).replace(/[\u0000-\u001f]+/g, ' ')); j = Array.isArray(j) ? j : j.modList || []; for (const m of j) if (m.modid) { mods.push(m.modid); rec.mods[m.modid] = m.version || ''; rec.modNames[m.modid] = m.name || m.modid; } } catch (e) { /* odd json */ } }
     const json = async n => { try { return JSON.parse((await rd(n)).replace(/\/\/[^\n]*/g, '')); } catch (e) { return null; } }, models = {}, has = n => names.includes(n);
-    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^entity\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d;   /* creature textures (Strata's skinned mob renderer) */
+    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(entity|models)\//.test(m[2]) && !/^models\/armor\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d;   /* creature textures (Strata's skinned mob renderer) */
         if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
       m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && /\.name$/.test(ln.slice(0, i).trim())) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
     { rec.mcsnd = rec.mcsnd || {}; rec.sndmap = rec.sndmap || {}; let bytes = 0;   // sounds: sounds.json events -> the ogg files (played by Minecraft mode's pack sound player)
