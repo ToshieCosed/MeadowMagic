@@ -65,3 +65,11 @@ Saves live in the browser's local storage, per device.
 | `.github/workflows/release.yml` | Publishes a GitHub Release, with the standalone file attached, whenever `release/strata-standalone.html` or `VERSION` changes on `main`. |
 | `tools/build_standalone.py` | Rebuilds `release/` and `index.html` from `src/`: `python3 tools/build_standalone.py` |
 | `tools/history/` | The patch scripts that built each feature batch, kept for reference. They were run against the working copy at the time and are not meant to be re-run. |
+
+## Guide
+
+[`docs/guide.pdf`](docs/guide.pdf) covers controls, the tech tree with wiring examples, every crafting recipe, Minecraft server compatibility, the Forge 1.12.2 mod table and how to import mods and packs. `tools/make_resource_pack.py` builds a Minecraft resource pack on your own computer from Mojang's download servers, since Strata can't ship those files.
+
+## Licence
+
+Strata is by ToshieCosed and is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): free to play, share, study and modify for any non-commercial purpose. Commercial use is reserved to the author. Strata is not affiliated with Mojang or Microsoft and includes no Minecraft or mod assets.
