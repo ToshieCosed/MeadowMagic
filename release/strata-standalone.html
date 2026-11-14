@@ -4691,6 +4691,7 @@ function draw(focusX,focusZ,showPlayer){
     upload(cloudMesh,cloudVB,gl.STREAM_DRAW); gl.uniform2f(U.uCloudA,cam.persp?.82:.16,cam.persp?0:30); gl.uniform1i(U.uMode,1); gl.bindVertexArray(cloudMesh.vao); gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_INT,0); gl.uniform1i(U.uMode,0); }
   if(lnMesh.n){gl.uniform1f(U.uAlpha,1);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-2,-4);gl.bindVertexArray(lnMesh.vao);gl.drawElements(gl.TRIANGLES,(lnMesh.n>>2)*6,gl.UNSIGNED_INT,0);gl.disable(gl.POLYGON_OFFSET_FILL);}
   gl.depthMask(true); gl.disable(gl.BLEND);
+  if(typeof window.__fxFrame==='function') try{ window.__fxFrame(); }catch(e){ console.error('fx',e); window.__fxFrame=null; } drawFx();
   if(typeof drawRays==='function') drawRays(di);   // before the first-person hand clears the depth buffer, so the world can hide the sun
   if(vmMesh.n||SKV.fpN){ gl.clear(gl.DEPTH_BUFFER_BIT); gl.uniform2f(U.uFogR,1e5,1e5); gl.uniform1f(U.uClouds,0); if(vmMesh.n){ gl.bindVertexArray(vmMesh.vao); gl.drawElements(gl.TRIANGLES,(vmMesh.n>>2)*6,gl.UNSIGNED_INT,0); } drawFPArm(); }
   gl.bindVertexArray(null);
@@ -5620,6 +5621,32 @@ function drawHeldMap(){ const s=held(); if(cam.mode!=='fp'||mode!=='play'||!s||s
   gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform3f(TU.uL,1,1,1); gl.uniform2f(TU.uFogR,1e5,1e5); gl.disable(gl.DEPTH_TEST);
   gl.bindVertexArray(texVAO); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,t); gl.activeTexture(gl.TEXTURE0); gl.bindBuffer(gl.ARRAY_BUFFER,texVBO); gl.bufferSubData(gl.ARRAY_BUFFER,0,d); gl.drawArrays(gl.TRIANGLE_FAN,0,4);
   gl.enable(gl.DEPTH_TEST); gl.useProgram(prog); gl.bindVertexArray(null); }
+// ---- effects layer: textured, coloured quads drawn after the world, either additive (glow, as Minecraft mods draw wisps and sparkles) or alpha blended ----
+// FX.tex(key, image) registers a texture; FX.quad / FX.bill queue quads for this frame; drawFx() draws and clears them. Used by the Minecraft compat ports.
+const fxProg=gl.createProgram();
+gl.attachShader(fxProg,shader(gl.VERTEX_SHADER,`#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; uniform mat4 uVP; out vec2 vUV; out vec4 vCol;
+void main(){ vUV=aUV; vCol=aCol; gl_Position=uVP*vec4(aPos,1.); }`));
+gl.attachShader(fxProg,shader(gl.FRAGMENT_SHADER,`#version 300 es
+precision highp float; in vec2 vUV; in vec4 vCol; uniform sampler2D uTex; out vec4 o;
+void main(){ vec4 t=texture(uTex,vUV)*vCol; if(t.a<.004) discard; o=t; }`));
+gl.linkProgram(fxProg); if(!gl.getProgramParameter(fxProg,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(fxProg));
+const fxVAO=gl.createVertexArray(), fxVBO=gl.createBuffer(); gl.bindVertexArray(fxVAO); gl.bindBuffer(gl.ARRAY_BUFFER,fxVBO);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,36,0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,2,gl.FLOAT,false,36,12); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,4,gl.FLOAT,false,36,20); gl.bindVertexArray(null);
+const FX={ T:new Map(), B:new Map(), n:0,
+  tex(key,src,smooth){ const o=this.T.get(key); if(o&&o.src===src) return; if(o) gl.deleteTexture(o.t); this.T.set(key,{src,t:glTex(src,!!smooth)}); },
+  has(key){ return this.T.has(key); },
+  quad(key,q,uv,c,add){ add=add|0; const k=key+'|'+add; let b=this.B.get(k); if(!b) this.B.set(k,b={key,add,a:[]});   // add: 0 alpha blended, 1 additive glow, 2 solid (writes depth) const A=b.a, I=[0,1,2,0,2,3];   // q: 4 corners, uv: 4 [u,v], c: [r,g,b,a] 0..1
+    for(const i of I) A.push(q[i][0],q[i][1],q[i][2],uv[i][0],uv[i][1],c[0],c[1],c[2],c[3]); this.n++; },
+  bill(key,x,y,z,s,r4,c,add,rot){ const R=cam.right, U=cam.up||[0,1,0], cs=Math.cos(rot||0)*s, sn=Math.sin(rot||0)*s;   // a camera-facing sprite of half-size s; r4 = [u0,v0,u1,v1]
+    const ax=[R[0]*cs+U[0]*sn,R[1]*cs+U[1]*sn,R[2]*cs+U[2]*sn], ay=[U[0]*cs-R[0]*sn,U[1]*cs-R[1]*sn,U[2]*cs-R[2]*sn], P=(a,b)=>[x+ax[0]*a+ay[0]*b,y+ax[1]*a+ay[1]*b,z+ax[2]*a+ay[2]*b];
+    this.quad(key,[P(-1,-1),P(1,-1),P(1,1),P(-1,1)],[[r4[0],r4[3]],[r4[2],r4[3]],[r4[2],r4[1]],[r4[0],r4[1]]],c,add); } };
+function drawFx(){ if(!FX.n) return; gl.useProgram(fxProg); gl.uniformMatrix4fv(gl.getUniformLocation(fxProg,'uVP'),false,cam.vp); gl.uniform1i(gl.getUniformLocation(fxProg,'uTex'),1);
+  gl.bindVertexArray(fxVAO); gl.bindBuffer(gl.ARRAY_BUFFER,fxVBO); gl.enable(gl.BLEND); gl.depthMask(false); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  const L=[...FX.B.values()].sort((a,b)=>(a.add===2?-1:a.add)-(b.add===2?-1:b.add));   // solid first, then blended layers, glow on top
+  for(const b of L){ const T=FX.T.get(b.key); if(!T||!b.a.length) continue; if(b.add===2){ gl.disable(gl.BLEND); gl.depthMask(true); } else { gl.enable(gl.BLEND); gl.depthMask(false); gl.blendFunc(gl.SRC_ALPHA,b.add?gl.ONE:gl.ONE_MINUS_SRC_ALPHA); }
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,T.t); gl.activeTexture(gl.TEXTURE0); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(b.a),gl.STREAM_DRAW); gl.drawArrays(gl.TRIANGLES,0,b.a.length/9); }
+  FX.B.clear(); FX.n=0; gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(prog); gl.bindVertexArray(null); }
 function drawTextured(){
   const list=[...(world.decor||[]),...drawerQuads()]; if(!list.length) return; let used=false;
   for(const e of list){ if(decorFar(e)) continue; const t=texFor(e); if(!t) continue;
@@ -12216,7 +12243,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     botania: {
       block(n, meta) {
         if (n === 'botania:pool') return { key: meta & 3, variant: 'variant=' + ['default', 'creative', 'diluted', 'fabulous'][meta & 3] };
-        if (n === 'botania:spreader') return { key: meta & 3, variant: 'variant=' + ['mana', 'redstone', 'elven', 'gaia'][meta & 3] };
+        if (n === 'botania:spreader') return { key: meta & 3, variant: 'variant=' + ['mana', 'redstone', 'elven', 'gaia'][meta & 3], noMesh: (S.modRec && S.modRec.fxm && S.modRec.fxm['botania:spreader#variant=mana']) ? 1 : 0 };   // drawn turned to its aim by fx()
         if (n === 'botania:altar') return { key: meta & 15, variant: 'variant=' + (['default', 'forest', 'plains', 'mountain', 'fungal', 'swamp', 'desert', 'taiga', 'mesa', 'mossy'][meta] || 'default') };
         if (/^botania:(specialflower|floatingspecialflower)$/.test(n)) return { plant: 'botania:blocks/flower16' };
         if (n === 'botania:alfheimportal') return { key: meta & 3, variant: 'state=' + (['off', 'on_x', 'on_z'][meta & 3] || 'off'), emit: (meta & 3) ? [9, 15, 11] : null };
@@ -12225,35 +12252,18 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         if (tag.subTileName && /specialflower/.test(hn)) { const sub = String(tag.subTileName), R = S.modRec, L = (R && R.lang && R.lang.botania) || {}, t = R && R.plants && R.plants['botania:' + sub.toLowerCase()];
           if (t) setBlock(X, y, Z, modBlock(hn, 0, { key: 'sub:' + sub, plant: t, name: L['tile.botania:flower.' + sub + '.name'] || sub })); }
         if (tag.manaCap != null && /pool/.test(hn)) B.pools.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: +tag.manaCap || 1000000, n: hn });
-        if (tag.rotationX != null && /spreader/.test(hn)) B.spread.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: 1000, n: hn });
+        if (tag.rotationX != null && /spreader/.test(hn)) B.spread.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: 1000, n: hn, rx: +tag.rotationX || 0, ry: +tag.rotationY || 0, v: ((here && here.modMeta) | 0) & 3 });
         if (tag.hasWater != null) B.alt.set(k, { x: X, y, z: Z, water: !!tag.hasWater, lava: !!tag.hasLava, items: tag.Items || [] });
-        if (tag.subTileCmp && /specialflower/.test(hn)) { const c = tag.subTileCmp; B.flow.set(k, { x: X, y, z: Z, mana: +c.mana || 0, burn: +c.burnTime || 0 }); }
+        if (tag.subTileCmp && /specialflower/.test(hn)) { const c = tag.subTileCmp; B.flow.set(k, { x: X, y, z: Z, mana: +c.mana || 0, burn: +c.burnTime || 0, sub: String(tag.subTileName || '').toLowerCase(), max: +c.maxMana || 0 }); }
         if (/terraplate/.test(hn)) B.terra.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: 500000, n: hn });
-        if (/alfheimportal/.test(hn)) B.portal.set(k, { x: X, y, z: Z });
+        if (/alfheimportal/.test(hn)) B.portal.set(k, Object.assign(B.portal.get(k) || { open: 0 }, { x: X, y, z: Z }));
         if (tag.manaToGet != null) B.rune.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: +tag.manaToGet || 0, items: tag.Items || [], n: hn }); },
-      dyn(vb) { const B = botS(), p = player, t = performance.now() / 1000;
-        for (const [k, q] of B.pools) { if (!/pool/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.pools.delete(k); continue; } if (q.mana <= 0 || Math.hypot(q.x - p.x, q.z - p.z) > 48) continue;
-          const h = q.y + (1 + Math.min(1, q.mana / q.cap) * 6.5) / 16; setVL(GLOW); emitBox(vb, [q.x + 1 / 16, q.y + 1 / 16, q.z + 1 / 16], [q.x + 15 / 16, h, q.z + 15 / 16], /fabulous/.test(q.n) || q.y < 0 ? [235, 150, 255] : [60, 190, 255], IDT); }
+      dyn(vb) { const B = botS(), p = player, t = performance.now() / 1000;   // in the world mesh: the apothecary's water or lava and the items floating over altars (pools, sparkles and the rest are drawn by fx())
         for (const [k, q] of B.alt) { if (!/altar/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.alt.delete(k); continue; } if (Math.hypot(q.x - p.x, q.z - p.z) > 40) continue;
           if (q.water || q.lava) { setVL(q.lava ? GLOW : sampleLight(q.x + .5, q.y + 1, q.z + .5)); emitBox(vb, [q.x + 3 / 16, q.y + 18 / 16, q.z + 3 / 16], [q.x + 13 / 16, q.y + 19 / 16, q.z + 13 / 16], q.lava ? [240, 120, 30] : [60, 110, 230], IDT); }
           botOrbit(vb, q, q.y + 1.35, t); }
-        for (const [k, q] of B.rune) { if (!/runealtar/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.rune.delete(k); continue; } if (Math.hypot(q.x - p.x, q.z - p.z) > 40) continue; botOrbit(vb, q, q.y + 1.3, t); }
-        const live = (M, re) => { for (const [k, q] of M) if (!re.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) M.delete(k); };
-        live(B.flow, /specialflower/); live(B.terra, /terraplate/); live(B.portal, /alfheimportal/);
-        for (const q of B.flow.values()) { if (Math.hypot(q.x - p.x, q.z - p.z) > 32) continue; const ph = (q.x * 7 + q.z * 13) % 10;   // a burning Endoflame flickers; a flower holding mana gives off a slow wisp
-          if (q.burn > 0) { const f = .06 + Math.abs(Math.sin(t * 9 + ph)) * .04; setVL(GLOW); emitBox(vb, [q.x + .5 - f, q.y + .62, q.z + .5 - f], [q.x + .5 + f, q.y + .62 + f * 2.2, q.z + .5 + f], [255, 150 + (Math.sin(t * 13 + ph) * 40 | 0), 40], IDT); }
-          if (q.mana > 0) { const u = (t * .45 + ph / 10) % 1, r = .035 * (1 - u); setVL(GLOW); const wx = q.x + .5 + Math.sin(t * 2 + ph) * .18, wz = q.z + .5 + Math.cos(t * 2 + ph) * .18, wy = q.y + .5 + u * .9; emitBox(vb, [wx - r, wy - r, wz - r], [wx + r, wy + r, wz + r], [200, 255, 230], IDT); } }
-        for (const q of B.terra.values()) { if (q.mana <= 0 || Math.hypot(q.x - p.x, q.z - p.z) > 40) continue; const f = Math.min(1, q.mana / q.cap), c = [60 + f * 40 | 0, 120 + f * 135 | 0, 255 - f * 175 | 0]; setVL(GLOW);   // the agglomeration: sparkles spiral in, blue turning green as it fills
-          emitBox(vb, [q.x + .2, q.y + 3 / 16, q.z + .2], [q.x + .8, q.y + 3.4 / 16, q.z + .8], c, IDT);
-          for (let i = 0; i < 6; i++) { const a = t * (1.5 + f * 3) + i * Math.PI / 3, rr = .45 * (1 - ((t * .5 + i / 6) % 1)), y = q.y + .3 + ((t * .5 + i / 6) % 1) * (.4 + f * .8), r = .045; emitBox(vb, [q.x + .5 + Math.cos(a) * rr - r, y - r, q.z + .5 + Math.sin(a) * rr - r], [q.x + .5 + Math.cos(a) * rr + r, y + r, q.z + .5 + Math.sin(a) * rr + r], c, IDT); } }
-        for (const q of B.portal.values()) { const st = (BLOCKS[world.get(q.x, q.y, q.z)] || {}).modMeta & 3; if (!st || Math.hypot(q.x - p.x, q.z - p.z) > 48) continue; const ax = st === 1; setVL(GLOW);   // an open gateway: a shimmering green sheet in the 3x3 frame above the core
-          const a = ax ? [q.x - 1, q.y + 1, q.z + .47] : [q.x + .47, q.y + 1, q.z - 1], b = ax ? [q.x + 2, q.y + 4, q.z + .53] : [q.x + .53, q.y + 4, q.z + 2], g = 200 + Math.sin(t * 2) * 30 | 0; emitBox(vb, a, b, [70, g, 120], IDT);
-          for (let i = 0; i < 8; i++) { const u = (t * .3 + i / 8) % 1, v = (i * .37 + Math.sin(t + i) * .1 + 1) % 1, r = .05, cx = ax ? q.x - 1 + v * 3 : q.x + .5, cz = ax ? q.z + .5 : q.z - 1 + v * 3, cy = q.y + 1 + u * 3; emitBox(vb, [cx - r, cy - r, cz - r], [cx + r, cy + r, cz + r], [210, 255, 220], IDT); } }
-        for (const m of S.mobs) { if (!/^mod:botania:/.test(m.type) || !BOT_MOTE.test(m.type)) continue; if (Math.hypot(m.x - p.x, m.z - p.z) > 48) continue;
-          if (/manaburst/i.test(m.type)) { const T = m.btr = m.btr || []; const l = T[T.length - 1]; if (!l || Math.hypot(l[0] - m.x, l[1] - m.y, l[2] - m.z) > .08) { T.push([m.x, m.y + .1, m.z]); if (T.length > 14) T.shift(); }   // a mana burst leaves the spreader's green trail
-            setVL(GLOW); T.forEach((q, i) => { const r = .03 + .08 * (i + 1) / T.length; emitBox(vb, [q[0] - r, q[1] - r, q[2] - r], [q[0] + r, q[1] + r, q[2] + r], [40 + i * 8, 255, 60 + i * 8], IDT); }); continue; }
-          const sp = /spark/i.test(m.type), r = sp ? .12 : .1, c = /pixie/i.test(m.type) ? [255, 120, 210] : sp ? [120, 230, 255] : [90, 220, 255], y = m.y + (sp ? .25 + Math.sin(t * 3) * .05 : .1); setVL(GLOW);
-          emitBox(vb, [m.x - r, y - r, m.z - r], [m.x + r, y + r, m.z + r], c, IDT); } },
+        for (const [k, q] of B.rune) { if (!/runealtar/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.rune.delete(k); continue; } if (Math.hypot(q.x - p.x, q.z - p.z) > 40) continue; botOrbit(vb, q, q.y + 1.3, t); } },
+      fx() { botFx(); },
       tick() { const h = held(), hn = h && h.mc && S.forge.items[h.mc.id]; let el = document.getElementById('botHud');
         if (!/^botania:twigwand$/.test(hn || '') || mode !== 'play') { if (el) el.hidden = true; return; }
         const B = botS(), p = player; let best = null, bd = 6;
@@ -12301,6 +12311,86 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
 
   const GLOW = new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255]);
   const BOT_MOTE = /:(manaburst|spark|corporeaspark|pixie|magicmissile|signalflare|fallingstar)$/i;   // Botania entities that are motes of light, not creatures
+  // ---- Botania's client rendering, done the way the mod does it (vazkii.botania.client): FXWisp (misc/wisp_large, additive, tinted, alpha .5, grows then shrinks over
+  // ~28 ticks), FXSparkle (misc/particles.png frames 16-19, alpha .75), the mana pool's animated mana_water surface, the Elven Gateway's animated swirl,
+  // spreaders turned to their aim (RenderTileSpreader: rotationX + 90 about Y, rotationY about X, the core spinning 1 degree a tick), sparks as their item icon.
+  // Particles run on Minecraft's 20 ticks a second and are spawned at the mod's own rates and colours.
+  const BFX = { P: [], acc: 0, last: 0, tick: 0 };
+  function fxTex(path) { const C = S.fxT = S.fxT || new Map(); let e = C.get(path); if (e) return e.ok ? e : null; e = { ok: false }; C.set(path, e);
+    const F = S.modRec && S.modRec.files, d = F && (F['x/' + path] || F['b/' + path] || F['e/' + path] || F['i/' + path]); if (!d) return null;
+    createImageBitmap(new Blob([d], { type: 'image/png' })).then(b => { FX.tex('mc:' + path, b, /:misc\//.test(path)); Object.assign(e, { ok: true, key: 'mc:' + path, w: b.width, h: b.height, n: Math.max(1, Math.round(b.height / b.width)) }); }).catch(() => {}); return null; }
+  const WISP = 'botania:misc/wisp_large', SPARK = 'botania:misc/particles';
+  function bWisp(x, y, z, c, size, grav, mul, vx, vy, vz) { if (BFX.P.length > 2500) return; BFX.P.push({ k: 0, x, y, z, vx: vx || 0, vy: vy || 0, vz: vz || 0, g: grav || 0, age: 0, max: Math.max(2, (28 / (Math.random() * .3 + .7) * (mul || 1)) | 0), s: size, c }); }
+  function bSparkle(x, y, z, c, size, m) { if (BFX.P.length > 2500) return; const mu = m || 2; BFX.P.push({ k: 1, x, y, z, vx: 0, vy: 0, vz: 0, g: 0, age: 0, max: 3 * mu + 1, mu, s: size, c }); }
+  const hexC = v => [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+  const hsb = (h, sa, br) => { const i = Math.floor(h * 6), f = h * 6 - i, p = br * (1 - sa), q = br * (1 - f * sa), u = br * (1 - (1 - f) * sa); return [[br, u, p], [q, br, p], [p, br, u], [p, q, br], [u, p, br], [br, p, q]][((i % 6) + 6) % 6]; };
+  // SubTileEntity.getColor() of the generating and functional flowers (white when not listed)
+  const BOT_FC = { endoflame: 0x785000, hydroangeas: 0x532FE0, thermalily: 0xD03C00, arcanerose: 0xFF8EF8, munchdew: 0x79C900, entropinnyum: 0xCB0000, kekimurus: 0x935D28, gourmaryllis: 0xD3D604,
+    narslimmus: 0x71D560, rafflowsia: 0x502C76, shulk_me_not: 0x815598, dandelifeon: 0x9C0A7B, daybloom: 0xFFFF44, nightshade: 0x3B2A80, jadedamaranthus: 0x961283, bellethorn: 0xBA3421,
+    dreadthorn: 0x260B45, heiseidream: 0xFF219D, tigerseye: 0xB1A618, orechid: 0x818181, orechidignem: 0xAE3030, fallenkanade: 0xFFFF00, exoflame: 0x661900, agricarnation: 0x8EF828,
+    hopperhock: 0x3F3F3F, rannuncarpus: 0xFFD400, tangleberrie: 0x4B797C, jiyuulia: 0xBD9ACA, hyacidus: 0x8B438F, pollidisiac: 0xCF4919, clayconia: 0x7B8792, loonium: 0x274A00,
+    daffomill: 0xD8BA00, vinculotus: 0x0A6051, spectranthemum: 0xC5C5C5, medumone: 0x3D2204, marimorphosis: 0x769897, bubbell: 0x0DCF89, solegnolia: 0xC6C628, puredaisy: 0xFFFFFF, manastar: 0x9EE5FF };
+  function fxBox(path, a, b, faces, T, L, frame) {   // one model element's faces through the effects layer; T maps block-local 0..1 coords to the world
+    for (const [d, f] of Object.entries(faces)) { const tex = fxTex(f[0]); if (!tex) continue; const x0 = a[0] / 16, y0 = a[1] / 16, z0 = a[2] / 16, x1 = b[0] / 16, y1 = b[1] / 16, z1 = b[2] / 16;
+      const C = { north: [[x1, y1, z0], [x0, y1, z0], [x0, y0, z0], [x1, y0, z0]], south: [[x0, y1, z1], [x1, y1, z1], [x1, y0, z1], [x0, y0, z1]], west: [[x0, y1, z0], [x0, y1, z1], [x0, y0, z1], [x0, y0, z0]],
+        east: [[x1, y1, z1], [x1, y1, z0], [x1, y0, z0], [x1, y0, z1]], up: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], down: [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]] }[d]; if (!C) continue;
+      const D = { north: [16 - b[0], 16 - b[1], 16 - a[0], 16 - a[1]], south: [a[0], 16 - b[1], b[0], 16 - a[1]], west: [a[2], 16 - b[1], b[2], 16 - a[1]], east: [16 - b[2], 16 - b[1], 16 - a[2], 16 - a[1]], up: [a[0], a[2], b[0], b[2]], down: [a[0], 16 - b[2], b[0], 16 - a[2]] }[d];
+      const uv = f[1] || D, n = tex.n, fr = (frame || 0) % n, V = v => (fr * 16 + v) / (16 * n), sh = { up: 1, down: .5, north: .8, south: .8, east: .6, west: .6 }[d];
+      FX.quad(tex.key, C.map(q => T(q[0], q[1], q[2])), [[uv[0] / 16, V(uv[1])], [uv[2] / 16, V(uv[1])], [uv[2] / 16, V(uv[3])], [uv[0] / 16, V(uv[3])]], [L[0] * sh, L[1] * sh, L[2] * sh, 1], 2); } }
+  const litAt = (x, y, z) => { const l = sampleLight(x, y, z); return [0, 1, 2].map(i => Math.min(1, l[i] / 255 * SUNV[i] + l[4 + i] / 255 + .04)); };
+  function botFx() { if (typeof FX === 'undefined' || !S.world) return; const B = botS(), p = player, now = performance.now(), R = S.modRec;
+    if (!fxTex(WISP) || !fxTex(SPARK)) return;
+    const live = (M, re) => { for (const [k, q] of M) if (!re.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) M.delete(k); };
+    live(B.flow, /specialflower/); live(B.terra, /terraplate/); live(B.portal, /alfheimportal/); live(B.spread, /spreader/); live(B.pools, /pool/);
+    const near = (q, r) => Math.hypot(q.x - p.x, q.z - p.z) < r;
+    // ---- ticks: spawn and move particles at 20 a second ----
+    BFX.acc = Math.min(.25, BFX.acc + (BFX.last ? (now - BFX.last) / 1000 : 0)); BFX.last = now;
+    while (BFX.acc >= .05) { BFX.acc -= .05; const T = ++BFX.tick, rnd = Math.random;
+      for (const q of B.pools.values()) { if (!near(q, 40) || q.mana <= 0) continue; const fab = /fabulous/.test(q.n);   // TilePool: blue wisps rise from a pool holding mana
+        if (rnd() > 1 - q.mana / q.cap * .1) bWisp(q.x + .3 + rnd() * .5, q.y + .6 + rnd() * .25, q.z + rnd(), fab ? hsb((T * 2 % 360) / 360, .6, 1) : hexC(0x00C6FF), rnd() / 3, -rnd() / 25, 2); }
+      for (const q of B.flow.values()) { if (!near(q, 32)) continue;   // SubTileGenerating / SubTileFunctional: wisps in the flower's colour while it holds mana; the Endoflame's flame while it burns
+        if (q.mana > 0 && rnd() > 1 - q.mana / Math.max(q.mana, q.max || 1000) / 3.5) bWisp(q.x + .55 + rnd() * .2 - .1, q.y + .75 + rnd() * .2 - .1, q.z + .5, hexC(BOT_FC[q.sub] != null ? BOT_FC[q.sub] : 0xFFFFFF), rnd() / 6, -rnd() / 30);
+        if (q.burn > 0 && (q.burn--, rnd() < .1) && typeof parts !== 'undefined') parts.push({ x: q.x + .4 + rnd() * .2, y: q.y + .65, z: q.z + .4 + rnd() * .2, vx: 0, vy: .25, vz: 0, t: .5, c: [255, 170, 60], s: .05, ember: true }); }
+      for (const q of B.terra.values()) { if (!near(q, 40) || q.mana <= 0) continue; const tk = 100 * q.mana / q.cap, n = 3, inc = 360 / n, sp = 5;   // TileTerraPlate: three spirits circling in, blue to green
+        let wt = tk * sp - inc; const r = Math.sin((tk - 100) / 10) * 2, g = Math.sin(wt * Math.PI / 180 * .55);
+        for (let i = 0; i < n; i++) { const x = q.x + Math.sin(wt * Math.PI / 180) * r + .5, y = q.y + .25 + Math.abs(r) * .7, z = q.z + Math.cos(wt * Math.PI / 180) * r + .5; wt += inc; const c = [0, tk / 100, 1 - tk / 100];
+          bWisp(x, y, z, c, .85, g * .05, .25); bWisp(x, y, z, c, rnd() * .1 + .1, (rnd() - .5) * .05, (rnd() - .5) * .05, (rnd() - .5) * .05, 1, 0); } }
+      for (const q of B.portal.values()) { const st = (BLOCKS[world.get(q.x, q.y, q.z)] || {}).modMeta & 3; q.open = st ? Math.min(60, q.open + 1) : 0;   // TileAlfPortal: wisps drift out of an open gateway
+        if (st && near(q, 40) && rnd() < .3) { const ax = st === 1, u = rnd() * 3 - 1, v = rnd() * 3; bWisp(ax ? q.x + u : q.x + .5, q.y + 1 + v, ax ? q.z + .5 : q.z + u, [rnd() * .25, .7 + rnd() * .3, rnd() * .25], rnd() * .15 + .1, -.01, 1); } }
+      for (const m of S.mobs) { if (!/^mod:botania:/.test(m.type) || !BOT_MOTE.test(m.type) || !near(m, 48)) continue; const md = m.md || {};
+        if (/manaburst/i.test(m.type)) {   // EntityManaBurst: a line of wisps from where it was last tick to where it is now
+          const col = typeof md[6] === 'number' ? hexC(md[6]) : hexC(0x20FF20), os = typeof md[7] === 'number' && md[8] > 0 ? md[7] / md[8] : 1, seed = Math.sin((m.eid * 9301 + 49297) % 9001) * .4;
+          const px = m.bpx != null ? m.bpx : m.x, py = m.bpy != null ? m.bpy : m.y, pz = m.bpz != null ? m.bpz : m.z, dx = m.x - px, dy = m.y - py, dz = m.z - pz, dl = Math.hypot(dx, dy, dz), st = Math.max(1, Math.min(60, Math.ceil(dl / .095)));
+          for (let i = 0; i < st; i++) { const f = i / st, sz = os + (rnd() - .5) * .065 + seed; bWisp(px + dx * f, py + dy * f + .1, pz + dz * f, col.map(v => Math.max(0, Math.min(1, v + (rnd() - .5) * .25))), .2 * sz, 0, 1, -dx * .01, -dy * .01, -dz * .01); }
+          bWisp(m.x, m.y + .1, m.z, col, .1 * os, 0, 1, (rnd() - .5) * .06, (rnd() - .5) * .06, (rnd() - .5) * .06); m.bpx = m.x; m.bpy = m.y; m.bpz = m.z; continue; }
+        if (/pixie/i.test(m.type)) { bSparkle(m.x + (rnd() - .5) * .25, m.y + .5 + (rnd() - .5) * .25, m.z + (rnd() - .5) * .25, [1, .25, .9], 1 + rnd() * .25, 10); continue; }
+        if (/magicmissile|fallingstar|signalflare/i.test(m.type)) { bSparkle(m.x + (rnd() - .5) * .1, m.y + (rnd() - .5) * .1, m.z + (rnd() - .5) * .1, /magic/.test(m.type) ? [.8, .2, 1] : [1, 1, 1], .8 + rnd() * .4, 2); } }
+      for (let i = BFX.P.length - 1; i >= 0; i--) { const q = BFX.P[i]; if (++q.age >= q.max) { BFX.P.splice(i, 1); continue; } q.vy -= .04 * q.g; q.x += q.vx; q.y += q.vy; q.z += q.vz; } }
+    // ---- every frame: draw ----
+    const W = fxTex(WISP), SP = fxTex(SPARK), T = BFX.tick;
+    for (const q of BFX.P) { if (q.k === 0) { const h = q.max / 2; let a = q.age / h; if (a > 1) a = 2 - a; FX.bill(W.key, q.x, q.y, q.z, .5 * q.s * Math.max(.05, a), [0, 0, 1, 1], [q.c[0], q.c[1], q.c[2], .5], 1); }
+      else { const f = Math.min(3, (q.age / q.mu) | 0); FX.bill(SP.key, q.x, q.y, q.z, .1 * q.s, [f * .125, .25, f * .125 + .124875, .375], [q.c[0], q.c[1], q.c[2], .75], 1); } }
+    // mana pools: the animated mana_water surface (RenderTilePool), full bright; the fabulous pool cycles through the rainbow
+    const MW = fxTex('botania:blocks/mana_water');
+    if (MW) for (const q of B.pools.values()) { if (q.mana <= 0 || !near(q, 48)) continue; const h = q.y + (1 + Math.min(1, q.mana / q.cap) * 6.5) / 16, fr = ((T / 2) | 0) % MW.n, v0 = fr / MW.n, v1 = (fr + 1) / MW.n;
+      const c = /fabulous/.test(q.n) ? hsb((T * 2 % 360) / 360, .5, 1) : [1, 1, 1]; FX.quad(MW.key, [[q.x + 1 / 16, h, q.z + 1 / 16], [q.x + 15 / 16, h, q.z + 1 / 16], [q.x + 15 / 16, h, q.z + 15 / 16], [q.x + 1 / 16, h, q.z + 15 / 16]], [[1 / 16, v0 + (v1 - v0) / 16], [15 / 16, v0 + (v1 - v0) / 16], [15 / 16, v1 - (v1 - v0) / 16], [1 / 16, v1 - (v1 - v0) / 16]], [c[0], c[1], c[2], .9], 0); }
+    // the Elven Gateway: alfheim_portal_swirl over the 3x3 opening, fading in over 3 seconds (RenderTileAlfPortal)
+    const SW = fxTex('botania:blocks/alfheim_portal_swirl');
+    if (SW) for (const q of B.portal.values()) { const st = (BLOCKS[world.get(q.x, q.y, q.z)] || {}).modMeta & 3; if (!st || !q.open || !near(q, 48)) continue; const ax = st === 1, fr = T % SW.n, v0 = fr / SW.n, v1 = (fr + 1) / SW.n;
+      const a = Math.min(1, (Math.sin(T / 8) + 1) / 7 + .6) * (q.open / 60), P = (u, v) => ax ? [q.x - 1 + u, q.y + 1 + v, q.z + .5] : [q.x + .5, q.y + 1 + v, q.z - 1 + u], C = [P(0, 3), P(3, 3), P(3, 0), P(0, 0)], U = [[0, v0], [1, v0], [1, v1], [0, v1]];
+      FX.quad(SW.key, C, U, [1, 1, 1, a], 0); FX.quad(SW.key, [C[1], C[0], C[3], C[2]], [U[1], U[0], U[3], U[2]], [1, 1, 1, a], 0); }
+    // mana spreaders: the mod's own model, turned to where it aims, its core spinning and bobbing
+    const FM = R && R.fxm;
+    if (FM) for (const q of B.spread.values()) { if (!near(q, 48)) continue; const vn = ['mana', 'redstone', 'elven', 'gaia'][q.v & 3], els = FM['botania:spreader#variant=' + vn] || FM['botania:spreader#variant=mana']; if (!els) continue;
+      const ya = (q.rx + 90) * Math.PI / 180, pa = q.ry * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), spn = Math.sin(pa), L = litAt(q.x + .5, q.y + .5, q.z + .5);
+      const rot = (x, y, z) => { const y1 = y * cp - z * spn, z1 = y * spn + z * cp; return [q.x + .5 + x * cy + z1 * sy, q.y + .5 + y1, q.z + .5 - x * sy + z1 * cy]; };
+      const tm = T % 360 * Math.PI / 180, bob = Math.sin(T / 20) * .05, ct = Math.cos(tm), st2 = Math.sin(tm);
+      for (const e of els) { const core = e.a[0] === 5 && e.a[1] === 4 && e.b[0] === 11;
+        fxBox(null, e.a, e.b, e.f, core ? (x, y, z) => { const lx = x - .5, lz = z - .5; return rot(lx * ct + lz * st2, y - .5 + bob, -lx * st2 + lz * ct); } : (x, y, z) => rot(x - .5, y - .5, z - .5), L, T); } }
+    // sparks: their item icon, facing the camera (RenderSparkBase)
+    for (const m of S.mobs) { if (!/^mod:botania:.*spark$/i.test(m.type) || !near(m, 40)) continue; const ic = fxTex(/corporea/i.test(m.type) ? 'botania:items/spark_corporea' : 'botania:items/spark'); if (!ic) continue;
+      FX.bill(ic.key, m.x, m.y + .2, m.z, .25, [0, 0, 1, 1 / ic.n], [1, 1, 1, .85 + Math.sin(T / 5) * .15], 0); } }
+  window.__fxFrame = () => { if (!S || !S.forge || !S.world) return; for (const P of Object.values(PORTS)) if (P.fx) try { P.fx(); } catch (e) { console.error('port fx', e); P.fx = null; } };
   const botS = () => S.bot = S.bot || { pools: new Map(), spread: new Map(), alt: new Map(), rune: new Map(), flow: new Map(), terra: new Map(), portal: new Map() };
   function botItemId(e) { if (!e || !e.id) return 0; const F = S.forge; F.byItem = F.byItem || new Map(Object.entries(F.items).map(([i, n]) => [n, +i])); const num = F.byItem.get(String(e.id)); if (num == null) return 0; const st = toStack({ id: num, count: 1, damage: e.Damage | 0 }); return st ? st.id : 0; }
   function botOrbit(vb, q, y0, t) { const its = (q.items || []).filter(e => e && e.id && (e.Count | 0) > 0), n = its.length; if (!n) return; setVL(sampleLight(q.x + .5, y0, q.z + .5));
@@ -12596,7 +12686,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     const zr = n => cache.get(n) || null, rd = async n => { const d = zr(n); return d && new TextDecoder().decode(d); };
     const mods = []; { const mi = names.find(n => /(^|\/)mcmod\.info$/i.test(n)); if (mi) try { let j = JSON.parse((await rd(mi)).replace(/[\u0000-\u001f]+/g, ' ')); j = Array.isArray(j) ? j : j.modList || []; for (const m of j) if (m.modid) { mods.push(m.modid); rec.mods[m.modid] = m.version || ''; rec.modNames[m.modid] = m.name || m.modid; } } catch (e) { /* odd json */ } }
     const json = async n => { let t; try { t = await rd(n); return JSON.parse(t); } catch (e) { try { return JSON.parse(String(t).replace(/^\s*\/\/[^\n]*/gm, '')); } catch (e2) { return null; } } }, models = {}, has = n => names.includes(n);
-    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(entity|models?)\//.test(m[2]) && !/^models\/armor\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d;   /* creature textures (Strata's skinned mob renderer) */
+    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(entity|models?)\//.test(m[2]) && !/^models\/armor\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d; if (/^misc\//.test(m[2])) rec.files['x/' + key] = d;   /* effect sprites (wisps, sparkles) */   /* creature textures (Strata's skinned mob renderer) */
         if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
       m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && (/\.name$/.test(ln.slice(0, i).trim()) || LANG_KEEP.test(ln.slice(0, i).trim()))) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
     { rec.mcsnd = rec.mcsnd || {}; rec.sndmap = rec.sndmap || {}; let bytes = 0;   // sounds: sounds.json events -> the ogg files (played by Minecraft mode's pack sound player)
@@ -12610,18 +12700,19 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       while (cur && n++ < 12) { Object.entries(cur.textures || {}).forEach(([k, v]) => { if (!(k in T)) T[k] = v; }); if (!el && cur.elements) el = cur.elements; parent = cur.parent || null; if (!parent) break; cur = await modelOf(parent, kind); if (!cur) break; }
       const get = k => { let v = T[k], g = 0; while (typeof v === 'string' && v[0] === '#' && g++ < 8) v = T[v.slice(1)]; return typeof v === 'string' ? (v.includes(':') ? v : 'minecraft:' + v) : null; };
       if (T.cross && get('cross')) { const c = get('cross'); return { s: c, t: c, b: c, plant: c, parent }; }   // a cross model: a plant drawn as two crossed sprites
-      const bx = el && el.length <= 12 && el.every(e => e.from && e.to) ? el.map(e => [e.from[0] / 16, e.from[1] / 16, e.from[2] / 16, e.to[0] / 16, e.to[1] / 16, e.to[2] / 16]) : null, full = bx && bx.length === 1 && bx[0].join() === '0,0,0,1,1,1', boxes = bx && !full && bx.every(q => q.every(v => v >= -0.5 && v <= 1.5)) ? bx.map(q => q.map(v => Math.min(1, Math.max(0, v)))).filter(q => q[3] > q[0] && q[4] > q[1] && q[5] > q[2]) : null;   // shaped models keep their boxes, even with one texture for every face
+      const bx = el && el.length <= 12 && el.every(e => e.from && e.to) ? el.map(e => [e.from[0] / 16, e.from[1] / 16, e.from[2] / 16, e.to[0] / 16, e.to[1] / 16, e.to[2] / 16]) : null, full = bx && bx.length === 1 && bx[0].join() === '0,0,0,1,1,1', boxes = bx && !full && bx.every(q => q.every(v => v >= -0.5 && v <= 1.5)) ? bx.map(q => q.map(v => Math.min(1, Math.max(0, v)))).filter(q => q[3] > q[0] && q[4] > q[1] && q[5] > q[2]) : null,
+        fx = boxes && el.length <= 32 ? el.map(e => ({ a: e.from, b: e.to, f: Object.fromEntries(Object.entries(e.faces || {}).map(([d, fc]) => [d, [fc.texture && fc.texture[0] === '#' ? get(fc.texture.slice(1)) : fc.texture, fc.uv || null]])) })) : null;   // the model itself, for blocks a port draws with its own transform   // shaped models keep their boxes, even with one texture for every face
       if (el && !T.all) { const f = (el[0] && el[0].faces) || {}, tx = d => f[d] && f[d].texture && f[d].texture[0] === '#' ? get(f[d].texture.slice(1)) : null; const s2 = tx('north') || tx('south') || tx('east'), t2 = tx('up'), b2 = tx('down');
-        if (s2 || t2) return { s: s2 || t2, t: t2 || s2, b: b2 || t2 || s2, layer: get('layer0'), parent, boxes }; }
+        if (s2 || t2) return { s: s2 || t2, t: t2 || s2, b: b2 || t2 || s2, layer: get('layer0'), parent, boxes, fx }; }
       const side = get('all') || get('side') || get('front') || get('texture') || get('particle'), top = get('all') || get('top') || get('end') || get('up') || side, bot = get('all') || get('bottom') || get('end') || get('down') || top;
-      return { s: side || top, t: top, b: bot, layer: get('layer0'), parent, boxes }; };
+      return { s: side || top, t: top, b: bot, layer: get('layer0'), parent, boxes, fx }; };
     const local = t => !t ? null : t.split(':')[0] === 'minecraft' ? t.split('/').pop() : t;   // vanilla textures go by their plain name in Strata's pack layout
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/blockstates\/([^/]+)\.json$/i); if (!m) continue; const bs = await json(n); if (!bs) continue; const reg = m[1] + ':' + m[2]; let model = null, tex = {};
       if (bs.forge_marker) { const d = bs.defaults || {}; model = d.model || null; Object.assign(tex, d.textures || {}); const v = bs.variants || {}, first = v.normal || v.inventory || Object.values(v)[0]; const fv = Array.isArray(first) ? first[0] : first && typeof first === 'object' ? (first.model || first.textures ? first : Object.values(first)[0]) : null; if (fv) { if (fv.model) model = fv.model; Object.assign(tex, fv.textures || {}); } }
       else if (bs.variants) { const v = bs.variants, first = v.normal || v[''] || Object.values(v)[0], fv = Array.isArray(first) ? first[0] : first; model = fv && fv.model; }
       else if (bs.multipart) { const p0 = bs.multipart[0] && bs.multipart[0].apply; model = p0 && (Array.isArray(p0) ? p0[0].model : p0.model); }
       let r = model ? await resolve(model, 'block') : null; if (Object.keys(tex).length) { const t0 = t => { let v = tex[t]; return v ? (v.includes(':') ? v : 'minecraft:' + v) : null; }; const s2 = t0('cross') || t0('all') || t0('side') || t0('texture') || t0('particle'); if (s2) r = { s: s2, t: t0('all') || t0('top') || t0('end') || s2, b: t0('all') || t0('bottom') || t0('end') || s2, plant: t0('cross') || (r && r.plant), boxes: r && r.boxes }; }
-      if (bs.variants && !bs.forge_marker) { const V = rec.variants = rec.variants || {}; let nv = 0; for (const [vk, vv] of Object.entries(bs.variants)) { if (nv++ > 160) break; const mv = Array.isArray(vv) ? vv[0] : vv; if (!mv || !mv.model) continue; const r2 = await resolve(mv.model, 'block'); if (r2 && local(r2.s)) (V[reg] = V[reg] || {})[vk] = [local(r2.s), local(r2.t), local(r2.b)]; if (r2 && r2.plant) (rec.plants = rec.plants || {})[reg] = rec.plants[reg] || local(r2.plant); } }
+      if (bs.variants && !bs.forge_marker) { const V = rec.variants = rec.variants || {}; let nv = 0; for (const [vk, vv] of Object.entries(bs.variants)) { if (nv++ > 160) break; const mv = Array.isArray(vv) ? vv[0] : vv; if (!mv || !mv.model) continue; const r2 = await resolve(mv.model, 'block'); if (r2 && local(r2.s)) (V[reg] = V[reg] || {})[vk] = [local(r2.s), local(r2.t), local(r2.b)]; if (r2 && r2.plant) (rec.plants = rec.plants || {})[reg] = rec.plants[reg] || local(r2.plant); if (r2 && r2.fx) (rec.fxm = rec.fxm || {})[reg + '#' + vk] = r2.fx; } }
       if (r && r.plant) (rec.plants = rec.plants || {})[reg] = local(r.plant);
       if (r && local(r.s)) rec.blocks[reg] = [local(r.s), local(r.t), local(r.b)]; if (r && r.boxes) (rec.shapes = rec.shapes || {})[reg] = r.boxes; }
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/item\/([^/]+)\.json$/i); if (!m) continue; const reg = m[1] + ':' + m[2]; const r = await resolve(m[1] + ':item/' + m[2], 'item'); const t = r && (r.layer || (!rec.blocks[reg] && r.s));
@@ -12629,7 +12720,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
@@ -12647,6 +12738,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         o.chunk(cx, cz, sections, gu); if (S.world) try { skullScan(cx + (S.OX >> 4), cz + (S.OZ >> 4), sections); } catch (e) { /* odd chunk */ } },
       unload(cx, cz) { o.unload(cx, cz); const sx = cx + (S.OX >> 4), sz = cz + (S.OZ >> 4); if (S.skulls) for (const [k, q] of S.skulls) if (q.x >> 4 === sx && q.z >> 4 === sz) S.skulls.delete(k); },
       vmeta(eid, idx, kind, v) { if (!S.world) return; if (nameMeta(eid, idx, kind, v)) return; const m = S.ents.get(eid), off = PV() >= 210 ? 1 : 0;
+        if (m && m.modEnt) (m.md = m.md || {})[idx] = v;   // mod entities' data (a mana burst's colour and mana)
         if (m && m.stand && idx === 10 + off && kind === 'byte') { standFlags(m, v); return; }
         if (m && m.pl && idx === 5 + off && kind === 'byte') { m.useH = v; return; }   // hand states: 1 = using, 2 = off hand
         o.vmeta(eid, idx, kind, v); },
