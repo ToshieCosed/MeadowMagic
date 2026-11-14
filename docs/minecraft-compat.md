@@ -266,4 +266,6 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
 - Mana bursts, sparks, pixies and other motes render as glowing points.
 - Holding a Wand of the Forest shows a mana bar for the nearest pool, spreader or runic altar within 6 blocks.
 - The Lexica Botania opens Strata's own lexicon screen: categories, entries, search, and the book's text from the mod's lang file.
+- Rendering follows the mod's own client code: an effects layer draws Botania's wisps (misc/wisp_large, additive) and sparkles (misc/particles frames 16-19) at the mod's spawn rates and colours; mana pools show the animated mana_water surface (rainbow in the fabulous pool); an open Elven Gateway shows the animated swirl; spreaders are drawn from their model turned to their aim (rotationX + 90, rotationY) with the core spinning and bobbing; mana bursts are lines of wisps in the burst's own colour; sparks show their icon.
+- Baubles: a Baubles button in the inventory opens the mod's equipment screen (amulet, two rings, belt, head, body, charm).
 - Jars imported before this stage should be re-imported to pick up the lexicon text, plant models and block shapes.
