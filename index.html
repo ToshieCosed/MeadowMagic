@@ -5636,8 +5636,8 @@ gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,36,0); 
 const FX={ T:new Map(), B:new Map(), n:0,
   tex(key,src,smooth){ const o=this.T.get(key); if(o&&o.src===src) return; if(o) gl.deleteTexture(o.t); this.T.set(key,{src,t:glTex(src,!!smooth)}); },
   has(key){ return this.T.has(key); },
-  quad(key,q,uv,c,add){ add=add|0; const k=key+'|'+add; let b=this.B.get(k); if(!b) this.B.set(k,b={key,add,a:[]});   // add: 0 alpha blended, 1 additive glow, 2 solid (writes depth) const A=b.a, I=[0,1,2,0,2,3];   // q: 4 corners, uv: 4 [u,v], c: [r,g,b,a] 0..1
-    for(const i of I) A.push(q[i][0],q[i][1],q[i][2],uv[i][0],uv[i][1],c[0],c[1],c[2],c[3]); this.n++; },
+  quad(key,q,uv,c,add){ add=add|0; const k=key+'|'+add; let b=this.B.get(k); if(!b) this.B.set(k,b={key,add,a:[]}); const A=b.a, IX=[0,1,2,0,2,3];   // add: 0 alpha blended, 1 additive glow, 2 solid (writes depth); q: 4 corners, uv: 4 [u,v], c: [r,g,b,a] 0..1
+    for(const i of IX) A.push(q[i][0],q[i][1],q[i][2],uv[i][0],uv[i][1],c[0],c[1],c[2],c[3]); this.n++; },
   bill(key,x,y,z,s,r4,c,add,rot){ const R=cam.right, U=cam.up||[0,1,0], cs=Math.cos(rot||0)*s, sn=Math.sin(rot||0)*s;   // a camera-facing sprite of half-size s; r4 = [u0,v0,u1,v1]
     const ax=[R[0]*cs+U[0]*sn,R[1]*cs+U[1]*sn,R[2]*cs+U[2]*sn], ay=[U[0]*cs-R[0]*sn,U[1]*cs-R[1]*sn,U[2]*cs-R[2]*sn], P=(a,b)=>[x+ax[0]*a+ay[0]*b,y+ax[1]*a+ay[1]*b,z+ax[2]*a+ay[2]*b];
     this.quad(key,[P(-1,-1),P(1,-1),P(1,1),P(-1,1)],[[r4[0],r4[3]],[r4[2],r4[3]],[r4[2],r4[1]],[r4[0],r4[1]]],c,add); } };
