@@ -150,6 +150,7 @@ const bo = {}; { const nm5 = await pg.evaluate(() => StrataMCE.dbg().o.name); cm
     await W(1500); r.fx2 = { P: P.BFX.P.length, tex: [...FX.T.keys()].filter(k => /botania/.test(k)), noMesh: (BLOCKS[world.get(34 + S.OX, 4, 30 + S.OZ)] || {}).noMesh, sp: [...B.spread.values()].map(q => [q.rx, q.ry]) };
     await W(300); r.lexShot = 1; return r; }));
   await pg.screenshot({ path: '/tmp/botania-lexicon.png' });
+  await pg.evaluate(() => { const l = document.getElementById('botLex'); if (l) l.hidden = true; player.x = 31.5 + StrataMCE.dbg().OX; player.z = 26.5 + StrataMCE.dbg().OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .55); }); await wait(2500); await pg.screenshot({ path: '/tmp/botania-fx.png' });
   await pg.evaluate(() => { const l = document.getElementById('botLex'); if (l) l.hidden = true; StrataMCE.dbg().client; }); await pg.keyboard.press('Escape').catch(() => {}); await wait(300);
   await pg.evaluate(() => { const S = StrataMCE.dbg(); S.client.api.modSend('baubles', Uint8Array.of(0)); }); await wait(2500);
   bo.bau = await pg.evaluate(() => { const S = StrataMCE.dbg(), el = document.getElementById('mcInv'); return { type: S.win && S.win.type, n: S.win && S.win.n, shown: !!el && !el.hidden, lbls: [...document.querySelectorAll('#mcTop .lbl')].map(e => e.textContent) }; });
