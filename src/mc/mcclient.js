@@ -137,6 +137,7 @@
     if (!ids) throw new Error('No packet table for protocol ' + P);
     const rev = {}; for (const k of ['lc', 'cc', 'pc']) { rev[k] = {}; for (const n in (ids[k] || {})) rev[k][ids[k][n]] = n; }
     let state = 'login', ws, pend = 0, closed = false, joined = false, sky = true, posT = null;
+    const secTry = (fn, r, mask, gu, p0, size) => { for (const k of [sky, !sky]) { try { r.p = p0; const v = fn(r, mask, k, gu); if (r.p - p0 === size || !mask) { sky = k; return v; } } catch (e) { /* the other guess */ } } r.p = p0; return fn(r, mask, sky, gu); };   // whether chunks carry sky light: guessed from the dimension, confirmed by the data size (modded dimensions differ)
     const H = o.world || null;
     const say = (t, html) => { try { o.onChat && o.onChat(t, html); } catch (e) { /* ui */ } };
     const status = t => { try { o.onStatus && o.onStatus(t); } catch (e) { /* ui */ } };
@@ -264,11 +265,11 @@
           const w = new W().f64(H.cur ? H.cur.x : x).f64(H.cur ? H.cur.y : y).f64(H.cur ? H.cur.z : z).f32(yaw).f32(pitch).bool(true); out('position_look', w);
         } return;
         case 'map_chunk': if (LEG && H && H.chunk) {
-          if (V9) { const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.vi(); r.vi(); const sec = sections19(r, mask, sky, gu); H.chunk(x, z, sec, gu);
+          if (V9) { const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.vi(), size = r.vi(), p0 = r.p; let sec = secTry(sections19, r, mask, gu, p0, size); r.p = p0 + size; H.chunk(x, z, sec, gu);   // a modded dimension may or may not send sky light: the data size tells which
             if (P >= 110 && H.tile) { const n = r.vi(); for (let i = 0; i < n; i++) H.tile(null, null, null, 0, nbtRaw()); } return; }   // 1.9.4+: the chunk's block entities (signs...)
-          const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.u16(); r.vi();
+          const x = r.i32(), z = r.i32(), gu = r.bool(), mask = r.u16(), size = r.vi(), p0 = r.p;
           if (gu && mask === 0) { H.unload && H.unload(x, z); return; }
-          H.chunk(x, z, sections18(r, mask, sky, gu), gu);
+          let sec = secTry(sections18, r, mask, gu, p0, size); r.p = p0 + size; H.chunk(x, z, sec, gu);
         } return;
         case 'map_chunk_bulk': if (LEG && H && H.chunk) {
           const sk = r.bool(), n = r.vi(), ms = []; for (let i = 0; i < n; i++) ms.push([r.i32(), r.i32(), r.u16()]);

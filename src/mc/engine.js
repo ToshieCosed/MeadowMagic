@@ -1171,7 +1171,7 @@
   function makeHandler() {
     const Hd = {
       cur: null,
-      login(p) { S.gm = p.gamemode; S.eid = p.eid; S.dim = p.dimension; dimSet(p.dimension); }, respawn(dim) { for (const k of [...S.store.keys()]) unloadKey(k); S.store.clear(); S.objs.clear(); S.cracks.clear(); if (dim != null) dimSet(dim); },
+      login(p) { S.gm = p.gamemode; S.eid = p.eid; S.dim = p.dimension; dimSet(p.dimension); }, respawn(dim) { for (const k of [...S.store.keys()]) unloadKey(k); if (world) { for (const k of [...world.chunks.keys()]) unloadKey(k); if (world.edits) world.edits.clear(); } S.store.clear();   /* Strata re-applies a world's recorded edits when a chunk loads: a new dimension (or server) starts with none */ S.objs.clear(); S.cracks.clear(); if (dim != null) dimSet(dim); },
       time(age, tod) {   // the server's clock drives Strata's day/night: 24000 ticks, day = 0..12000 (sunrise at 0), 10 min day + 10 min night
         S.tod = tod; if (!S.world) return; world.dayLen = world.nightLen = 600; const fixed = tod < 0, t = Math.abs(tod), d = ((t % 24000) + 24000) % 24000, T = 1200;
         window.__mcMoon = Math.floor(t / 24000) % 8; world.time = Math.floor(t / 24000) * T + (d < 12000 ? d / 12000 * 600 : 600 + (d - 12000) / 12000 * 600); S.timeFixed = fixed; try { syncSkip(); } catch (e) { /* ui */ } },
@@ -1511,7 +1511,7 @@
     return path.replace(/[_.]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
   function modBlock(n, meta) { const pv = portBlock(n, meta), key = 'M' + n + (pv && pv.key != null ? '#' + pv.key : ''); if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
     const R = S.modRec, col = (pv && pv.col) || hashCol(n), tex = (pv && pv.tex) || (pv && pv.variant && R && R.variants && R.variants[n] && R.variants[n][pv.variant]) || (R && R.blocks[n]), boxes = (pv && pv.boxes) || (R && R.shapes && R.shapes[n]);
-    def(id, modName(n), col, col, col, Object.assign({ noItem: 1 }, boxes ? { opaque: false, lightOpaque: 0, shape: 1, decor: 1, boxes } : {})); post(id); BLOCKS[id].modName = n; BLOCKS[id].modMeta = meta; if (pv && pv.noMesh) BLOCKS[id].noMesh = 1;
+    def(id, modName(n), col, col, col, Object.assign({ noItem: 1 }, boxes ? { opaque: false, lightOpaque: 0, shape: 1, decor: 1, boxes } : {}, pv && pv.emit ? { emit: pv.emit } : {})); post(id); BLOCKS[id].modName = n; BLOCKS[id].modMeta = meta; if (pv && pv.noMesh) BLOCKS[id].noMesh = 1;
     SPEC[id] = { h: 2, tool: null, req: 0 }; S.vis.set(key, id); if (tex) texFor(id, tex, ''); return id; }
   function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
     S.modIds = S.modIds || new Map(); let sid = S.modIds.get(n); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(n, sid);
@@ -1605,8 +1605,8 @@
       dim(id, name) { return id === 98 || /pocket/i.test(name) ? 'pocket' : null; },
       block(n) { const T = k => 'dimensionalpocketsii:blocks/pocket/' + k;
         if (n === 'dimensionalpocketsii:block_dimensional_pocket') return { tex: [T('frame/frame_face'), T('frame/frame_face'), T('frame/frame_face')], col: '#3b2a5c' };
-        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#2c2340' };
-        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall_edge') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#241c36' };
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#2c2340', emit: [14, 13, 15] };   // the mod's walls give light 15
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall_edge') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#241c36', emit: [14, 13, 15] };
         return null; },
       tap(n) { if (!player.crouch || held()) return false;   // the mod plays its entry sound on the client that clicked
         if (n === 'dimensionalpocketsii:block_dimensional_pocket') soundHere('dimensionalpocketsii:portal_in'); return false; } },
