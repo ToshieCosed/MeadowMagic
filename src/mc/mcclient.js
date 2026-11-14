@@ -183,7 +183,7 @@
         if (d === 2 && H && H.modSpawn) { const eid = r.i32(), mod = r.str(), tid = r.i32(); r.skip(16); const x = r.f64(), y = r.f64(), z = r.f64(), yaw = ang(r.i8()), pitch = ang(r.i8()); H.modSpawn({ eid, mod, tid, x, y, z, yaw, pitch }); }
         else if (d === 1 && H && H.modGui) { const wid = r.i32(), mod = r.str(), gid = r.i32(); H.modGui(wid, mod, gid, r.i32(), r.i32(), r.i32()); }
         return true; }
-      if (ch === 'FORGE') return true;
+      if (ch === 'FORGE') { if (r.b() === 1 && H && H.dimReg) { const dim = r.i32(); H.dimReg(dim, r.str()); } return true; }   // 1 = DimensionRegister: a modded dimension's id and provider type name
       if (H && H.modPayload) { try { if (H.modPayload(ch, r.u.slice(r.p))) return true; } catch (e) { status('Mod packet ' + ch + ' failed: ' + e.message); return true; } }
       return F.chans && F.chans.includes(ch);   // a mod channel nothing here understands yet: swallow it
     }

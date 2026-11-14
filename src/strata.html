@@ -10285,7 +10285,7 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
         if (d === 2 && H && H.modSpawn) { const eid = r.i32(), mod = r.str(), tid = r.i32(); r.skip(16); const x = r.f64(), y = r.f64(), z = r.f64(), yaw = ang(r.i8()), pitch = ang(r.i8()); H.modSpawn({ eid, mod, tid, x, y, z, yaw, pitch }); }
         else if (d === 1 && H && H.modGui) { const wid = r.i32(), mod = r.str(), gid = r.i32(); H.modGui(wid, mod, gid, r.i32(), r.i32(), r.i32()); }
         return true; }
-      if (ch === 'FORGE') return true;
+      if (ch === 'FORGE') { if (r.b() === 1 && H && H.dimReg) { const dim = r.i32(); H.dimReg(dim, r.str()); } return true; }   // 1 = DimensionRegister: a modded dimension's id and provider type name
       if (H && H.modPayload) { try { if (H.modPayload(ch, r.u.slice(r.p))) return true; } catch (e) { status('Mod packet ' + ch + ' failed: ' + e.message); return true; } }
       return F.chans && F.chans.includes(ch);   // a mod channel nothing here understands yet: swallow it
     }
@@ -11502,7 +11502,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function showTitle(a, v) { const box = hud2(), w = document.getElementById('mcTitle');
     if (a === 0) { document.getElementById('mcT1').innerHTML = H2(v); w.style.opacity = 1; clearTimeout(S.tt); S.tt = setTimeout(() => { w.style.opacity = 0; }, (S.tStay || 70) * 50 + (S.tIn || 10) * 50); }
     else if (a === 1) document.getElementById('mcT2').innerHTML = H2(v); else if (a === 2) { S.tIn = v[0]; S.tStay = v[1]; } else if (a === 3) w.style.opacity = 0; else if (a === 4) { w.style.opacity = 0; document.getElementById('mcT1').textContent = ''; document.getElementById('mcT2').textContent = ''; } }
-  function dimSet(dim) { S.dim = dim; if (!S.world || !world || !world.meta) return; world.meta.dim = dim === -1 ? 'under' : dim === 1 ? 'dusk' : undefined; hudDirty = true; }
+  function modDim(dim) { if (!S.forge || dim === 0) return undefined; const nm = (S.dimNames || {})[dim] || ''; for (const P of Object.values(PORTS)) { const d = P.dim && P.dim(dim, nm); if (d) return d; } return undefined; }   // a modded dimension a port maps onto one of Strata's own (sky, light, fog, roof cut-away)
+  function dimSet(dim) { S.dim = dim; if (!S.world || !world || !world.meta) return; world.meta.dim = dim === -1 ? 'under' : dim === 1 ? 'dusk' : modDim(dim); hudDirty = true; }
   // ==== 1.9 - 1.12.2 (protocols 107-340): new mobs and objects, metadata indices per version, off hand, boss bars, sign block entities, riding ====
   const PV = () => (S && S.o && S.o.protocol) || 47, V9 = () => PV() >= 107;
   // mob type ids added in 1.9-1.12 (1.11 split zombie/skeleton/horse/guardian variants into their own ids)
@@ -12187,6 +12188,18 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
             P2([-3, 0, -1], [2, 30, 2], [56, 0], { rot: [['x', sw, 29, 0]] }), P2([1, 0, -1], [2, 30, 2], [56, 0], { mir: 1, rot: [['x', -sw, 29, 0]] })] }; } }; } },
     // Elevator mod: Strata's own elevators (jump to go up, crouch to go down) find the target the way the mod's client does and ask the server to move you
     // network: channel "elevatorid": server <- 0 teleport (int from x, y, z, to x, y, z); client <- 1 config (bool same colour only, int range, bool skip blocked elevators)
+    // Dimensional Pockets II: a pocket block you crouch-tap with an empty hand to step inside a 16-block room in dimension 98 ("Pocket Dimension").
+    // Strata shows that dimension the way it shows its own pocket dimensions: dark violet sky, low ambient light, and the roof cut away so the iso camera sees into the room.
+    // The mod's GUI buttons send empty packets (they only work in single player), so its pocket and connector screens are shown with their slots only.
+    dimensionalpocketsii: {
+      dim(id, name) { return id === 98 || /pocket/i.test(name) ? 'pocket' : null; },
+      block(n) { const T = k => 'dimensionalpocketsii:blocks/pocket/' + k;
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket') return { tex: [T('frame/frame_face'), T('frame/frame_face'), T('frame/frame_face')], col: '#3b2a5c' };
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#2c2340' };
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket_wall_edge') return { tex: [T('wall/wall'), T('wall/wall'), T('wall/wall')], col: '#241c36' };
+        return null; },
+      tap(n) { if (!player.crouch || held()) return false;   // the mod plays its entry sound on the client that clicked
+        if (n === 'dimensionalpocketsii:block_dimensional_pocket') soundHere('dimensionalpocketsii:portal_in'); return false; } },
     elevatorid: { payload: { elevatorid(b) { const r = bbR(b, 0); if (r.u8() === 1) S.elev = { same: r.bool(), range: r.i32(), skip: r.bool() }; return true; } } },
   };
   const P2 = (p, s, uv, o) => Object.assign({ p, s, uv }, o || {});
@@ -12549,7 +12562,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       combat(pid, t) { if (pid === S.eid) combat(pid, t); }, border(b) { border(b); }, tabDone(l) { sug(l); },
       cooldown(id, ticks) { const sid = id; (S.icd = S.icd || new Map()); if (ticks > 0) S.icd.set(sid, { end: performance.now() + ticks * 50, dur: ticks * 50 }); else S.icd.delete(sid); },
       trades(wid, l) { trades(wid, l); }, bookOpen() { const h = held(); if (h && h.mc && (h.mc.id === 387 || h.mc.id === 386)) openMcBook(h); },
-      advancements(r, a, d, p) { advancements(r, a, d, p); }, forgeRegistries(reg, mods) { forgeRegistries(reg, mods); }, modPayload(ch, b) { return modPayload(ch, b); }, modSpawn(e) { modSpawn(e); }, modGui(wid, mod, gid, x, y, z) { modGui(wid, mod, gid, x, y, z); }, serverPack(buf, url) { return serverPack(buf, url); },
+      advancements(r, a, d, p) { advancements(r, a, d, p); }, forgeRegistries(reg, mods) { forgeRegistries(reg, mods); }, modPayload(ch, b) { return modPayload(ch, b); }, dimReg(dim, name) { (S.dimNames = S.dimNames || {})[dim] = name; if (S.dim === dim) dimSet(dim); }, modSpawn(e) { modSpawn(e); }, modGui(wid, mod, gid, x, y, z) { modGui(wid, mod, gid, x, y, z); }, serverPack(buf, url) { return serverPack(buf, url); },
     });
   }
   function unloadKey(k) { S.store.delete(k); const ch = world && world.chunks.get(k); if (ch) { freeMesh(ch.mesh); freeMesh(ch.water); freeMesh(ch.leaf); freeMesh(ch.glass); world.chunks.delete(k); } }
