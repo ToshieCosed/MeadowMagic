@@ -259,3 +259,11 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
 - The first crouch-tap on a new pocket only claims it (the mod sets the creator); the second one enters.
 - Pocket walls give light (the mod's light 15), so the room is lit.
 - **Fixes found along the way, for every server:** whether a chunk carries sky light is now confirmed from the chunk's data size (modded dimensions can differ from the dimension number's guess; this had caused `map_chunk failed: bad nbt tag`). A respawn into another dimension, or a proxy switch, now drops every loaded chunk and Strata's recorded block edits, so the old world's blocks don't reappear in the new one.
+
+### 20g — Botania (r1.10-364.4, needs Baubles)
+- Mystical and special flowers are drawn as crossed sprites; each special flower is named from its subtile (Endoflame, Pure Daisy…) via the tile NBT `subTileName`.
+- Mana pools, spreaders, runic altars and the petal apothecary keep their model shapes. Pools show their mana level as a liquid (pink in the fabulous pool), the apothecary shows water or lava, and items placed on altars float and orbit.
+- Mana bursts, sparks, pixies and other motes render as glowing points.
+- Holding a Wand of the Forest shows a mana bar for the nearest pool, spreader or runic altar within 6 blocks.
+- The Lexica Botania opens Strata's own lexicon screen: categories, entries, search, and the book's text from the mod's lang file.
+- Jars imported before this stage should be re-imported to pick up the lexicon text, plant models and block shapes.
