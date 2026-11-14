@@ -473,7 +473,7 @@
   const WINS = {   // 1.8 window type -> container slot count (when the packet says 0) and layout
     'minecraft:crafting_table': { n: 10, kind: 'craft3' }, 'minecraft:furnace': { n: 3, kind: 'furnace' }, 'minecraft:enchanting_table': { n: 2, kind: 'enchant' },
     'minecraft:anvil': { n: 3, kind: 'anvil' }, 'minecraft:brewing_stand': { n: 4, kind: 'brew' }, 'minecraft:beacon': { n: 1, kind: 'beacon' }, 'minecraft:villager': { n: 3, kind: 'trade' },
-    'minecraft:dispenser': { kind: 'grid3' }, 'minecraft:dropper': { kind: 'grid3' }, 'minecraft:hopper': { kind: 'row' } };
+    'minecraft:dispenser': { kind: 'grid3' }, 'minecraft:dropper': { kind: 'grid3' }, 'minecraft:hopper': { kind: 'row' }, 'forge:baubles:0': { n: 16 } };   // Baubles: crafting, armour and 7 bauble slots before the player's inventory
   const WTITLE = { 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chest': 'Chest', 'container.chestDouble': 'Large Chest', 'container.enchant': 'Enchant', 'container.brewing': 'Brewing Stand', 'container.dispenser': 'Dispenser', 'container.dropper': 'Dropper', 'container.hopper': 'Item Hopper', 'container.repair': 'Repair & Name', 'container.beacon': 'Beacon', 'container.enderchest': 'Ender Chest' };
   const winOff = () => S.win ? (S.win.n || 0) : 9;                 // where the player's main inventory starts in the open window
   const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
@@ -1361,6 +1361,7 @@
         const ic = it => { const s = it && toStack(it); return s ? `<span class="islot" style="width:34px;height:34px;display:inline-grid">${slotHTML({ ...s, n: it.count })}</span>` : ''; };
         b.innerHTML = ic(t.a) + (t.b ? '+' + ic(t.b) : '') + '→' + ic(t.out) + (t.off ? '<small>sold out</small>' : ''); b.title = mcName(t.out); b.addEventListener('click', () => tradeFill(i)); row.appendChild(b); });
       box.appendChild(row); }
+    if (kind === 'player' && S.forge && (S.bauOK != null ? S.bauOK : (S.bauOK = Object.values(S.forge.items).some(n => /^baubles:/.test(n))))) { const bb = document.createElement('button'); bb.className = 'ghost'; bb.textContent = '💍 Baubles'; bb.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px'; bb.addEventListener('click', () => S.client.api.modSend('baubles', Uint8Array.of(0))); box.appendChild(bb); }   // the mod's own inventory button: packet 0 asks the server to open it
     if (kind === 'player' || kind === 'craft3') { const w = kind === 'player' ? 2 : 3, hd = document.createElement('button'); hd.className = 'ghost'; hd.textContent = S.rb ? '📖 Hide recipes' : '📖 Recipe book'; hd.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px';
       hd.addEventListener('click', () => { S.rb = !S.rb; mcInvRender(); }); box.appendChild(hd); if (!S.rb) return;
       const q = document.createElement('input'); q.placeholder = 'Search recipes'; q.value = S.rbq || ''; q.style.cssText = 'font-size:13px;padding:4px 8px'; q.addEventListener('input', () => { S.rbq = q.value; clearTimeout(S.rbt); S.rbt = setTimeout(() => { mcInvRender(); const n = document.querySelector('#mcExt input'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); }); box.appendChild(q);
@@ -1509,8 +1510,9 @@
     if (L) { for (const k of ['tile.' + mod + '.' + path + '.name', 'tile.' + n + '.name', 'item.' + mod + '.' + path + '.name', 'item.' + n + '.name', 'tile.' + path + '.name', 'item.' + path + '.name', 'block.' + mod + '.' + path + '.name']) if (L[k]) return L[k];
       for (const pre of ['tile.', 'item.', '']) for (const k in L) if (k.startsWith(pre) && (k.endsWith('.' + path + '.name') || k.endsWith(':' + path + '.name'))) return L[k]; }
     return path.replace(/[_.]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
-  const LANG_KEEP = /^botania\.(entry|page|category|tagline)\./;   // ports that show a mod's own book text keep those lang keys
+  const LANG_KEEP = /^(botania\.(entry|page|category|tagline)\.|advancement\.)/;   // ports that show a mod's own book text keep those lang keys
   const BOT_LEX = {"basics":["welcome","tutorial","flowers","apothecary","lexicon","wand","pureDaisy","runeAltar","terrasteel","blackLotus","flowerBag","gardenOfGlass","wrap"],"mana":["mIntro","spreader","pool","sparks","sparkUpgrades","rfGenerator","lens","distributor","manaVoid","manaTablet","manaMirror","manaDetector","redstoneSpreader","manastar","dreamwoodSpreader","elvenLenses","prism","poolCart","sparkChanger","bellows"],"generationFlowers":["gIntro","endoflame","hydroangeas","thermalily","arcanerose","munchdew","entropinnyum","kekimurus","gourmaryllis","narslimmus","spectrolus","rafflowsia","shulk_me_not","dandelifeon"],"functionalFlowers":["fIntro","flowerShrinking","flowerSpeed","jadedAmaranthus","bellethorne","dreadthorne","heiseiDream","tigerseye","orechid","orechid","orechidIgnem","fallenKanade","exoflame","agricarnation","hopperhock","tangleberrie","jiyuulia","rannuncarpus","hyacidus","pollidisiac","clayconia","loonium","daffomill","vinculotus","spectranthemum","medumone","marimorphosis","bubbell","solegnolia","bergamute"],"devices":["pylon","manaEnchanting","turntable","manaAlchemy","openCrate","forestEye","forestDrum","platform","manaConjuration","spectralPlatform","gatherDrum","craftCrate","brewery","flasks","complexBrews","incense","hourglass","ghostRail","canopyDrum","cocoon","cocoon","manaBomb","teruTeruBozu","avatar","felPumpkin","animatedTorch"],"tools":["manaBlaster","grassSeeds","dirtRod","terraformRod","manaGear","terrasteelArmor","grassHorn","terraSword","terraPick","waterRod","elfGear","openBucket","rainbowRod","tornadoRod","fireRod","vineBall","laputaShard","virus","skyDirtRod","glassPick","diviningRod","gravityRod","missileRod","craftingHalo","clip","cobbleRod","smeltRod","worldSeed","spellCloth","thornChakram","fireChakram","overgrowthSeed","livingwoodBow","crystalBow","temperanceStone","terraAxe","obedienceStick","slimeBottle","exchangeRod","manaweave","autocraftingHalo","sextant","astrolabe"],"baubles":["bIntro","cosmeticBaubles","tinyPlanet","manaRing","auraRing","travelBelt","knockbackBelt","icePendant","lavaPendant","waterRing","miningRing","magnetRing","divaCharm","pixieRing","superTravelBelt","reachRing","itemFinder","superLavaPendant","bloodPendant","judgementCloaks","monocle","swapRing","speedUpBelt","baubleBox","dodgeRing","invisibilityCloak","cloudPendant","superCloudPendant","thirdEye","goddessCharm"],"ender":["enderAir","enderEyeBlock","pistonRelay","enderHand","enderDagger","spawnerClaw","redString","flightTiara","corporea","corporeaIndex","corporeaFunnel","corporeaInterceptor","spawnerMover","keepIvy","blackHoleTalisman","corporeaCrystalCube","luminizerTransport","starSword","thunderSword","corporeaRetainer"],"alfhomancy":["aIntro","elfMessage","elfResources","gaiaRitual","gaiaRitualHardmode","elvenLore","relics","relicInfo","infiniteFruit","kingKey","flugelEye","thorRing","lokiRing","odinRing"],"misc":["decorativeBlocks","dispenserTweaks","shinyFlowers","tinyPotato","headCreating","azulejo","starfield","mushrooms","phantomInk","blazeBlock","challenges","cacophonium","pavement","preventingDecay","banners","bcIntegration","shedding","tcIntegration"]};
+  window.__mcLang = k => { const L = S && S.modRec && S.modRec.lang; if (!L || !S.forge) return null; for (const m in L) if (L[m][k] != null) return String(L[m][k]); return null; };   // chat text that names mod lang keys (advancements)
   const DYE16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
   function modBlock(n, meta, pvo) { let pv = pvo || portBlock(n, meta); { const vr = !pv && S.modRec && S.modRec.variants && S.modRec.variants[n], vk = vr && Object.keys(vr); if (vk && vk.length > 1 && vk.every(k => /^color=/.test(k))) pv = { key: meta & 15, variant: 'color=' + DYE16[meta & 15] }; }   // one block, sixteen dye colours by metadata
     const key = 'M' + n + (pv && pv.key != null ? '#' + pv.key : ''); if (S.vis.has(key)) return S.vis.get(key); const id = S.next++; S.regs.push(id);
@@ -1624,6 +1626,7 @@
         if (n === 'botania:spreader') return { key: meta & 3, variant: 'variant=' + ['mana', 'redstone', 'elven', 'gaia'][meta & 3] };
         if (n === 'botania:altar') return { key: meta & 15, variant: 'variant=' + (['default', 'forest', 'plains', 'mountain', 'fungal', 'swamp', 'desert', 'taiga', 'mesa', 'mossy'][meta] || 'default') };
         if (/^botania:(specialflower|floatingspecialflower)$/.test(n)) return { plant: 'botania:blocks/flower16' };
+        if (n === 'botania:alfheimportal') return { key: meta & 3, variant: 'state=' + (['off', 'on_x', 'on_z'][meta & 3] || 'off'), emit: (meta & 3) ? [9, 15, 11] : null };
         return null; },
       tileAny(x, y, z, tag) { const B = botS(), X = x + S.OX, Z = z + S.OZ, k = pk(X, y, Z), here = BLOCKS[world.get(X, y, Z)], hn = (here && here.modName) || '';
         if (tag.subTileName && /specialflower/.test(hn)) { const sub = String(tag.subTileName), R = S.modRec, L = (R && R.lang && R.lang.botania) || {}, t = R && R.plants && R.plants['botania:' + sub.toLowerCase()];
@@ -1631,6 +1634,9 @@
         if (tag.manaCap != null && /pool/.test(hn)) B.pools.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: +tag.manaCap || 1000000, n: hn });
         if (tag.rotationX != null && /spreader/.test(hn)) B.spread.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: 1000, n: hn });
         if (tag.hasWater != null) B.alt.set(k, { x: X, y, z: Z, water: !!tag.hasWater, lava: !!tag.hasLava, items: tag.Items || [] });
+        if (tag.subTileCmp && /specialflower/.test(hn)) { const c = tag.subTileCmp; B.flow.set(k, { x: X, y, z: Z, mana: +c.mana || 0, burn: +c.burnTime || 0 }); }
+        if (/terraplate/.test(hn)) B.terra.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: 500000, n: hn });
+        if (/alfheimportal/.test(hn)) B.portal.set(k, { x: X, y, z: Z });
         if (tag.manaToGet != null) B.rune.set(k, { x: X, y, z: Z, mana: +tag.mana || 0, cap: +tag.manaToGet || 0, items: tag.Items || [], n: hn }); },
       dyn(vb) { const B = botS(), p = player, t = performance.now() / 1000;
         for (const [k, q] of B.pools) { if (!/pool/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.pools.delete(k); continue; } if (q.mana <= 0 || Math.hypot(q.x - p.x, q.z - p.z) > 48) continue;
@@ -1639,13 +1645,26 @@
           if (q.water || q.lava) { setVL(q.lava ? GLOW : sampleLight(q.x + .5, q.y + 1, q.z + .5)); emitBox(vb, [q.x + 3 / 16, q.y + 18 / 16, q.z + 3 / 16], [q.x + 13 / 16, q.y + 19 / 16, q.z + 13 / 16], q.lava ? [240, 120, 30] : [60, 110, 230], IDT); }
           botOrbit(vb, q, q.y + 1.35, t); }
         for (const [k, q] of B.rune) { if (!/runealtar/.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) { B.rune.delete(k); continue; } if (Math.hypot(q.x - p.x, q.z - p.z) > 40) continue; botOrbit(vb, q, q.y + 1.3, t); }
+        const live = (M, re) => { for (const [k, q] of M) if (!re.test((BLOCKS[world.get(q.x, q.y, q.z)] || {}).modName || '')) M.delete(k); };
+        live(B.flow, /specialflower/); live(B.terra, /terraplate/); live(B.portal, /alfheimportal/);
+        for (const q of B.flow.values()) { if (Math.hypot(q.x - p.x, q.z - p.z) > 32) continue; const ph = (q.x * 7 + q.z * 13) % 10;   // a burning Endoflame flickers; a flower holding mana gives off a slow wisp
+          if (q.burn > 0) { const f = .06 + Math.abs(Math.sin(t * 9 + ph)) * .04; setVL(GLOW); emitBox(vb, [q.x + .5 - f, q.y + .62, q.z + .5 - f], [q.x + .5 + f, q.y + .62 + f * 2.2, q.z + .5 + f], [255, 150 + (Math.sin(t * 13 + ph) * 40 | 0), 40], IDT); }
+          if (q.mana > 0) { const u = (t * .45 + ph / 10) % 1, r = .035 * (1 - u); setVL(GLOW); const wx = q.x + .5 + Math.sin(t * 2 + ph) * .18, wz = q.z + .5 + Math.cos(t * 2 + ph) * .18, wy = q.y + .5 + u * .9; emitBox(vb, [wx - r, wy - r, wz - r], [wx + r, wy + r, wz + r], [200, 255, 230], IDT); } }
+        for (const q of B.terra.values()) { if (q.mana <= 0 || Math.hypot(q.x - p.x, q.z - p.z) > 40) continue; const f = Math.min(1, q.mana / q.cap), c = [60 + f * 40 | 0, 120 + f * 135 | 0, 255 - f * 175 | 0]; setVL(GLOW);   // the agglomeration: sparkles spiral in, blue turning green as it fills
+          emitBox(vb, [q.x + .2, q.y + 3 / 16, q.z + .2], [q.x + .8, q.y + 3.4 / 16, q.z + .8], c, IDT);
+          for (let i = 0; i < 6; i++) { const a = t * (1.5 + f * 3) + i * Math.PI / 3, rr = .45 * (1 - ((t * .5 + i / 6) % 1)), y = q.y + .3 + ((t * .5 + i / 6) % 1) * (.4 + f * .8), r = .045; emitBox(vb, [q.x + .5 + Math.cos(a) * rr - r, y - r, q.z + .5 + Math.sin(a) * rr - r], [q.x + .5 + Math.cos(a) * rr + r, y + r, q.z + .5 + Math.sin(a) * rr + r], c, IDT); } }
+        for (const q of B.portal.values()) { const st = (BLOCKS[world.get(q.x, q.y, q.z)] || {}).modMeta & 3; if (!st || Math.hypot(q.x - p.x, q.z - p.z) > 48) continue; const ax = st === 1; setVL(GLOW);   // an open gateway: a shimmering green sheet in the 3x3 frame above the core
+          const a = ax ? [q.x - 1, q.y + 1, q.z + .47] : [q.x + .47, q.y + 1, q.z - 1], b = ax ? [q.x + 2, q.y + 4, q.z + .53] : [q.x + .53, q.y + 4, q.z + 2], g = 200 + Math.sin(t * 2) * 30 | 0; emitBox(vb, a, b, [70, g, 120], IDT);
+          for (let i = 0; i < 8; i++) { const u = (t * .3 + i / 8) % 1, v = (i * .37 + Math.sin(t + i) * .1 + 1) % 1, r = .05, cx = ax ? q.x - 1 + v * 3 : q.x + .5, cz = ax ? q.z + .5 : q.z - 1 + v * 3, cy = q.y + 1 + u * 3; emitBox(vb, [cx - r, cy - r, cz - r], [cx + r, cy + r, cz + r], [210, 255, 220], IDT); } }
         for (const m of S.mobs) { if (!/^mod:botania:/.test(m.type) || !BOT_MOTE.test(m.type)) continue; if (Math.hypot(m.x - p.x, m.z - p.z) > 48) continue;
+          if (/manaburst/i.test(m.type)) { const T = m.btr = m.btr || []; const l = T[T.length - 1]; if (!l || Math.hypot(l[0] - m.x, l[1] - m.y, l[2] - m.z) > .08) { T.push([m.x, m.y + .1, m.z]); if (T.length > 14) T.shift(); }   // a mana burst leaves the spreader's green trail
+            setVL(GLOW); T.forEach((q, i) => { const r = .03 + .08 * (i + 1) / T.length; emitBox(vb, [q[0] - r, q[1] - r, q[2] - r], [q[0] + r, q[1] + r, q[2] + r], [40 + i * 8, 255, 60 + i * 8], IDT); }); continue; }
           const sp = /spark/i.test(m.type), r = sp ? .12 : .1, c = /pixie/i.test(m.type) ? [255, 120, 210] : sp ? [120, 230, 255] : [90, 220, 255], y = m.y + (sp ? .25 + Math.sin(t * 3) * .05 : .1); setVL(GLOW);
           emitBox(vb, [m.x - r, y - r, m.z - r], [m.x + r, y + r, m.z + r], c, IDT); } },
       tick() { const h = held(), hn = h && h.mc && S.forge.items[h.mc.id]; let el = document.getElementById('botHud');
         if (!/^botania:twigwand$/.test(hn || '') || mode !== 'play') { if (el) el.hidden = true; return; }
         const B = botS(), p = player; let best = null, bd = 6;
-        for (const M of [B.pools, B.spread, B.rune]) for (const q of M.values()) { const d = Math.hypot(q.x + .5 - p.x, q.y + .5 - p.y, q.z + .5 - p.z); if (d < bd) { bd = d; best = q; } }
+        for (const M of [B.pools, B.spread, B.rune, B.terra]) for (const q of M.values()) { const d = Math.hypot(q.x + .5 - p.x, q.y + .5 - p.y, q.z + .5 - p.z); if (d < bd) { bd = d; best = q; } }
         if (!el) { hud2(); el = document.createElement('div'); el.id = 'botHud'; el.style.cssText = 'position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 64px);transform:translateX(-50%);background:rgba(10,20,30,.72);border:1px solid #3cbfff66;border-radius:10px;padding:6px 12px;font:12px system-ui;color:#e8f6ff;text-align:center;min-width:180px;pointer-events:none'; document.getElementById('mcHud2').appendChild(el); }
         if (!best) { el.hidden = true; return; } el.hidden = false; const f = best.cap ? Math.min(1, best.mana / best.cap) : 0, bn = (BLOCKS[world.get(best.x, best.y, best.z)] || {}).name || 'Mana';
         el.innerHTML = `<b>${bn}</b><div style="height:8px;margin:4px 0;border-radius:4px;background:#0b2232;overflow:hidden"><i style="display:block;height:100%;width:${(f * 100).toFixed(1)}%;background:linear-gradient(90deg,#1f8fff,#7fe3ff)"></i></div>${Math.round(best.mana).toLocaleString()} / ${Math.round(best.cap).toLocaleString()}`; },
@@ -1653,8 +1672,16 @@
       label(n, mc) { const t = itemTag(mc) || {}, L = (S.modRec && S.modRec.lang && S.modRec.lang.botania) || {};
         if (/^botania:(specialflower|floatingspecialflower)$/.test(n) && t.type) return L['tile.botania:flower.' + t.type + '.name'] || t.type;
         if (n === 'botania:manatablet' && t.mana != null) return 'Mana Tablet (' + Math.round(t.mana / 500000 * 100) + '%)';
+        if (/^botania:manaring(greater)?$/.test(n) && t.mana != null) return (/greater/.test(n) ? 'Greater Band of Mana' : 'Band of Mana') + ' (' + Math.round(t.mana / (/greater/.test(n) ? 2000000 : 500000) * 100) + '%)';
         return null; },
       ent(nm) { if (!BOT_MOTE.test(nm)) return null; return { tex: Object.keys(window.__ENT || {}).find(k => k.startsWith('botania:')) || 'botania:model/pixie', mob: { w: .25, h: .25, name: modName(nm) }, model: () => ({ k: .0625, parts: [] }) }; } },
+    // Baubles (1.12-1.5.2): the mod's inventory, opened by its packet 0 on channel "baubles"; container slots 0 craft result, 1-4 craft, 5-8 armour,
+    // 9-15 baubles (amulet, ring, ring, belt, head, body, charm), then the player's inventory and the off hand (52)
+    baubles: {
+      gui(W, box) { if (W.type !== 'forge:baubles:0') return false; const top = document.querySelector('#mcInv #mcTop'); if (!top) return false; top.innerHTML = '';
+        const arm = grid(1); ['Helmet', 'Chestplate', 'Leggings', 'Boots'].forEach((l, i) => mcSlot(arm, 5 + i, { lbl: l })); if (V9()) mcSlot(arm, 52, { lbl: 'Off hand' }); top.appendChild(arm);
+        const L = ['Amulet', 'Ring', 'Ring', 'Belt', 'Head', 'Body', 'Charm'], c1 = grid(1), c2 = grid(1); L.forEach((l, i) => mcSlot(i < 4 ? c1 : c2, 9 + i, { lbl: l })); top.appendChild(c1); top.appendChild(c2);
+        const g = grid(2); for (let i = 1; i <= 4; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); return true; } },
     elevatorid: { payload: { elevatorid(b) { const r = bbR(b, 0); if (r.u8() === 1) S.elev = { same: r.bool(), range: r.i32(), skip: r.bool() }; return true; } } },
   };
   const P2 = (p, s, uv, o) => Object.assign({ p, s, uv }, o || {});
@@ -1681,7 +1708,7 @@
 
   const GLOW = new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255]);
   const BOT_MOTE = /:(manaburst|spark|corporeaspark|pixie|magicmissile|signalflare|fallingstar)$/i;   // Botania entities that are motes of light, not creatures
-  const botS = () => S.bot = S.bot || { pools: new Map(), spread: new Map(), alt: new Map(), rune: new Map() };
+  const botS = () => S.bot = S.bot || { pools: new Map(), spread: new Map(), alt: new Map(), rune: new Map(), flow: new Map(), terra: new Map(), portal: new Map() };
   function botItemId(e) { if (!e || !e.id) return 0; const F = S.forge; F.byItem = F.byItem || new Map(Object.entries(F.items).map(([i, n]) => [n, +i])); const num = F.byItem.get(String(e.id)); if (num == null) return 0; const st = toStack({ id: num, count: 1, damage: e.Damage | 0 }); return st ? st.id : 0; }
   function botOrbit(vb, q, y0, t) { const its = (q.items || []).filter(e => e && e.id && (e.Count | 0) > 0), n = its.length; if (!n) return; setVL(sampleLight(q.x + .5, y0, q.z + .5));
     its.forEach((e, i) => { const id = botItemId(e); if (!id || !ITEMS[id]) return; const a = t * .8 + i * 2 * PI / n, r = n > 1 ? .45 : 0;

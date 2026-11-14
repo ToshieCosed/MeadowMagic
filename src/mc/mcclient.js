@@ -59,7 +59,8 @@
   // ---- chat components ----
   const TR = { 'chat.type.text': '<%s> %s', 'chat.type.announcement': '[%s] %s', 'chat.type.emote': '* %s %s', 'chat.type.admin': '[%s: %s]', 'chat.type.team.text': '<%s> %s',
     'multiplayer.player.joined': '%s joined the game', 'multiplayer.player.left': '%s left the game', 'multiplayer.player.joined.renamed': '%s (formerly known as %s) joined the game',
-    'death.attack.generic': '%s died', 'commands.message.display.incoming': '%s whispers to you: %s', 'commands.message.display.outgoing': 'You whisper to %s: %s' };
+    'death.attack.generic': '%s died', 'commands.message.display.incoming': '%s whispers to you: %s', 'commands.message.display.outgoing': 'You whisper to %s: %s',
+    'chat.type.advancement.task': '%s has made the advancement %s', 'chat.type.advancement.goal': '%s has reached the goal %s', 'chat.type.advancement.challenge': '%s has completed the challenge %s', 'chat.square_brackets': '[%s]' };
   function comp(x) {
     if (x == null) return '';
     if (typeof x === 'string') { const t = x.trim(); if (t[0] === '{' || t[0] === '[' || t[0] === '"') { try { return comp(JSON.parse(t)); } catch (e) { /* plain text */ } } return x.replace(/§./g, ''); }
@@ -67,7 +68,7 @@
     if (Array.isArray(x)) return x.map(comp).join('');
     let s = '';
     if (x.text != null) s += comp(String(x.text)); else if (x.translate != null) {
-      const w = (x.with || x.args || []).map(comp); let i = 0; const f = TR[x.translate];
+      const w = (x.with || x.args || []).map(comp); let i = 0; const f = TR[x.translate] || (typeof window !== 'undefined' && window.__mcLang ? window.__mcLang(x.translate) : null);   // mods' own lang files (advancements and the like)
       s += f ? f.replace(/%(\d+\$)?s/g, (m, n) => n ? (w[parseInt(n) - 1] || '') : (w[i++] || '')) : (x.fallback ? comp(x.fallback) : x.translate + (w.length ? ' ' + w.join(' ') : ''));
     } else if (x.selector != null) s += x.selector; else if (x.keybind != null) s += x.keybind;
     if (x.extra) s += comp(x.extra);
@@ -91,7 +92,7 @@
     if (x.clickEvent && /^(run|suggest)_command$/.test(x.clickEvent.action)) s2.cmd = [x.clickEvent.action[0], String(x.clickEvent.value || '')];
     if (x.hoverEvent && x.hoverEvent.action === 'show_text') s2.hover = comp(x.hoverEvent.value);
     if (x.clickEvent && x.clickEvent.action === 'open_url' && /^https?:\/\//i.test(x.clickEvent.value || '')) s2.link = x.clickEvent.value;
-    let h = ''; if (x.text != null) h += secHTML(String(x.text), s2); else if (x.translate != null) { const w = (x.with || []).map(e => compHTML(e, s2)); let i = 0; const f = TR[x.translate];
+    let h = ''; if (x.text != null) h += secHTML(String(x.text), s2); else if (x.translate != null) { const w = (x.with || []).map(e => compHTML(e, s2)); let i = 0; const f = TR[x.translate] || (typeof window !== 'undefined' && window.__mcLang ? window.__mcLang(x.translate) : null);   // mods' own lang files (advancements and the like)
       h += f ? secHTML(f, s2).replace(/%(\d+\$)?s/g, (m, n) => n ? (w[parseInt(n) - 1] || '') : (w[i++] || '')) : escH(x.translate) + (w.length ? ' ' + w.join(' ') : ''); } else if (x.selector != null) h += escH(x.selector);
     if (x.extra) h += x.extra.map(e => compHTML(e, s2)).join(''); return h; }
   const hex = u => Array.from(u, x => x.toString(16).padStart(2, '0')).join('');
