@@ -4519,7 +4519,7 @@ function boxes3(id){ // 3D models for held and dropped stage 3 items (null = not
 
 /* ---------- animals ---------- */
 const MC={white:[236,234,228],black:[40,38,40],pink:[240,170,170],snout:[225,140,145],brown:[122,82,50],dbrown:[70,46,30],yellow:[235,190,60],red:[210,50,50],horn:[230,225,205],hoof:[60,50,45]};
-function emitMob(vb,m){
+function emitMob(vb,m){ if(m.fxOnly) return;   // drawn by a compat port's own renderer (effects layer)
   const s=m.size?m.size*.5:m.baby?.55:1, cf=Math.cos(m.face), sf=Math.sin(m.face), hurt=m.hurtT>.18;
   const T=(py,pz,ang)=>{ const ca=Math.cos(ang||0), sa=Math.sin(ang||0); return (lx,ly,lz)=>{ let y=ly-py,z=lz-pz; const y2=y*ca-z*sa, z2=y*sa+z*ca; y=y2+py; z=z2+pz;
       if(m.tilt){ const c=Math.cos(m.tilt), s2=Math.sin(m.tilt), X=lx*c-y*s2; y=lx*s2+y*c; lx=X; } return [m.x+(lx*cf+z*sf)*s, m.y+y*s, m.z+(-lx*sf+z*cf)*s]; }; };
@@ -9442,7 +9442,7 @@ function partsOut(parts,m,K,sy,tex,out,ref){ const e=ENT[tex]; const rw=ref||64,
 const skinned=m=>!!modelFor(m);
 { const _em=emitMob; emitMob=function(vb,m){ if(skinned(m)) return; return _em.apply(this,arguments); }; }
 function drawSkins(){ const cm=window.__cmobs, list=cm?(mobs.length?mobs.concat(cm):cm):mobs; if((!PACK.on&&!cm)||!world||!list.length) return; let used=false, wasCull=false; const p=player;
-  for(const m of list){ if(Math.hypot(m.x-p.x,m.z-p.z)>56) continue; const f=modelFor(m); if(!f) continue; const M=f(m); const tk=M.tex; if(!ENT[tk]) continue;
+  for(const m of list){ if(m.fxOnly||Math.hypot(m.x-p.x,m.z-p.z)>56) continue; const f=modelFor(m); if(!f) continue; const M=f(m); const tk=M.tex; if(!ENT[tk]) continue;
     if(!used){ used=true; gl.useProgram(texProg); gl.uniformMatrix4fv(TU.uVP,false,cam.vp); gl.uniform1i(TU.uTex,1); gl.uniform3fv(TU.uFog,FOG); const fr=world.radius*CS; gl.uniform2f(TU.uFocus,cam.tx??player.x,cam.tz??player.z); gl.uniform2f(TU.uFogR,fr-22,fr-6); gl.bindVertexArray(skVAO); wasCull=gl.isEnabled(gl.CULL_FACE); gl.disable(gl.CULL_FACE); }
     const L=sampleLight(m.x,m.y+.6,m.z), hurt=m.hurtT>.18?[1,.45,.45]:m.frozen>0?[.7,.8,1.1]:[1,1,1];
     const lit=[Math.min(1.1,(L[0]/255*SUNV[0]+L[4]/255+.04)),Math.min(1.1,(L[1]/255*SUNV[1]+L[5]/255+.04)),Math.min(1.1,(L[2]/255*SUNV[2]+L[6]/255+.04))];
@@ -12551,13 +12551,13 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
     S.modIds = S.modIds || new Map(); let sid = S.modIds.get(n); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(n, sid);
     const R = S.modRec, P = portOf(n), tx = (P && P.icons && P.icons[n]) || (R && R.items[n]); ITEMS[sid] = { name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }; S.items.push(sid); return sid; }
-  function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
+  function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); { const P = PORTS[mod]; const n = P && P.entName && P.entName(tid, L); if (n) return n; } return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
   function modSpawn(e) { if (!S.world || !S.forge) return; const nm = modEntName(e.mod, e.tid), x = e.x + S.OX, z = e.z + S.OZ;
     const m = { mc: 1, eid: e.eid, type: 'mcgeneric', x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * PI / 180, tface: -e.yaw * PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: 0, flee: 0, magma: 0, eq: null, cname: modName(nm), modEnt: nm };
     { const ty = modEntType(nm); if (ty) m.type = ty; }
     S.ents.set(e.eid, m); S.mobs.push(m); }
   // a mod creature's texture from its jar (textures/entity/...) on Strata's humanoid body when it uses the humanoid layout (64x64 / 64x32)
-  function modEntType(nm) { { const P = PORTS[nm.split(':')[0]], d = P && P.ent && P.ent(nm); if (d && window.__ENT && __ENT[d.tex]) { const ty = 'mod:' + nm; if (!MOB[ty]) { MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }, d.mob || {}); __skins.MODELS[ty] = m => Object.assign(d.model(m), { tex: d.tex }); __ENT[ty] = __ENT[d.tex]; (S.modTypes = S.modTypes || []).push(ty); } return ty; } }
+  function modEntType(nm) { { const P = PORTS[nm.split(':')[0]], d = P && P.ent && P.ent(nm); if (d && d.fx) { const ty = 'mod:' + nm; if (!MOB[ty]) MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }, d.mob || {}); return ty; } if (d && window.__ENT && __ENT[d.tex]) { const ty = 'mod:' + nm; if (!MOB[ty]) { MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }, d.mob || {}); __skins.MODELS[ty] = m => Object.assign(d.model(m), { tex: d.tex }); __ENT[ty] = __ENT[d.tex]; (S.modTypes = S.modTypes || []).push(ty); } return ty; } }
     const [mod, path] = nm.split(':'), keys = Object.keys(window.__ENT || {}).filter(k => k.startsWith(mod + ':entity/')); if (!keys.length) return null;
     const base = k => k.split('/').pop().replace(/\.png$/, ''), want = path.toLowerCase(), simp = v => v.replace(/^entity_?|_?entity$/g, '').replace(/[^a-z0-9]/g, '');
     const key = keys.find(k => base(k) === want) || keys.find(k => simp(base(k)) === simp(want)) || keys.find(k => base(k).includes(simp(want)) || simp(want).includes(simp(base(k)))) || keys.find(k => k.includes('/' + want + '/'));
@@ -12695,8 +12695,9 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         const g = grid(2); for (let i = 1; i <= 4; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); return true; } },
     // Lycanites Mobs (1.12.2-2.0.8): creatures from their own OBJ models and model classes (lycFx); Strata's own mob renderer draws nothing for them
     lycanitesmobs: {
+      entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const cr = L.filter(n => C[n]), pr = L.filter(n => !C[n]); return tid >= 1000 ? pr[tid - 1000] || null : tid >= 100 ? cr[tid - 100] || null : null; },   // CreatureManager / ProjectileManager network ids
       ent(nm) { const R = S.modRec, d = R && R.ocr && R.ocr[nm]; const tex = Object.keys(window.__ENT || {}).find(k => k.startsWith(nm.split(':')[0] + ':')) || 'lycanitesmobs:entity/' + nm.split(':')[1];
-        return { tex, mob: d ? { w: d.w, h: d.h, name: modName(nm) } : { w: .4, h: .4, name: modName(nm) }, model: () => ({ k: .0625, parts: [] }) }; },
+        return { fx: 1, tex, mob: d ? { w: d.w, h: d.h, name: modName(nm) } : { w: .4, h: .4, name: modName(nm) }, model: () => ({ k: .0625, parts: [] }) }; },
       fx() { lycFx(); } },
     elevatorid: { payload: { elevatorid(b) { const r = bbR(b, 0); if (r.u8() === 1) S.elev = { same: r.bool(), range: r.i32(), skip: r.bool() }; return true; } } },
   };
@@ -12810,7 +12811,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function lycO() { if (LY.O !== null) return LY.O; const R = S.modRec; if (!R || !R.ocr || !Object.keys(R.ocr).length || !window.StrataObjMobs) return (LY.O = false);
     const F = R.files, dec = new TextDecoder(), d0 = Object.values(R.ocr)[0], ns = d0.ns, pkg = d0.model.slice(0, d0.model.indexOf('client/model/'));
     LY.O = StrataObjMobs.create({ pkg, texKey: n => F['e/' + ns + ':entity/' + n] ? ns + ':entity/' + n : null,
-      load: k => { if (k.startsWith('class:')) return F['j/' + k.slice(6)] || null; const o = k.startsWith('obj:') ? F['o/' + ns + ':' + k.slice(4) + '.obj'] : k.startsWith('parts:') ? F['o/' + ns + ':' + k.slice(6) + '_parts.json'] : null; return o ? dec.decode(o) : null; } });
+      load: k => { if (k.startsWith('class:')) { const b = F['j/' + k.slice(6)]; return b ? (b instanceof Uint8Array ? b : new Uint8Array(b)) : null; } const o = k.startsWith('obj:') ? F['o/' + ns + ':' + k.slice(4) + '.obj'] : k.startsWith('parts:') ? F['o/' + ns + ':' + k.slice(6) + '_parts.json'] : null; return o ? dec.decode(o) : null; } });
     return LY.O; }
   function lycFly(d) { if (LY.fly.has(d.name)) return LY.fly.get(d.name); let f = 0; const O = lycO(); try { if (O && d.ent) f = O.vm.call(O.vm.newObj(d.ent), 'isFlying', '()Z', []) ? 1 : 0; } catch (e) { /* walks */ } LY.fly.set(d.name, f); return f; }   // the entity class's own isFlying()
   const LYL = [[.2, 1, -.7], [-.2, 1, .7]].map(v => { const l = Math.hypot(...v); return v.map(q => q / l); });   // Minecraft's two entity lights
@@ -12830,7 +12831,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
   function lycFx() { const O = lycO(); if (!O || typeof FX === 'undefined') return; const now = performance.now(), p = player, R = S.modRec;
     LY.acc = Math.min(.25, LY.acc + (LY.last ? (now - LY.last) / 1000 : 0)); LY.last = now; let ticks = 0; while (LY.acc >= .05) { LY.acc -= .05; ticks++; } const part = LY.acc / .05;
     for (const m of S.mobs) { const nm = m.modEnt; if (!nm || !R.ocr) continue; const d = R.ocr[nm]; if (!d && !(R.oprj && /^[^:]+:/.test(nm) && Object.keys(R.ocr).some(k => k.startsWith(nm.split(':')[0] + ':')))) continue;
-      if (Math.hypot(m.x - p.x, m.z - p.z) > 64) continue;
+      m.fxOnly = 1; if (Math.hypot(m.x - p.x, m.z - p.z) > 64) continue;
       if (!d) { lycProj(m, ticks, part); continue; }
       const M = O.model(d.name, d.model); if (!M) continue; const md = m.md || {};
       const st = m.ly || (m.ly = { ticks: (Math.random() * 400) | 0, limb: 0, amt: 0, cool: 0, px: m.x, pz: m.z, progress: 0, playing: false, inc: false });
