@@ -6090,10 +6090,10 @@ async function applyPack(rec){
 function packAssign(id,names,flags){ if(!PACK.on||!PACK.lay) return false; const lay=PACK.lay, fs=[lay[names.s],lay[names.t],lay[names.b]]; if(!fs[0]&&!fs[1]) return false; const f=flags||'';
   const tintAll=f.includes('t'), fl=k=>((tintAll||k===1&&f.includes('T'))?1:0)|(f.includes('w')?2:0)|(f.includes('f')?4:0), col=id&127, row=(id>>7)*2, o0=(row*128+col)*4, o1=((row+1)*128+col)*4;
   for(let k=0;k<3;k++){ const e=fs[k]||fs[0]||fs[1]; PACK_SLOTS[o0+k]=e.L+1; PACK_SLOTS[o1+k]=e.n; } PACK_SLOTS[o0+3]=fl(0)|(fl(1)<<4)|(fl(2)<<8); PACK_SLOTS[o1+3]=(fs[0]||fs[1]).ft;
-  PACK.has[id]=1; PACK.x[id]=f.includes('x')?1:0; PACK.tint[id]=(tintAll||f.includes('T'))?1:0;
+  PACK.has[id]=1; PACK.x[id]=f.includes('x')?1:0; PACK.tint[id]=(tintAll||f.includes('T'))?1:0; PACK.spec[id]={s:names.s,t:names.t||names.s,b:names.b||names.t||names.s,f};   // icons and held blocks look faces up here too (Minecraft-server blocks)
   gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,slotTex); gl.texSubImage2D(gl.TEXTURE_2D,0,0,row,128,2,gl.RGBA_INTEGER,gl.UNSIGNED_SHORT,PACK_SLOTS.subarray(row*128*4,(row+2)*128*4)); gl.activeTexture(gl.TEXTURE0); return true; }
 function packUnassign(id){ const col=id&127, row=(id>>7)*2; for(const r of [row,row+1]) PACK_SLOTS.fill(0,(r*128+col)*4,(r*128+col)*4+4); PACK.has[id]=0; PACK.x[id]=0; PACK.tint[id]=0; }
-function packRefresh(){ for(const k in iconCache) delete iconCache[k]; if(world) for(const ch of world.chunks.values()) ch.dirty=true;
+function packRefresh(){ for(const k in iconCache) delete iconCache[k]; try{ TEXPX.clear(); }catch(e){} if(world) for(const ch of world.chunks.values()) ch.dirty=true;
   try{ renderHotbar(); }catch(e){} try{ if(typeof SX!=='undefined'&&SX&&!document.getElementById('sx').hidden) renderSX(); }catch(e){} packUI(); }
 async function packForWorld(meta,preview){ if(preview||!meta){ if(PACK.on||PACK.worldId){ PACK.worldId=null; clearPack(); packRefresh(); } return; }
   if(PACK.worldId===meta.id) return; PACK.worldId=meta.id; const rec=await PDB.get(meta.id); if(PACK.worldId!==meta.id) return;
@@ -6517,7 +6517,25 @@ const glintC=(c,x,y)=>{ const b=Math.max(0,Math.sin((x+y)*.45-performance.now()/
 function emitItem(vb,id,M,gl){ if(vb===dynVB&&typeof window.__fx3dItem==='function'&&window.__fx3dItem(id,M)) return;   // a compat port draws this item as a 3D model (effects layer)
   if(isFlatItem(id)){ const T=(x,y,z)=>ap(M,x,y,z), t=1/16;
     for(const [x,y,w,c] of itemPixels(id)) emitBox(vb,[x*t,(15-y)*t,7.5*t],[(x+w)*t,(16-y)*t,8.5*t],gl?glintC(c,x,y):c,T); return; }
+  { const bid=ITEMS[id].block; if(PACK&&PACK.on&&PACK.has[bid]&&!BLOCKS[bid].shape&&texCube(vb,bid,M,gl)) return; }
   const bd=BLOCKS[ITEMS[id].block], g2=c=>gl?glintC(c,4,4):c; emitBox(vb,[0,0,0],[1,1,1],g2(bd.side),(x,y,z)=>ap(M,x,y,z)); emitBox(vb,[-.004,.999,-.004],[1.004,1.004,1.004],g2(bd.top),(x,y,z)=>ap(M,x,y,z)); }
+// a block item as Java draws it: the block's own textures on every face (pixel runs, like flat items), shaded per face, cut-out pixels left open
+const TEXPX=new Map();
+function texPixels(name,tint){ const k=name+'|'+(tint||''); if(TEXPX.has(k)) return TEXPX.get(k); let rows=null;
+  try{ let bm=PACK.img['b/'+name]; if(!bm&&typeof MC_OLD!=='undefined'&&MC_OLD[name]) for(const o of [].concat(MC_OLD[name])) if(!bm) bm=PACK.img['b/'+o];   // pre-1.13 file names
+    if(bm){ const w=bm.width, c=document.createElement('canvas'); c.width=c.height=16; const g=c.getContext('2d',{willReadFrequently:true}); g.imageSmoothingEnabled=false; g.drawImage(bm,0,0,w,w,0,0,16,16);
+    const d=g.getImageData(0,0,16,16).data, tc=tint?hex(tint):null; rows=[];
+    for(let y=0;y<16;y++){ let run=null; for(let x=0;x<=16;x++){ const o=(y*16+x)*4, on=x<16&&d[o+3]>=128, col=on?(tc?[d[o]*tc[0]/255|0,d[o+1]*tc[1]/255|0,d[o+2]*tc[2]/255|0]:[d[o],d[o+1],d[o+2]]).map(v=>v&252):null;
+        if(run&&(!on||col+''!==run.c+'')){ rows.push([run.x,y,x-run.x,run.c]); run=null; } if(on&&!run) run={x,c:col}; } } } }catch(e){ rows=null; }
+  TEXPX.set(k,rows); return rows; }
+// faces: [corner order (bit0 x, bit1 y, bit2 z) as in BOXF, fixed axis, its value, u axis, u flipped, v axis, v flipped, shade, which texture]
+const TCF=[[[1,3,7,5],0,1,2,1,1,1,.6,'s'],[[0,2,6,4],0,0,2,0,1,1,.6,'s'],[[2,3,7,6],1,1,0,0,2,0,1,'t'],[[0,1,5,4],1,0,0,0,2,0,.5,'b'],[[4,5,7,6],2,1,0,0,1,1,.8,'s'],[[0,1,3,2],2,0,0,1,1,1,.8,'s']];
+function texCube(vb,bid,M,glint){ const sp=PACK.spec[bid]; if(!sp) return false; const f=sp.f||'', tAll=f.includes('t'), tTop=f.includes('T'), G='#79c05a';
+  const P={s:texPixels(sp.s,tAll?G:null),t:texPixels(sp.t,tAll||tTop?G:null),b:texPixels(sp.b,tAll?G:null)}; if(!P.s&&!P.t) return false;
+  for(const [ord,ax,val,ua,uf,va,vf,sh,w] of TCF){ const rows=P[w]||P.s||P.t; const l=sh*255|0;
+    for(const [x,y,n,c0] of rows){ const c=glint?glintC(c0,x,y):c0, u0=x/16,u1=(x+n)/16, v0=y/16,v1=(y+1)/16, U=uf?[1-u1,1-u0]:[u0,u1], V=vf?[1-v1,1-v0]:[v0,v1];
+      vb.need(4); for(const k of ord){ const q=[0,0,0]; q[ax]=val; q[ua]=U[(k>>ua)&1]; q[va]=V[(k>>va)&1]; const a=ap(M,q[0],q[1],q[2]); vb.v(a[0],a[1],a[2],c[0],c[1],c[2],l); } } }
+  return true; }
 // Minecraft item display transforms (translation in pixels, rotation in degrees, scale)
 const DISP={hand:{tp:[[0,4,.5],[0,-90,55],.85],fp:[[1.13,3.2,1.13],[0,-90,25],.68]},flat:{tp:[[0,3,1],[0,0,0],.55],fp:[[1.13,3.2,1.13],[0,-90,25],.68]},block:{tp:[[0,2.5,0],[75,45,0],.375],fp:[[0,0,0],[0,45,0],.4]}};
 const dispOf=id=>{ const it=ITEMS[id]; if(!isFlatItem(id)) return DISP.block; return it&&(it.type||it.tool||it.weapon||it.rod||id===I.STICK)?DISP.hand:DISP.flat; };
@@ -20031,7 +20049,7 @@ class LobDarklingsModel extends ModelCreatureObj {
       block(n, meta) { const r = dtRad(n, meta); if (!r) return null; S.dt = S.dt || 1; const c = Math.min(r, 8) / 16, T = dtTex(n); return { key: 'r' + r, tex: [T[0], T[1], T[0]], col: '#6b5232', boxes: [[.5 - c, .5 - c, .5 - c, .5 + c, .5 + c, .5 + c]] }; } },
     firstaid: {   // per-limb health (channel "firstaid": 1 part update, 3 config + model NBT, 5 add health, 8 model NBT; client sends 2 = apply healing item to a part)
       payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (old !== hp) F.flash = performance.now(); };
-        if (d === 1) { const id = r.u8(), mx = r.i32(); r.f32(); const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
+        if (d === 1) { const id = r.u8(), mx = r.i32(); r.p += 4; const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
         else if (d === 3 || d === 8) { let t = {}; try { t = nbtRead(b, 1)[0] || {}; } catch (e) { /* bad tag */ } FA_KEYS.forEach((k, i) => { const q = t[k]; if (q) set(i, +q.health || 0, q.maxHealth | 0); }); F.on = 1; }
         else if (d === 5) { for (let i = 0; i < 8; i++) { const v = r.d.getFloat32(r.p); r.p += 4; if (v) set(i, Math.min(F.parts[i].max, F.parts[i].hp + v), 0); } } } },
       use(n) { if (!/^firstaid:(bandage|plaster)$/.test(n)) return false; faPick(); return true; },

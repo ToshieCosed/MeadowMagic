@@ -1569,7 +1569,7 @@
       block(n, meta) { const r = dtRad(n, meta); if (!r) return null; S.dt = S.dt || 1; const c = Math.min(r, 8) / 16, T = dtTex(n); return { key: 'r' + r, tex: [T[0], T[1], T[0]], col: '#6b5232', boxes: [[.5 - c, .5 - c, .5 - c, .5 + c, .5 + c, .5 + c]] }; } },
     firstaid: {   // per-limb health (channel "firstaid": 1 part update, 3 config + model NBT, 5 add health, 8 model NBT; client sends 2 = apply healing item to a part)
       payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (old !== hp) F.flash = performance.now(); };
-        if (d === 1) { const id = r.u8(), mx = r.i32(); r.f32(); const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
+        if (d === 1) { const id = r.u8(), mx = r.i32(); r.p += 4; const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
         else if (d === 3 || d === 8) { let t = {}; try { t = nbtRead(b, 1)[0] || {}; } catch (e) { /* bad tag */ } FA_KEYS.forEach((k, i) => { const q = t[k]; if (q) set(i, +q.health || 0, q.maxHealth | 0); }); F.on = 1; }
         else if (d === 5) { for (let i = 0; i < 8; i++) { const v = r.d.getFloat32(r.p); r.p += 4; if (v) set(i, Math.min(F.parts[i].max, F.parts[i].hp + v), 0); } } } },
       use(n) { if (!/^firstaid:(bandage|plaster)$/.test(n)) return false; faPick(); return true; },
