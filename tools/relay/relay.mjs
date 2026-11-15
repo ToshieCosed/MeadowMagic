@@ -113,13 +113,21 @@ function tcpSend(ctx, body) {
   ctx.sock.write(frame);
   if (ctx.pending) { const k = ctx.pending; ctx.pending = null; ctx.enc = crypto.createCipheriv('aes-128-cfb8', k, k); ctx.dec = crypto.createDecipheriv('aes-128-cfb8', k, k); }   // everything after the encryption response is encrypted
 }
+function joinRefusal(status, t) {   // Mojang's reason, in words
+  if (/InsufficientPrivileges/.test(t)) return 'Your Microsoft account isn\'t allowed to join multiplayer servers. Check the Xbox privacy setting "You can join multiplayer games" (account.xbox.com, Privacy & online safety), or for a child account ask the parent account.';
+  if (/UserBanned/.test(t)) return 'This Minecraft account is banned from online multiplayer.';
+  if (status === 401 || status === 403 || /ForbiddenOperation|Invalid token/.test(t)) return 'Your Minecraft sign-in has expired. Tap Sign in again, then connect.';
+  if (status === 429) return 'Mojang\'s session server is rate limiting joins. Wait a minute and try again.';
+  return 'Session server refused the join (' + status + ').';
+}
 async function encryptBegin(ctx, send, m) {
   if (!session) return send({ type: 'mc_error', message: 'Not signed in.' });
   try {
     const secret = crypto.randomBytes(16), pub = Buffer.from(m.publicKey, 'base64'), token = Buffer.from(m.verifyToken, 'base64');
     const hash = mcDigest(Buffer.concat([Buffer.from(m.serverId || '', 'utf8'), secret, pub]));
-    const j = await post(EP.sessionjoin, { accessToken: session.mcToken, selectedProfile: session.uuid, serverId: hash }, true);
-    if (j.status !== 204 && !j.ok) return send({ type: 'mc_error', message: 'Session server refused the join (' + j.status + ').' });
+    let j = await post(EP.sessionjoin, { accessToken: session.mcToken, selectedProfile: session.uuid, serverId: hash }, true);
+    if (j.status !== 204 && !j.ok) { const s2 = await refresh().catch(() => null); if (s2) { session = s2; j = await post(EP.sessionjoin, { accessToken: session.mcToken, selectedProfile: session.uuid, serverId: hash }, true); } }   // the Minecraft token lasts about a day
+    if (j.status !== 204 && !j.ok) return send({ type: 'mc_error', message: joinRefusal(j.status, JSON.stringify(j.j || {})) });
     const key = crypto.createPublicKey({ key: pub, format: 'der', type: 'spki' }), enc = b => crypto.publicEncrypt({ key, padding: crypto.constants.RSA_PKCS1_PADDING }, b);
     ctx.pending = secret; send({ type: 'mc_encrypt_ready', secret: enc(secret).toString('base64'), token: enc(token).toString('base64') });
   } catch (e) { send({ type: 'mc_error', message: e.message }); }

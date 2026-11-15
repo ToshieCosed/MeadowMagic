@@ -275,6 +275,15 @@ public final class Relay implements WsServer.Handler {
         return new BigInteger(MessageDigest.getInstance("SHA-1").digest(in)).toString(16);
     }
 
+    static String joinRefusal(int status, String body) {   // Mojang's reason, in words
+        String t = body == null ? "" : body;
+        if (t.contains("InsufficientPrivileges")) return "Your Microsoft account isn't allowed to join multiplayer servers. Check the Xbox privacy setting \"You can join multiplayer games\" (account.xbox.com, Privacy & online safety), or for a child account ask the parent account.";
+        if (t.contains("UserBanned")) return "This Minecraft account is banned from online multiplayer.";
+        if (status == 401 || status == 403 || t.contains("ForbiddenOperation") || t.contains("Invalid token")) return "Your Minecraft sign-in has expired. Tap Sign in again, then connect.";
+        if (status == 429) return "Mojang's session server is rate limiting joins. Wait a minute and try again.";
+        return "Session server refused the join (" + status + ").";
+    }
+
     private void encryptBegin(Ctx x, Map<String, Object> m) {
         Session s = session; if (s == null) { send(x, Json.of("type", "mc_error", "message", "Not signed in.")); return; }
         try {
@@ -282,8 +291,12 @@ public final class Relay implements WsServer.Handler {
             byte[] pub = Base64.getDecoder().decode(Json.str(m, "publicKey")), token = Base64.getDecoder().decode(Json.str(m, "verifyToken"));
             String sid = Json.str(m, "serverId"); if (sid == null) sid = "";
             ByteArrayOutputStream h = new ByteArrayOutputStream(); h.write(sid.getBytes(StandardCharsets.UTF_8)); h.write(secret); h.write(pub);
-            Http.Res j = Http.postJson(cfg.ep.get("sessionjoin"), Json.of("accessToken", s.mcToken, "selectedProfile", s.uuid, "serverId", mcDigest(h.toByteArray())));
-            if (j.status != 204 && !j.ok()) { send(x, Json.of("type", "mc_error", "message", "Session server refused the join (" + j.status + ").")); return; }
+            String digest = mcDigest(h.toByteArray());
+            Http.Res j = Http.postJson(cfg.ep.get("sessionjoin"), Json.of("accessToken", s.mcToken, "selectedProfile", s.uuid, "serverId", digest));
+            if (j.status != 204 && !j.ok()) {   // the Minecraft token lasts about a day: get a fresh one from the saved sign-in and try once more
+                Session s2 = refresh(); if (s2 != null) { session = s = s2; j = Http.postJson(cfg.ep.get("sessionjoin"), Json.of("accessToken", s.mcToken, "selectedProfile", s.uuid, "serverId", digest)); }
+            }
+            if (j.status != 204 && !j.ok()) { send(x, Json.of("type", "mc_error", "message", joinRefusal(j.status, j.text))); return; }
             Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding"); rsa.init(Cipher.ENCRYPT_MODE, KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pub)));
             byte[] es = rsa.doFinal(secret); rsa.init(Cipher.ENCRYPT_MODE, KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pub))); byte[] et = rsa.doFinal(token);
             synchronized (x) { x.pending = secret; }

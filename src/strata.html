@@ -21265,7 +21265,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     { const d = document.getElementById('fwDone'), g = document.getElementById('fwSignOk'); if (d) d.removeEventListener('click', bookHooks.done, true); if (g) g.removeEventListener('click', bookHooks.sign, true); }
     if (!S) return; const s = S; S = null; MCE.active = false; clearInterval(s.t1); delete MOB.mcgeneric; delete __skins.MODELS.mcgeneric; if (window.__ENT && __ENT.mcgeneric) { try { gl.deleteTexture(__ENT.mcgeneric.tex); } catch (x) { /* gone */ } delete __ENT.mcgeneric; } cmStop(s); { const e = document.getElementById('mcInv'); if (e) e.remove(); } cancelAnimationFrame(s.tagRaf); { const tb = document.getElementById('mcTags'); if (tb) tb.remove(); } restoreOwnSkin(s.skinBak); if (s.mo) s.mo.disconnect(); clearInterval(s.t2);
     try { s.client.close(); } catch (e) { /* closed */ }
-    try { chatUnhook(s); ownHooks(false); } catch (e) { /* ui */ } window.__elytra = false; window.__mcPackImport = null;
+    try { chatUnhook(s); ownHooks(false); } catch (e) { /* ui */ } for (const id of ['faHud', 'faPick', 'faSet', 'sdThirst', 'sdTemp', 'sdDrink', 'shMeter', 'lyHud', 'lyEvent', 'lyBook', 'rskGui']) { const el = document.getElementById(id); if (el) el.remove(); }   // mod HUDs belong to the session window.__elytra = false; window.__mcPackImport = null;
     if (s.world) {
       for (const n of new Set(OVR)) if (s.saved[n]) window[n] = s.saved[n];
       if (s.srvPack) { try { applyPack(s.packPrev); } catch (e) { /* pack */ } }
