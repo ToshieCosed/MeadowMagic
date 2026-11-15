@@ -1668,12 +1668,12 @@
     // Lycanites Mobs (1.12.2-2.0.8): creatures from their own OBJ models and model classes (lycFx); Strata's own mob renderer draws nothing for them
     lycanitesmobs: {
       // CreatureManager / ProjectileManager hand out network ids (creatures from 100, projectiles from 1000) while iterating their HashMaps,
-      // so the order is Java's HashMap order of the names: custom projectiles, then the old sprite ones, then the old model ones (those with an OBJ model)
+      // so the order is Java's HashMap order of the names, which Lycanites loads in reverse alphabetical order (every creature, the model-less 'fear' too): custom projectiles, then the old sprite ones, then the old model ones (those with an OBJ model)
       entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const ns = L.length ? L[0].split(':')[0] : 'lycanitesmobs', short = n => n.split(':')[1];
-        if (!S.lyIds) { const cr = javaOrder(Object.values(C).filter(d => d.ns === ns).map(d => d.name)), P = R.oprj || {}, pj = Object.keys(P).filter(k => k.startsWith(ns + ':')).map(short), have = new Set(L.map(short));
+        if (!S.lyIds) { const cr = javaOrder(((R.ocrAll && R.ocrAll[ns]) || Object.values(C).filter(d => d.ns === ns).map(d => d.name)).slice().sort().reverse()), P = R.oprj || {}, pj = Object.keys(P).filter(k => k.startsWith(ns + ':')).map(short), have = new Set(L.map(short));
           const objp = Object.keys(R.files).filter(k => k.startsWith('o/' + ns + ':projectile/') && k.endsWith('.obj')).map(k => k.slice(('o/' + ns + ':projectile/').length, -4));
           const old = [...have].filter(n => !C[ns + ':' + n] && !pj.includes(n)), oldM = old.filter(n => objp.includes(n)), oldS = old.filter(n => !objp.includes(n));
-          S.lyIds = { cr: cr.map(n => ns + ':' + n), pr: [...javaOrder(pj.filter(n => have.has(n))), ...javaOrder(oldS.sort()), ...javaOrder(oldM.sort())].map(n => ns + ':' + n) }; }
+          S.lyIds = { cr: cr.map(n => ns + ':' + n.toLowerCase()), pr: [...javaOrder(pj.filter(n => have.has(n)).sort().reverse()), ...javaOrder(oldS.sort()), ...javaOrder(oldM.sort())].map(n => ns + ':' + n) }; }
         return tid >= 1000 ? S.lyIds.pr[tid - 1000] || null : tid >= 100 ? S.lyIds.cr[tid - 100] || null : null; },
       ent(nm) { const R = S.modRec, d = R && R.ocr && R.ocr[nm]; const tex = Object.keys(window.__ENT || {}).find(k => k.startsWith(nm.split(':')[0] + ':')) || 'lycanitesmobs:entity/' + nm.split(':')[1];
         return { fx: 1, tex, mob: d ? { w: d.w, h: d.h, name: modName(nm) } : { w: .4, h: .4, name: modName(nm) }, model: () => ({ k: .0625, parts: [] }) }; },
@@ -2133,7 +2133,7 @@
       for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/((?:entity|projectile)\/[^/]+?)(\.obj|_parts\.json)$/i); if (m) { const d = await z.read(n); if (d) rec.files['o/' + m[1] + ':' + m[2] + m[3]] = d; } }
       for (const n of names) if (/\/client\/(model|renderer)\/.+\.class$|\/core\/entity\/.+\.class$/.test(n) && !/^(net|javax|org|io|kotlin)\//.test(n)) { const d = await z.read(n); if (d) rec.files['j/' + n.slice(0, -6)] = d; }
       const C = rec.ocr = rec.ocr || {}, PJ = rec.oprj = rec.oprj || {};
-      for (const n of names) { let m = n.match(/^assets\/([^/]+)\/creatures\/[^/]+\.json$/i); if (m) { const j = await json(n); if (!j || !j.modelClass || !j.name) continue;
+      for (const n of names) { let m = n.match(/^assets\/([^/]+)\/creatures\/[^/]+\.json$/i); if (m) { const j = await json(n); if (j && j.name) { const A = rec.ocrAll = rec.ocrAll || {}, L = A[m[1]] = A[m[1]] || []; if (!L.includes(String(j.name))) L.push(String(j.name)); } if (!j || !j.modelClass || !j.name) continue;
           C[m[1] + ':' + String(j.name).toLowerCase()] = { ns: m[1], name: String(j.name).toLowerCase(), model: j.modelClass.replace(/\./g, '/'), ent: String(j.entityClass || '').replace(/\./g, '/'), w: +j.width || .6, h: +j.height || 1, scale: +j.sizeScale || 1, health: +j.health || 20,
             tame: !!j.tameable, mount: !!j.mountable, sub: (j.subspecies || []).map(q => ({ i: q.index | 0, name: q.name ? String(q.name).toLowerCase() : null, v: (q.variants || []).map(v => ({ i: v.index | 0, c: String(v.color || v.name || '').toLowerCase() })) })) }; continue; }
         m = n.match(/^assets\/([^/]+)\/projectiles\/[^/]+\.json$/i); if (m) { const j = await json(n); if (!j || !j.name) continue; PJ[m[1] + ':' + String(j.name).toLowerCase()] = { frames: +j.animationFrames || 1, scale: +j.scale || 1, tscale: +j.textureScale || 1, toff: +j.textureOffsetY || 0, glow: !!j.glow, roll: +j.rollSpeed || 0, w: +j.width || .5 }; } } }
