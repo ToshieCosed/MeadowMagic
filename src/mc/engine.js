@@ -1783,7 +1783,7 @@
     // sparks: their item icon, facing the camera (RenderSparkBase)
     for (const m of S.mobs) { if (!/^mod:botania:.*spark$/i.test(m.type) || !near(m, 40)) continue; const ic = fxTex(/corporea/i.test(m.type) ? 'botania:items/spark_corporea' : 'botania:items/spark'); if (!ic) continue;
       FX.bill(ic.key, m.x, m.y + .2, m.z, .25, [0, 0, 1, 1 / ic.n], [1, 1, 1, .85 + Math.sin(T / 5) * .15], 0); } }
-  // ---- Lycanites Mobs: creatures drawn from their OBJ models, posed every frame by the mod's own model classes (StrataJVM runs them from the player's jar) ----
+  // ---- Lycanites Mobs: creatures drawn from their OBJ models, posed every frame by Strata's port of the mod's model classes (objmobs.js, lycmodels.js) ----
   // Entity data (BaseCreatureEntity, 1.12.2): 12 target bits, 13 attack phase, 14 animation bits (1 attacked, 2 grounded, 4 in water, 8 blocking, 16 minion, 64 boss),
   // 15 attack cooldown max, 17 stealth, 18 baby, 20 size, 23 subspecies, 24 variant; 34 tamed bits (TameableCreatureEntity). Projectiles: 6 scale, 7 projectile name.
   // the order a java.util.HashMap<String, ...> iterates its keys: by bucket (the spread String hash masked to the table size), then insertion order
@@ -1792,11 +1792,11 @@
     return L.map((k, i) => [h(k), i, k]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(e => e[2]); }
   const LY = { O: null, acc: 0, last: 0, fly: new Map() };
   function lycO() { if (LY.O !== null) return LY.O; const R = S.modRec; if (!R || !R.ocr || !Object.keys(R.ocr).length || !window.StrataObjMobs) return (LY.O = false);
-    const F = R.files, dec = new TextDecoder(), d0 = Object.values(R.ocr)[0], ns = d0.ns, pkg = d0.model.slice(0, d0.model.indexOf('client/model/'));
-    LY.O = StrataObjMobs.create({ pkg, texKey: n => F['e/' + ns + ':entity/' + n] ? ns + ':entity/' + n : null,
-      load: k => { if (k.startsWith('class:')) { const b = F['j/' + k.slice(6)]; return b ? (b instanceof Uint8Array ? b : new Uint8Array(b)) : null; } const o = k.startsWith('obj:') ? F['o/' + ns + ':' + k.slice(4) + '.obj'] : k.startsWith('parts:') ? F['o/' + ns + ':' + k.slice(6) + '_parts.json'] : null; return o ? dec.decode(o) : null; } });
+    const F = R.files, dec = new TextDecoder(), ns = Object.values(R.ocr)[0].ns;
+    LY.O = StrataObjMobs.create({ texKey: n => F['e/' + ns + ':entity/' + n] ? ns + ':entity/' + n : null,
+      load: k => { const o = k.startsWith('obj:') ? F['o/' + ns + ':' + k.slice(4) + '.obj'] : k.startsWith('parts:') ? F['o/' + ns + ':' + k.slice(6) + '_parts.json'] : null; return o ? dec.decode(o) : null; } });
     return LY.O; }
-  function lycFly(d) { if (LY.fly.has(d.name)) return LY.fly.get(d.name); let f = 0; const O = lycO(); try { if (O && d.ent) f = O.vm.call(O.vm.newObj(d.ent), 'isFlying', '()Z', []) ? 1 : 0; } catch (e) { /* walks */ } LY.fly.set(d.name, f); return f; }   // the entity class's own isFlying()
+  const lycFly = d => !!(window.StrataLyc && StrataLyc.flying && StrataLyc.flying[d.name]);   // the entity classes' isFlying() on the client (ported table)
   const LYL = [[.2, 1, -.7], [-.2, 1, .7]].map(v => { const l = Math.hypot(...v); return v.map(q => q / l); });   // Minecraft's two entity lights
   function lycDraw(P, tk, layer, L, hurt) { const T = fxTex(tk); if (!T) return;
     for (const q of P) { const gl = q.gl, full = !gl.lit || (gl.lm && gl.lm[0] >= 240), add = gl.dst === 'ONE', c = q.color, gc = gl.color || [1, 1, 1, 1], a = c[3] * gc[3]; if (a <= .004) continue;
@@ -1825,12 +1825,12 @@
       const an = md[14] | 0, subI = md[23] | 0, varI = md[24] | 0, sb = d.sub.find(q => q.i === subI) || null, vr = sb && sb.v.find(v => v.i === varI), yaw = -m.face * 180 / Math.PI;
       let hy = ((m.hyaw != null ? m.hyaw : yaw) - yaw) % 360; if (hy > 180) hy -= 360; if (hy < -180) hy += 360;
       const s = st.s || (st.s = {}); Object.assign(s, { loop: st.ticks + part, limbSwing: st.limb + st.amt * part, limbAmount: st.amt, onGround: !!(an & 2), inWater: !!(an & 4), anim: an, attackCooldown: st.cool, attackCooldownMax: md[15] | 0, progress: st.progress,
-        stealth: +md[17] || 0, attackPhase: md[13] | 0, target: md[12] | 0, tamed: md[34] | 0, child: !!md[18], renderScale: (typeof md[20] === 'number' && md[20] > 0 ? md[20] : 1) * d.scale, sub: subI, subName: sb && sb.name, variant: varI, varColor: (vr && vr.c) || null,
+        stealth: +md[17] || 0, attackPhase: md[13] | 0, color: md[19] | 0, target: md[12] | 0, tamed: md[34] | 0, child: !!md[18], renderScale: (typeof md[20] === 'number' && md[20] > 0 ? md[20] : 1) * d.scale, sub: subI, subName: sb && sb.name, variant: varI, varColor: (vr && vr.c) || null,
         texName: d.name, health: typeof md[7] === 'number' ? md[7] : d.health, maxHealth: d.health, flying: lycFly(d), perch: !!((md[12] | 0) & 64), headYaw: hy, headPitch: m.pitch || 0, hurt: m.hurtT > 0 ? 1 : 0, bright: 15728880, id: m.eid, yaw });
-      const cls = [d.ent, O.vm && 'com/lycanitesmobs/core/entity/BaseCreatureEntity', 'com/lycanitesmobs/core/entity/AgeableCreatureEntity'].concat(d.tame ? ['com/lycanitesmobs/core/entity/TameableCreatureEntity'] : [], d.mount ? ['com/lycanitesmobs/core/entity/RideableCreatureEntity'] : []);
+      const cls = [d.ent.split('/').pop(), 'BaseCreatureEntity', 'AgeableCreatureEntity'].concat(d.tame ? ['TameableCreatureEntity'] : [], d.mount ? ['RideableCreatureEntity'] : []);
       const ent = st.e || (st.e = O.entity(s, cls));
       const B = O.ident(); O.tr(B, m.x, m.y, m.z); O.rot(B, 180 - yaw, 0, 1, 0); if (m.dead || m.deathT) { const dt = Math.min(1, Math.sqrt(Math.max(0, ((m.deathT || 20) - 1) / 20 * 1.6))); O.rot(B, dt * 90, 0, 0, 1); } O.sc(B, -1, -1, 1); O.tr(B, 0, -1.501, 0);   // RenderLivingBase
-      const L = litAt(m.x, m.y + d.h / 2, m.z), base = ent.getTexture('') || O.vm && (S.modRec.files['e/' + d.ns + ':entity/' + d.name] ? d.ns + ':entity/' + d.name : null);
+      const L = litAt(m.x, m.y + d.h / 2, m.z), base = ent.getTexture('') || (S.modRec.files['e/' + d.ns + ':entity/' + d.name] ? d.ns + ':entity/' + d.name : null);
       if (base) lycDraw(O.pose(M, ent, null, B), base, null, L, s.hurt);
       for (const l of M.layers) { if (!O.layerOn(l, ent)) continue; const tk = O.layerTex(l, ent); if (!tk || !S.modRec.files['e/' + tk]) continue; lycDraw(O.pose(M, ent, l, B), tk, l, L, 0); } } }
   window.__fxFrame = () => { if (!S || !S.forge || !S.world) return; for (const P of Object.values(PORTS)) if (P.fx) try { P.fx(); } catch (e) { console.error('port fx', e); P.fx = null; } };
@@ -2129,9 +2129,8 @@
     const zr = n => cache.get(n) || null, rd = async n => { const d = zr(n); return d && new TextDecoder().decode(d); };
     const mods = []; { const mi = names.find(n => /(^|\/)mcmod\.info$/i.test(n)); if (mi) try { let j = JSON.parse((await rd(mi)).replace(/[\u0000-\u001f]+/g, ' ')); j = Array.isArray(j) ? j : j.modList || []; for (const m of j) if (m.modid) { mods.push(m.modid); rec.mods[m.modid] = m.version || ''; rec.modNames[m.modid] = m.name || m.modid; } } catch (e) { /* odd json */ } }
     const json = async n => { let t; try { t = await rd(n); return JSON.parse(t); } catch (e) { try { return JSON.parse(String(t).replace(/^\s*\/\/[^\n]*/gm, '')); } catch (e2) { return null; } } }, models = {}, has = n => names.includes(n);
-    if (names.some(n => /^assets\/[^/]+\/models\/entity\/[^/]+\.obj$/i.test(n))) {   // creatures modelled as OBJ files and animated by the mod's own model classes (Lycanites Mobs): kept for StrataObjMobs
+    if (names.some(n => /^assets\/[^/]+\/models\/entity\/[^/]+\.obj$/i.test(n))) {   // creatures modelled as OBJ files (Lycanites Mobs): their models and part pivots, for Strata's port of the mod's models (objmobs.js, lycmodels.js)
       for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/((?:entity|projectile)\/[^/]+?)(\.obj|_parts\.json)$/i); if (m) { const d = await z.read(n); if (d) rec.files['o/' + m[1] + ':' + m[2] + m[3]] = d; } }
-      for (const n of names) if (/\/client\/(model|renderer)\/.+\.class$|\/core\/entity\/.+\.class$/.test(n) && !/^(net|javax|org|io|kotlin)\//.test(n)) { const d = await z.read(n); if (d) rec.files['j/' + n.slice(0, -6)] = d; }
       const C = rec.ocr = rec.ocr || {}, PJ = rec.oprj = rec.oprj || {};
       for (const n of names) { let m = n.match(/^assets\/([^/]+)\/creatures\/[^/]+\.json$/i); if (m) { const j = await json(n); if (j && j.name) { const A = rec.ocrAll = rec.ocrAll || {}, L = A[m[1]] = A[m[1]] || []; if (!L.includes(String(j.name))) L.push(String(j.name)); } if (!j || !j.modelClass || !j.name) continue;
           C[m[1] + ':' + String(j.name).toLowerCase()] = { ns: m[1], name: String(j.name).toLowerCase(), model: j.modelClass.replace(/\./g, '/'), ent: String(j.entityClass || '').replace(/\./g, '/'), w: +j.width || .6, h: +j.height || 1, scale: +j.sizeScale || 1, health: +j.health || 20,
