@@ -1667,7 +1667,14 @@
         const g = grid(2); for (let i = 1; i <= 4; i++) mcSlot(g, i); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 0, { cls: 'out' }); return true; } },
     // Lycanites Mobs (1.12.2-2.0.8): creatures from their own OBJ models and model classes (lycFx); Strata's own mob renderer draws nothing for them
     lycanitesmobs: {
-      entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const cr = L.filter(n => C[n]), pr = L.filter(n => !C[n]); return tid >= 1000 ? pr[tid - 1000] || null : tid >= 100 ? cr[tid - 100] || null : null; },   // CreatureManager / ProjectileManager network ids
+      // CreatureManager / ProjectileManager hand out network ids (creatures from 100, projectiles from 1000) while iterating their HashMaps,
+      // so the order is Java's HashMap order of the names: custom projectiles, then the old sprite ones, then the old model ones (those with an OBJ model)
+      entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const ns = L.length ? L[0].split(':')[0] : 'lycanitesmobs', short = n => n.split(':')[1];
+        if (!S.lyIds) { const cr = javaOrder(Object.values(C).filter(d => d.ns === ns).map(d => d.name)), P = R.oprj || {}, pj = Object.keys(P).filter(k => k.startsWith(ns + ':')).map(short), have = new Set(L.map(short));
+          const objp = Object.keys(R.files).filter(k => k.startsWith('o/' + ns + ':projectile/') && k.endsWith('.obj')).map(k => k.slice(('o/' + ns + ':projectile/').length, -4));
+          const old = [...have].filter(n => !C[ns + ':' + n] && !pj.includes(n)), oldM = old.filter(n => objp.includes(n)), oldS = old.filter(n => !objp.includes(n));
+          S.lyIds = { cr: cr.map(n => ns + ':' + n), pr: [...javaOrder(pj.filter(n => have.has(n))), ...javaOrder(oldS.sort()), ...javaOrder(oldM.sort())].map(n => ns + ':' + n) }; }
+        return tid >= 1000 ? S.lyIds.pr[tid - 1000] || null : tid >= 100 ? S.lyIds.cr[tid - 100] || null : null; },
       ent(nm) { const R = S.modRec, d = R && R.ocr && R.ocr[nm]; const tex = Object.keys(window.__ENT || {}).find(k => k.startsWith(nm.split(':')[0] + ':')) || 'lycanitesmobs:entity/' + nm.split(':')[1];
         return { fx: 1, tex, mob: d ? { w: d.w, h: d.h, name: modName(nm) } : { w: .4, h: .4, name: modName(nm) }, model: () => ({ k: .0625, parts: [] }) }; },
       fx() { lycFx(); } },
@@ -1779,6 +1786,10 @@
   // ---- Lycanites Mobs: creatures drawn from their OBJ models, posed every frame by the mod's own model classes (StrataJVM runs them from the player's jar) ----
   // Entity data (BaseCreatureEntity, 1.12.2): 12 target bits, 13 attack phase, 14 animation bits (1 attacked, 2 grounded, 4 in water, 8 blocking, 16 minion, 64 boss),
   // 15 attack cooldown max, 17 stealth, 18 baby, 20 size, 23 subspecies, 24 variant; 34 tamed bits (TameableCreatureEntity). Projectiles: 6 scale, 7 projectile name.
+  // the order a java.util.HashMap<String, ...> iterates its keys: by bucket (the spread String hash masked to the table size), then insertion order
+  function javaOrder(keys) { const L = [...keys]; let cap = 16; while (L.length > cap * .75) cap *= 2;
+    const h = s => { let x = 0; for (let i = 0; i < s.length; i++) x = (Math.imul(31, x) + s.charCodeAt(i)) | 0; return (x ^ (x >>> 16)) & (cap - 1); };
+    return L.map((k, i) => [h(k), i, k]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(e => e[2]); }
   const LY = { O: null, acc: 0, last: 0, fly: new Map() };
   function lycO() { if (LY.O !== null) return LY.O; const R = S.modRec; if (!R || !R.ocr || !Object.keys(R.ocr).length || !window.StrataObjMobs) return (LY.O = false);
     const F = R.files, dec = new TextDecoder(), d0 = Object.values(R.ocr)[0], ns = d0.ns, pkg = d0.model.slice(0, d0.model.indexOf('client/model/'));

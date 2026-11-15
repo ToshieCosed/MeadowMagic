@@ -29,6 +29,7 @@ out.r = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new
   r.mobs = S.mobs.filter(m => m.modEnt && /^lycanitesmobs:/.test(m.modEnt)).map(m => [m.modEnt, m.type, !!m.ly, m.md ? [m.md[14], m.md[20], m.md[23], m.md[24]] : null]);
   await W(1500); r.tex = [...FX.T.keys()].filter(k => /lycanites/.test(k)); r.fly = Object.fromEntries([...(window.__lyFly || [])]);
   return r; });
+out.names = out.r.mobs.map(m => m[0].split(':')[1]).sort().join(' '); out.namesOk = mobs.every(n => out.names.split(' ').includes(n));
 await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 0 + S.OX; player.z = 8 + S.OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .5); }); await wait(2500); await pg.screenshot({ path: '/tmp/lyc.png' });
 await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .6); }); await wait(2000); await pg.screenshot({ path: '/tmp/lyc2.png' });
 } catch (e) { out.fail = String(e).slice(0, 400); }
