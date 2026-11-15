@@ -10907,6 +10907,8 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
     N['org/lwjgl/opengl/GL11.glColor4f'] = (v, o, a) => { GL.color = [a[0], a[1], a[2], a[3]]; };
     N['org/lwjgl/opengl/GL11.glDisable'] = (v, o, a) => { if (a[0] === 2896) GL.lit = 0; if (a[0] === 3042) GL.blend = 0; }; N['org/lwjgl/opengl/GL11.glEnable'] = (v, o, a) => { if (a[0] === 2896) GL.lit = 1; if (a[0] === 3042) GL.blend = 1; };
     N['static:net/minecraft/client/renderer/OpenGlHelper.field_77476_b'] = 33985;
+    N['net/minecraft/network/datasync/EntityDataManager.func_187226_a'] = () => ({ $is: () => true });   // entity classes' static setup (synced-data keys, attributes): not needed client-side here
+    N['net/minecraft/entity/ai/attributes/RangedAttribute.func_111112_a'] = (v, o) => o;
   }
 
   window.StrataJVM = { VM, parseClass, installNatives, jlist, jmap, vec, mcSin, mcCos, TOP };
