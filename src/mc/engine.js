@@ -1848,7 +1848,7 @@
     try { const A = px(base), B = px(base + '_overlay'); if (!A) return; const o = new Uint8Array(A.w * A.h * 4), ch = (c, k) => (c >> (16 - 8 * k)) & 255;
       for (let i = 0; i < A.w * A.h; i++) { const j = i * 4; for (let k = 0; k < 3; k++) o[j + k] = A.data[j + k] * ch(col[0], k) / 255; o[j + 3] = A.data[j + 3];
         if (B && B.w === A.w) { const al = B.data[j + 3] / 255; if (al > 0) { for (let k = 0; k < 3; k++) o[j + k] = o[j + k] * (1 - al) + B.data[j + k] * ch(col[1], k) / 255 * al; o[j + 3] = Math.max(o[j + 3], B.data[j + 3]); } } }
-      const png = StrataLyc.pngEncode(A.w, A.h, o); F['i/' + tex] = png; lyImg(tex, png); } catch (e) { /* no egg icon */ } }
+      const png = StrataLyc.pngEncode(A.w, A.h, o); F['i/' + tex] = png; lyImg(tex, png); } catch (e) { console.error('objmobs egg icon', e && e.message); } }
   const LYL = [[.2, 1, -.7], [-.2, 1, .7]].map(v => { const l = Math.hypot(...v); return v.map(q => q / l); });   // Minecraft's two entity lights
   function lycDraw(P, tk, layer, L, hurt) { const T = fxTex(tk); if (!T) return;
     for (const q of P) { const gl = q.gl, full = !gl.lit || (gl.lm && gl.lm[0] >= 240), add = gl.dst === 'ONE', c = q.color, gc = gl.color || [1, 1, 1, 1], a = c[3] * gc[3]; if (a <= .004) continue;
