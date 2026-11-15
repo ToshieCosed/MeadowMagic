@@ -1740,7 +1740,7 @@
   // spreaders turned to their aim (RenderTileSpreader: rotationX + 90 about Y, rotationY about X, the core spinning 1 degree a tick), sparks as their item icon.
   // Particles run on Minecraft's 20 ticks a second and are spawned at the mod's own rates and colours.
   const BFX = { P: [], acc: 0, last: 0, tick: 0 };
-  function fxTex(path) { const C = S.fxT = S.fxT || new Map(); let e = C.get(path); if (e) return e.ok ? e : null; e = { ok: false }; C.set(path, e);
+  function fxTex(path) { const C = S.fxTexC = S.fxTexC || new Map(); let e = C.get(path); if (e) return e.ok ? e : null; e = { ok: false }; C.set(path, e);
     const F = S.modRec && S.modRec.files, d = F && (F['x/' + path] || F['b/' + path] || F['e/' + path] || F['i/' + path]); if (!d) return null;
     createImageBitmap(new Blob([d], { type: 'image/png' })).then(b => { FX.tex('mc:' + path, b, /:misc\//.test(path), /:(entity|items)\//.test(path)); Object.assign(e, { ok: true, key: 'mc:' + path, w: b.width, h: b.height, n: Math.max(1, Math.round(b.height / b.width)) }); }).catch(() => {}); return null; }
   const WISP = 'botania:misc/wisp_large', SPARK = 'botania:misc/particles';
