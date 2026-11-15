@@ -12,6 +12,7 @@ const pg = await b.newPage({ viewport: { width: 900, height: 600 } }); const err
 pg.on('console', m => { const t = m.text(); if ((m.type() === 'error' || /^jvm:|objmobs|port fx/.test(t)) && !/ERR_TUNNEL|Failed to load/.test(t)) errs.push(t.slice(0, 300)); });
 let out = {};
 try {
+await pg.exposeFunction('srvCmd', c => { cmd(c); return 1; });
 await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html'); await pg.waitForSelector('#mpBtn');
 await pg.$eval('#mpBtn', e => e.click()); await pg.$eval('[data-mp=minecraft]', e => e.click());
 await pg.selectOption('#mcVer', { label: '1.12.2 (protocol 340)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:' + RP); await pg.dispatchEvent('#mcRelay', 'change');
@@ -47,8 +48,9 @@ cmd('give @a lycanitesmobs:summoningpedestal 1'); cmd('give @a lycanitesmobs:equ
 cmd('kill @e[type=lycanitesmobs:amalgalich]'); cmd('tp @a 9 4 -1'); cmd('gamemode survival @a'); cmd('effect @a minecraft:resistance 1000 255 true'); cmd('effect @a minecraft:regeneration 1000 255 true'); cmd('summon lycanitesmobs:beholder 9 7 4'); await wait(4000);
 out.more = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)), r = {}, F = S.forge.items;
   r.eqIcon = Object.keys(S.modRec.files).filter(k => k.startsWith('i/lycanitesmobs:gen/eq_')); r.eqItem = S.slots.filter(Boolean).map(it => F[it.id]).filter(n => /equipment$/.test(n || ''));
-  const px = Math.floor(player.x - S.OX) + 2, pz = Math.floor(player.z - S.OZ), py = Math.floor(player.y) - 1; r.at = [px, py, pz];
+  const px = Math.round(player.x - S.OX - .5) + 2, pz = Math.round(player.z - S.OZ - .5), py = 3; r.at = [px, py, pz];
   const k = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:summoningpedestal'); r.pedSlot = k; if (k >= 0) { inv.sel = k - 36; S.client.api.select(k - 36); await W(400); S.client.api.place(px, py, pz, 1, null, 8, 16, 8); await W(1500); }
+  if (!(BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)] || {}).modName) { r.pedCmd = 1; await window.srvCmd(`setblock ${px} ${py + 1} ${pz} lycanitesmobs:summoningpedestal`); await W(2500); }
   r.pedBlock = (BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)] || {}).modName; inv.sel = 8; S.client.api.select(8); await W(300); S.client.api.place(px, py + 1, pz, 1, null, 8, 16, 8);
   for (let q = 0; q < 25 && !(S.win && S.win.ly); q++) await W(200); r.ped = S.win && [S.win.ly, S.win.title, S.win.slots.length, document.querySelector('#mcInv') && document.querySelector('#mcInv').innerText.slice(0, 200).replace(/\s+/g, ' ')];
   const P = StrataMCE.dbgPort(); await W(400); try { closeInv(); } catch (e) { /* */ } await W(300);
