@@ -51,7 +51,7 @@ out.more = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => 
   const px = Math.round(player.x - S.OX - .5) + 2, pz = Math.round(player.z - S.OZ - .5), py = 3; r.at = [px, py, pz];
   const k = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:summoningpedestal'); r.pedSlot = k; if (k >= 0) { inv.sel = k - 36; S.client.api.select(k - 36); await W(400); S.client.api.place(px, py, pz, 1, null, 8, 16, 8); await W(1500); }
   if (!(BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)] || {}).modName) { r.pedCmd = 1; await window.srvCmd(`setblock ${px} ${py + 1} ${pz} lycanitesmobs:summoningpedestal`); await W(2500); }
-  { const b = BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)]; r.pedB = b && [b.name, b.modName]; r.srv = (await window.srvLog()).split('\n').filter(l => /block|Pedestal|pedestal|Exception|Strata/i.test(l)).slice(-8); }
+  { const b = BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)]; r.pedB = b && [b.name, b.modName]; r.srv = (await window.srvLog()).split('\n').slice(-14); r.disc = S.client && S.client.closed; }
   r.pedBlock = (BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)] || {}).modName; inv.sel = 8; S.client.api.select(8); await W(300); S.client.api.place(px, py + 1, pz, 1, null, 8, 16, 8);
   for (let q = 0; q < 25 && !(S.win && S.win.ly); q++) await W(200); r.ped = S.win && [S.win.ly, S.win.title, S.win.slots.length, document.querySelector('#mcInv') && document.querySelector('#mcInv').innerText.slice(0, 200).replace(/\s+/g, ' ')];
   const P = StrataMCE.dbgPort(); await W(400); try { closeInv(); } catch (e) { /* */ } await W(300);
