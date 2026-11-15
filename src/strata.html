@@ -5993,16 +5993,37 @@ const MC_OLD_ITEM={wheat_seeds:'seeds_wheat',melon_slice:'melon',melon_seeds:'se
   fishing_rod:'fishing_rod_uncast',bow:'bow_standby',minecart:'minecart_normal',oak_boat:'boat',bone_meal:'dye_powder_white',sugar_cane:'reeds',oak_door:'door_wood',iron_door:'door_iron',writable_book:'book_writable',written_book:'book_written'};
 for(const d of DYES) MC_OLD_ITEM[d.k+'_dye']='dye_powder_'+(d.k==='light_gray'?'silver':d.k);
 for(const [a,b] of [['wooden','wood'],['golden','gold'],['stone','stone'],['iron','iron'],['diamond','diamond']]) for(const t of ['pickaxe','axe','shovel','sword','hoe']) MC_OLD_ITEM[a+'_'+t]=b+'_'+t;
+/* ---------- raw DEFLATE (RFC 1951), synchronous: far quicker than a DecompressionStream per entry when a jar holds thousands of small files ---------- */
+const INFL=(()=>{ const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258], LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0],
+  DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577], DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13], CO=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+  function tree(lens,n){ const cnt=new Uint16Array(16), off=new Uint16Array(16), sym=new Uint16Array(n); for(let i=0;i<n;i++) cnt[lens[i]]++; cnt[0]=0; for(let i=1;i<16;i++) off[i]=off[i-1]+cnt[i-1]; for(let i=0;i<n;i++) if(lens[i]) sym[off[lens[i]]++]=i; return {cnt,sym}; }
+  let FL=null, FD=null;
+  return function(src,size){ let out=new Uint8Array(size||Math.max(1024,src.length*4)), op=0, bp=0, bb=0, bc=0;
+    const need=n=>{ if(op+n>out.length){ const o=new Uint8Array(Math.max(out.length*2,op+n)); o.set(out); out=o; } };
+    const bit=()=>{ if(!bc){ bb=src[bp++]; bc=8; } const b=bb&1; bb>>=1; bc--; return b; };
+    const bits=n=>{ let v=0; for(let i=0;i<n;i++) v|=bit()<<i; return v; };
+    const dec=t=>{ let code=0, first=0, idx=0; for(let len=1;len<16;len++){ code|=bit(); const c=t.cnt[len]; if(code-c<first) return t.sym[idx+(code-first)]; idx+=c; first+=c; first<<=1; code<<=1; } throw new Error('inflate: bad code'); };
+    if(!FL){ const l=new Uint8Array(288); l.fill(8,0,144); l.fill(9,144,256); l.fill(7,256,280); l.fill(8,280,288); FL=tree(l,288); FD=tree(new Uint8Array(30).fill(5),30); }
+    for(let last=0;!last;){ last=bit(); const type=bits(2);
+      if(type===0){ bc=0; const len=src[bp]|src[bp+1]<<8; bp+=4; need(len); out.set(src.subarray(bp,bp+len),op); op+=len; bp+=len; continue; }
+      let lt=FL, dt=FD;
+      if(type===2){ const hl=bits(5)+257, hd=bits(5)+1, hc=bits(4)+4, cl=new Uint8Array(19); for(let i=0;i<hc;i++) cl[CO[i]]=bits(3); const ct=tree(cl,19), L=new Uint8Array(hl+hd);
+        for(let i=0;i<hl+hd;){ const sy=dec(ct); if(sy<16) L[i++]=sy; else if(sy===16){ const pv=L[i-1]; for(let r=bits(2)+3;r--;) L[i++]=pv; } else if(sy===17) i+=bits(3)+3; else i+=bits(7)+11; }
+        lt=tree(L.subarray(0,hl),hl); dt=tree(L.subarray(hl),hd); }
+      else if(type!==1) throw new Error('inflate: bad block');
+      for(;;){ const sy=dec(lt); if(sy<256){ need(1); out[op++]=sy; continue; } if(sy===256) break; const li=sy-257, len=LB[li]+bits(LE[li]), di=dec(dt), dist=DB[di]+bits(DE[di]); need(len); for(let i=0;i<len;i++,op++) out[op]=out[op-dist]; } }
+    return out.subarray(0,op); }; })();
 /* ---------- zip reading (stored and deflated entries) ---------- */
 async function unzipPack(buf){ const dv=new DataView(buf), u8=new Uint8Array(buf); let e=-1;
   for(let i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-65557);i--) if(dv.getUint32(i,true)===0x06054b50){ e=i; break; }
   if(e<0) throw new Error('That file is not a .zip');
   const n=dv.getUint16(e+10,true); let p=dv.getUint32(e+16,true); const files=new Map(), td=new TextDecoder();
   for(let k=0;k<n&&p+46<=buf.byteLength;k++){ if(dv.getUint32(p,true)!==0x02014b50) break;
-    const meth=dv.getUint16(p+10,true), cs=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lo=dv.getUint32(p+42,true);
-    files.set(td.decode(u8.subarray(p+46,p+46+nl)),{meth,cs,lo}); p+=46+nl+xl+cl; }
+    const meth=dv.getUint16(p+10,true), cs=dv.getUint32(p+20,true), us=dv.getUint32(p+24,true), nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lo=dv.getUint32(p+42,true);
+    files.set(td.decode(u8.subarray(p+46,p+46+nl)),{meth,cs,us,lo}); p+=46+nl+xl+cl; }
   const read=async name=>{ const f=files.get(name); if(!f) return null; const st=f.lo+30+dv.getUint16(f.lo+26,true)+dv.getUint16(f.lo+28,true), data=u8.subarray(st,st+f.cs);
-    if(f.meth===0) return data.slice().buffer; if(f.meth!==8||typeof DecompressionStream==='undefined') return null;
+    if(f.meth===0) return data.slice().buffer; if(f.meth===8&&f.cs<4e6) try{ const r=INFL(data,f.us); return r.byteOffset===0&&r.byteLength===r.buffer.byteLength?r.buffer:r.slice().buffer; }catch(err){ /* try the browser's */ }
+    if(f.meth!==8||typeof DecompressionStream==='undefined') return null;
     try{ return await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(); }catch(err){ return null; } };
   return {files,read}; }
 /* ---------- storage: one pack per world, in IndexedDB (falls back to memory for this session) ---------- */
