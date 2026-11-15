@@ -269,3 +269,11 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
 - Rendering follows the mod's own client code: an effects layer draws Botania's wisps (misc/wisp_large, additive) and sparkles (misc/particles frames 16-19) at the mod's spawn rates and colours; mana pools show the animated mana_water surface (rainbow in the fabulous pool); an open Elven Gateway shows the animated swirl; spreaders are drawn from their model turned to their aim (rotationX + 90, rotationY) with the core spinning and bobbing; mana bursts are lines of wisps in the burst's own colour; sparks show their icon.
 - Baubles: a Baubles button in the inventory opens the mod's equipment screen (amulet, two rings, belt, head, body, charm).
 - Jars imported before this stage should be re-imported to pick up the lexicon text, plant models and block shapes.
+
+### 20h — Lycanites Mobs (1.12.2-2.0.8)
+- All 121 creatures are drawn from the mod's own OBJ models and textures (subspecies and variant skins), posed every frame by Strata's JavaScript port of the mod's model code: the runtime (ModelCustom, ModelCreatureObj, ModelObjOld, layers) in `src/mc/objmobs.js`, every creature model and template in `src/mc/lycmodels.js` (ported with `tools/port_lycanites.py`, checked part by part against the original classes in every layer).
+- Layers: glow, eyes, fire, pulses, scrolling hair, capes and ribbons, blended overlays, shields, whirlpools, dyed fur, as the mod sets them.
+- Animation state from the server's synced data: attack cooldown (the attack lunges), on ground, in water, blocking, pulling and whirlpools, stealth, attack phase, sitting, perching, baby, size, subspecies, variant, colour; flight from the entity classes.
+- Entity network ids follow the mod's own numbering (creatures from 100, projectiles from 1000, in Java HashMap order of the names it loads in reverse alphabetical order).
+- Sprite projectiles are drawn from their item textures with their frame animation. Not yet: laser beams, the five model projectiles, saddles and armour, the Beastiary and the pet, mount and summoning screens.
+- Jar import uses a synchronous inflater for small entries: a 100 MB jar of 5000 files imports in seconds.
