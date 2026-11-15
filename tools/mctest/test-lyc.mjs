@@ -47,13 +47,15 @@ cmd('give @a lycanitesmobs:summoningpedestal 1'); cmd('give @a lycanitesmobs:equ
 cmd('kill @e[type=lycanitesmobs:amalgalich]'); cmd('tp @a 9 4 -1'); cmd('gamemode survival @a'); cmd('effect @a minecraft:resistance 1000 255 true'); cmd('effect @a minecraft:regeneration 1000 255 true'); cmd('summon lycanitesmobs:beholder 9 7 4'); await wait(4000);
 out.more = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)), r = {}, F = S.forge.items;
   r.eqIcon = Object.keys(S.modRec.files).filter(k => k.startsWith('i/lycanitesmobs:gen/eq_')); r.eqItem = S.slots.filter(Boolean).map(it => F[it.id]).filter(n => /equipment$/.test(n || ''));
-  const k = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:summoningpedestal'); r.pedSlot = k; if (k >= 0) { inv.sel = k - 36; S.client.api.select(k - 36); await W(400); S.client.api.place(10, 3, -3, 1, null, 8, 16, 8); await W(1500); }
-  r.pedBlock = (BLOCKS[world.get(10 + S.OX, 4, -3 + S.OZ)] || {}).modName; inv.sel = 8; S.client.api.select(8); await W(300); S.client.api.place(10, 4, -3, 1, null, 8, 16, 8);
+  const px = Math.floor(player.x - S.OX) + 2, pz = Math.floor(player.z - S.OZ), py = Math.floor(player.y) - 1; r.at = [px, py, pz];
+  const k = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:summoningpedestal'); r.pedSlot = k; if (k >= 0) { inv.sel = k - 36; S.client.api.select(k - 36); await W(400); S.client.api.place(px, py, pz, 1, null, 8, 16, 8); await W(1500); }
+  r.pedBlock = (BLOCKS[world.get(px + S.OX, py + 1, pz + S.OZ)] || {}).modName; inv.sel = 8; S.client.api.select(8); await W(300); S.client.api.place(px, py + 1, pz, 1, null, 8, 16, 8);
   for (let q = 0; q < 25 && !(S.win && S.win.ly); q++) await W(200); r.ped = S.win && [S.win.ly, S.win.title, S.win.slots.length, document.querySelector('#mcInv') && document.querySelector('#mcInv').innerText.slice(0, 200).replace(/\s+/g, ' ')];
   const P = StrataMCE.dbgPort(); await W(400); try { closeInv(); } catch (e) { /* */ } await W(300);
   r.lasers = []; for (let q = 0; q < 40; q++) { await W(500); const L = S.mobs.filter(m => m.modEnt && /lycanitesmobs/.test(m.modEnt) && m.md && typeof m.md[7] === 'string'); if (L.length) { r.lasers = L.map(m => [m.modEnt, m.md[7], m.md[8], m.md[10]]); break; } }
+  { const k2 = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:equipment'); if (k2 >= 0) { inv.sel = k2 - 36; S.client.api.select(k2 - 36); invChanged(); } await W(1200); r.held3d = !!(StrataMCE.dbgPort && window.__fx3dItem); r.heldItem = ITEMS[inv.slots[inv.sel] && inv.slots[inv.sel].id] && ITEMS[inv.slots[inv.sel].id].lyEq; r.eqTex = [...FX.T.keys()].filter(k => /equipment\//.test(k)); }
   r.beamTex = [...FX.T.keys()].filter(k => /beam|laser/.test(k)); r.fxNames = [...document.querySelectorAll('#mcFx *, [id*=fx]')].map(e => e.textContent).join(' ').slice(0, 200); r.pos = [Math.round(player.x - S.OX), Math.round(player.z - S.OZ)]; return r; });
-await pg.screenshot({ path: '/tmp/lyc-laser.png' });
+await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .35); }); await wait(1500); await pg.screenshot({ path: '/tmp/lyc-laser.png' });
 await pg.evaluate(() => { const P = StrataMCE.dbgPort(); P.lycBook('creatures', 'warg'); }); await wait(800); await pg.screenshot({ path: '/tmp/lyc-book.png' });
 await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 0 + S.OX; player.z = 8 + S.OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .5); }); await wait(2500); await pg.screenshot({ path: '/tmp/lyc.png' });
 await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .6); }); await wait(2000); await pg.screenshot({ path: '/tmp/lyc2.png' });
