@@ -275,5 +275,12 @@ Turn on **Forge server (1.12.2 mods)** in the connect screen. Everything here ex
 - Layers: glow, eyes, fire, pulses, scrolling hair, capes and ribbons, blended overlays, shields, whirlpools, dyed fur, as the mod sets them.
 - Animation state from the server's synced data: attack cooldown (the attack lunges), on ground, in water, blocking, pulling and whirlpools, stealth, attack phase, sitting, perching, baby, size, subspecies, variant, colour; flight from the entity classes.
 - Entity network ids follow the mod's own numbering (creatures from 100, projectiles from 1000, in Java HashMap order of the names it loads in reverse alphabetical order).
-- Sprite projectiles are drawn from their item textures with their frame animation. Not yet: laser beams, the five model projectiles, saddles and armour, the Beastiary and the pet, mount and summoning screens.
+- Projectiles: sprites (item textures, frame-animated), laser beams (the `_beam` texture from the thrower to its target or along its look, stopping at blocks) and the five model projectiles (ported like the creatures).
+- Saddles and armour on creatures (`<creature>_saddle`, `<creature>_chest<grade>`) from the synced equipment.
+- The Beastiary (inventory button): creatures discovered with their ranks, descriptions, habitats and combat notes from the mod's lang file; pets, mounts and familiars with active / teleport / sit / follow / stance / PvP / release; the five summon sets with their minion and behaviour; the elements.
+- Holding a summoning staff: the minion bar (summon sets 1-5, as the mod's R wheel) with spirit and summon focus.
+- Riding a Lycanites mount: Ability, Attack, Inventory and Dismount buttons; jump and crouch send the mod's control states (jump, descend).
+- Machine screens: equipment forge (pommel, base, head and tips around the head, the piece), infuser, station, summoning pedestal (fuel, capacity, progress, minion and behaviour) and the creature inventory with its pet commands. Lycanites' containers put the player's slots first; Strata's windows follow a mod's layout.
+- Equipment parts get inventory icons drawn from their own models at import.
+- Mob and world events are announced; the mod's knockback (entity velocity) moves you.
 - Jar import uses a synchronous inflater for small entries: a 100 MB jar of 5000 files imports in seconds.
