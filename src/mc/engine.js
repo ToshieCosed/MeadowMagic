@@ -1587,6 +1587,8 @@
     dynamictrees: {   // branches drawn as BakedModelBlockBranchBasic builds them (a core of the branch's radius, a sleeve to each connected neighbour), leaves and rooty soil as the vanilla blocks they stand for
       alias(n, meta) { const m = /^dynamictrees:leaves(\d+)$/.exec(n); if (m) { const t = DT_FAM[+m[1] * 4 + ((meta >> 2) & 3)] || 'oak'; return DT_LEAF[t]; }
         if (/^dynamictrees:rooty(dirt|dirtspecies|dirtfake)$/.test(n)) return 3 << 4; if (n === 'dynamictrees:rootysand') return 12 << 4; return null; },
+      ent(nm) { return nm === 'dynamictrees:falling_tree' ? { fx: 1, mob: { w: .1, h: .1 } } : null; },
+      fx() { dtFallFx(); },
       block(n, meta) { const r = dtRad(n, meta); if (!r) return null; S.dt = S.dt || 1; const c = Math.min(r, 8) / 16, T = dtTex(n); return { key: 'r' + r, tex: [T[0], T[1], T[0]], col: '#6b5232', boxes: [[.5 - c, .5 - c, .5 - c, .5 + c, .5 + c, .5 + c]] }; } },
     firstaid: {   // per-limb health (channel "firstaid": 1 part update, 3 config + model NBT, 5 add health, 8 model NBT; client sends 2 = apply healing item to a part)
       payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (Math.ceil(old) !== Math.ceil(hp)) F.flash = F.chg = performance.now(); };
@@ -2167,6 +2169,38 @@
       if (pos) { lo[ax] = 8 + c; hi[ax] = 16; } else { lo[ax] = 0; hi[ax] = 8 - c; } box.push([px(lo[0]), px(lo[1]), px(lo[2]), px(hi[0]), px(hi[1]), px(hi[2])]); });
     const top = ring === 1 ? T[1] : T[0], bot = ring === 0 ? T[1] : T[0], key = 'c' + r + ':' + cn.join('') + ':' + ring;
     const id = modBlock(n, b.modMeta | 0, { key, tex: [T[0], top, bot], col: '#6b5232', boxes: box }); if (id !== world.get(X, y, Z)) setBlock(X, y, Z, id); }
+  // EntityFallingTree: the cut tree (voxel data NBT: branches with radius and connections, leaves) drawn as its own model and toppled as AnimationHandlerFallover does, on the client, until the server removes it
+  const DT_LEAFTEX = { oak: 'leaves_oak', spruce: 'leaves_spruce', birch: 'leaves_birch', jungle: 'leaves_jungle', acacia: 'leaves_acacia', darkoak: 'leaves_big_oak' }, DT_FOL = { spruce: [97, 153, 97], birch: [128, 167, 85] };
+  function dtTexKey(name, col) { const k = 'dt:' + name; if (FX.has(k)) return k; const bm = typeof PACK !== 'undefined' && PACK.img && PACK.img['b/' + name]; let src = bm;
+    if (!src) { src = document.createElement('canvas'); src.width = src.height = 1; const g = src.getContext('2d'); g.fillStyle = col; g.fillRect(0, 0, 1, 1); } else if (bm.height > bm.width) { const c = document.createElement('canvas'); c.width = c.height = bm.width; c.getContext('2d').drawImage(bm, 0, 0); src = c; }   // first frame of an animated texture
+    FX.tex(k, src, false, false); return k; }
+  function dtFallFx() { const L = window.StrataLyc; if (!L || typeof FX === 'undefined') return;
+    for (const m of S.mobs) { if (m.modEnt !== 'dynamictrees:falling_tree') continue; m.fxOnly = 1; const raw = m.md && m.md[6]; if (!raw || !raw.length) continue;
+      let T = m.dt; if (!T || T.raw !== raw) { let t = {}; try { t = nbtRead(raw, 0)[0] || {}; } catch (e) { continue; } const fam = String(t.species || 'dynamictrees:oak').split(':').pop().replace(/[^a-z]/g, ''), fk = Object.keys(DT_LOG).find(k => fam.startsWith(k)) || 'oak';
+        const bp = t.branchpos || [], bc = t.branchcon || [], lv = t.leaves || [], dec = e => [((e >> 16) & 255) - 64, ((e >> 8) & 255) - 64, (e & 255) - 64];
+        T = m.dt = { raw, fam: fk, br: bp.map((e, i) => ({ p: dec(e), r: (e >> 24) & 31, c: [0, 1, 2, 3, 4, 5].map(f => ((bc[i] | 0) >> (f * 5)) & 31) })), lv: lv.map(dec), tool: +t.tooldir | 0, cut: +t.cutdir | 0, massY: +t.massy || 1, trunk: +t.trunkheight || 4,
+          yaw: 0, pit: 0, speed: 0, landed: false, onGround: true, acc: 0, last: performance.now(), ox: m.x, oy: m.y, oz: m.z }; }
+      const now = performance.now(); T.acc = Math.min(.5, T.acc + (now - T.last) / 1000); T.last = now;
+      while (T.acc >= .05) { T.acc -= .05; if (T.landed || T.cut !== 0) break;   // the fall-over handler (cut from below); others just stand until removed
+        T.speed += .2 / (T.massY * 2); dtRot(T, T.speed); if (T.speed > 0 && dtHit(T)) { dtRot(T, -T.speed); T.speed *= -.25; T.landed = Math.abs(T.speed) < .02; } }
+      const r0 = (T.br[0] && T.br[0].r) || 1, tv = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][T.tool] || [0, 0, 0], k = r0 / 16, M = L.ident();   // renderTransform
+      L.tr(M, T.ox, T.oy, T.oz); L.tr(M, -tv[0] * k, -tv[1] * k, -tv[2] * k); L.rot(M, -T.yaw, 0, 0, 1); L.rot(M, T.pit, 1, 0, 0); L.tr(M, tv[0] * k, tv[1] * k, tv[2] * k); L.tr(M, -.5, 0, -.5);
+      const lt = litAt(m.x, m.y + 1, m.z), lname = DT_LOG[T.fam] || 'oak', bark = dtTexKey('log_' + lname, '#6b5232'), ring = dtTexKey('log_' + lname + '_top', '#9c7f4e'), leaf = dtTexKey(DT_LEAFTEX[T.fam] || 'leaves_oak', '#4a8f2f'), fol = DT_FOL[T.fam] || [72, 181, 24];
+      const P = (A, x, y, z, u, v, c) => A.push(M[0] * x + M[4] * y + M[8] * z + M[12], M[1] * x + M[5] * y + M[9] * z + M[13], M[2] * x + M[6] * y + M[10] * z + M[14], u, v, c[0], c[1], c[2], 1);
+      const box = (key, x0, y0, z0, x1, y1, z1, col, ringTop) => { const sh = [.5, 1, .8, .8, .6, .6];   // the six faces of a box, uv from the block-space coordinates like a baked block part
+        const F = [[[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], 0, 'xz'], [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], 1, 'xz'], [[x1, y1, z0], [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], 2, 'xy'], [[x0, y1, z1], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], 3, 'xy'], [[x0, y1, z0], [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], 4, 'zy'], [[x1, y1, z1], [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], 5, 'zy']];
+        for (const [a, b, c2, d, f, pl] of F) { const kk = (f === 1 && ringTop) || (f === 0 && ringTop) ? ring : key, A = FX.arr(kk, key === leaf ? 0 : 2), s2 = sh[f], cc = [col[0] * s2 * lt[0], col[1] * s2 * lt[1], col[2] * s2 * lt[2]], uv = q => pl === 'xz' ? [q[0] % 1, q[2] % 1] : pl === 'xy' ? [q[0] % 1, 1 - q[1] % 1] : [q[2] % 1, 1 - q[1] % 1];
+          for (const q of [a, b, c2, a, c2, d]) { const t2 = uv(q.map(v => v - Math.floor(Math.min(x0, y0, z0, 0)))); P(A, q[0], q[1], q[2], t2[0], t2[1], cc); } } };
+      for (const b of T.br) { const [x, y, z] = b.p, R = Math.min(b.r, 8) / 16, c = [.5 - R, .5 + R], W = [1, 1, 1];
+        box(bark, x + c[0], y + c[0], z + c[0], x + c[1], y + c[1], z + c[1], W, b.c.filter(Boolean).length === 1);
+        if (b.r < 8) b.c.forEach((cr, i) => { if (!cr) return; const q = Math.min(cr, b.r) / 16, lo = [.5 - q, .5 - q, .5 - q], hi = [.5 + q, .5 + q, .5 + q], ax = i >> 1 === 0 ? 1 : i >> 1 === 1 ? 2 : 0; if (i & 1) { lo[ax] = .5 + q; hi[ax] = 1; } else { lo[ax] = 0; hi[ax] = .5 - q; }
+          box(bark, x + lo[0], y + lo[1], z + lo[2], x + hi[0], y + hi[1], z + hi[2], W, false); }); }
+      for (const [x, y, z] of T.lv) box(leaf, x, y, z, x + 1, y + 1, z + 1, fol.map(v => v / 255), false); } }
+  function dtRot(T, d) { if (T.tool === 2) T.pit += d; else if (T.tool === 3) T.pit -= d; else if (T.tool === 4) T.yaw += d; else if (T.tool === 5) T.yaw -= d; }   // addRotation
+  function dtHit(T) { const t = T.tool, ox = [0, 0, 0, 0, -1, 1][t] || 0, oz = [0, 0, -1, 1, 0, 0][t] || 0, ang = (t >= 4 ? T.yaw : T.pit) * Math.PI / 180, h = Math.sin(ang) * (ox | oz), v = Math.cos(ang);   // testCollision: the trunk's segments against the world
+    const xb = T.ox + ox * (-.5 + v * .5 + h * .5), yb = T.oy - h * .5 + v * .5, zb = T.oz + oz * (-.5 + v * .5 + h * .5);
+    for (let s = 2; s < Math.min(T.trunk, 24); s++) { const X = Math.floor(xb + h * s * ox), Y = Math.floor(yb + v * s), Z = Math.floor(zb + h * s * oz), b = BLOCKS[world.get(X, Y, Z)]; if (b && (b.opaque || b.solid) && !b.modName && !b.leaves) return true; }
+    return Math.abs(T.yaw) >= 90 || Math.abs(T.pit) >= 90; }
   function dtAround(X, y, Z) { dtFix(X, y, Z); for (const [dx, dy, dz] of [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]]) dtFix(X + dx, y + dy, Z + dz); }
   function dtChunk(sx, sz, sections) { const ids = S.dtIds || (S.dtIds = new Set(Object.entries(S.forge.blocks).filter(([i, n]) => /branchx?$/.test(n) && dtRad(n, 0)).map(([i]) => +i))); if (!ids.size) return;
     const X0 = sx * 16, Z0 = sz * 16, hit = []; for (const sec of sections) { const bl = sec.blocks; for (let j = 0; j < 4096; j++) if (ids.has(bl[j] >> 4)) hit.push([X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15)]); }
