@@ -18589,7 +18589,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     def(id, name, col, col, 0, Object.assign({ opaque: false, lightOpaque: 0, shape: 1, decor: 1, noItem: 1, boxes }, extra || {})); post(id); S.vis.set(key, id); if (extra && extra.tex) texFor(id, extra.tex, extra.texF); return id;
   }
   function stateToId(st, below) {   // protocol 47: st = blockId<<4 | meta
-    if (S.forge) { const fb = S.forge.blocks[st >> 4]; if (fb && !fb.startsWith('minecraft:')) return modBlock(fb, st & 15); }   // Forge: modded ids fill gaps anywhere in the table, so go by registry name
+    if (S.forge) { const fb = S.forge.blocks[st >> 4]; if (fb && !fb.startsWith('minecraft:')) { const P = portOf(fb), al = P && P.alias ? P.alias(fb, st & 15) : null; return al != null ? stateToId(al, below) : modBlock(fb, st & 15); } }   // a port may show a modded block as a vanilla one (Dynamic Trees' leaves and rooty soil)   // Forge: modded ids fill gaps anywhere in the table, so go by registry name
     { const n = native(st >> 4, st & 15, below); if (n) return n; }
     let e = StrataMC.blocks18[st >> 4]; if (!e || e.k === 'skip') return 0;
     const v = e.v && e.v[st & 15]; if (v) e = v.k ? v : Object.assign({}, e, v);
@@ -19597,6 +19597,7 @@ class LobDarklingsModel extends ModelCreatureObj {
       if (input.crouchToggle) { input.crouchToggle = false; S.client.api.steer(0, 0, 2); if (V9()) { S.client.api.sneak(S.eid, true); setTimeout(() => { if (S) S.client.api.sneak(S.eid, false); }, 150); } } },   // 2 = unmount; the server answers with attach_entity -1
     useHeld() {   // tapping the air: open books, otherwise use the item like a right click (eat, drink, throw, bow, rod)
       const h = held(), mc = h && h.mc; if (!mc) return false; if (mc.id === 386 || mc.id === 387) return openMcBook(h);
+      { const pn = S.forge && S.forge.items[mc.id]; if (pn && !pn.startsWith('minecraft:')) portUse(pn, mc); }   // a port's client side of the right click (First Aid's apply-health screen)
       if (!FOOD18.has(mc.id) && !modUse(mc)) return false; const a = S.client.api; a.place(-1, -1, -1, 255, mc, 0, 0, 0); if (mc.id === 261) setTimeout(() => { if (S) a.dig(5, 0, 0, 0, 0); }, 1000); return true; },
 
     openInv() { if (mode === 'play') mcInvOpen(); },
@@ -19940,7 +19941,7 @@ class LobDarklingsModel extends ModelCreatureObj {
       n = skinBox(s.buf, n, M, -4, 0, -4, 8, 8, 8, 0, 0, 0); n = skinBox(s.buf, n, M, -4, 0, -4, 8, 8, 8, 32, 0, .25); SKIN.tex = s.T.tex; drawSkinMesh(s.buf, n / 6, Array.from(sampleLight(s.x + .5, s.y + .5, s.z + .5)), 1, false); }
     SKIN.tex = keep; }
   function skullScan(sx, sz, sections) { const X0 = sx * 16, Z0 = sz * 16; if (S.skulls) for (const [k, s] of S.skulls) if (s.x >> 4 === sx && s.z >> 4 === sz) S.skulls.delete(k);
-    const wb = S.forge && S.forge.byName.get('waystones:waystone');
+    const wb = S.forge && S.forge.byName.get('waystones:waystone'); if (S.dt) dtChunk(sx, sz, sections);
     for (const sec of sections) { const b = sec.blocks; for (let j = 0; j < 4096; j++) { const v = b[j] >> 4; if (v === 144) skullMeta(X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15), b[j] & 15); else if (wb != null && v === wb) wayTrack(X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15), b[j] & 15); } } }
   // ---- your own character in compat: elytra glide pose and wings, raised shield (hooks in Strata's buildPlayerSkin) ----
   const ownShield = () => { const h = S.slots[36 + inv.sel], o = S.slots[45]; return h && h.id === 442 ? 1 : o && o.id === 442 ? 2 : 0; };
@@ -20024,6 +20025,21 @@ class LobDarklingsModel extends ModelCreatureObj {
           <div>Energy: <b>${fmtRF(en)}</b> / ${fmtRF(cap)} RF</div><div>Generating: <b>${fmtRF(gen)}</b> RF/t (max ${fmtRF(max)})</div><div>Sun: ${isFinite(sun) ? Math.round(Math.max(0, Math.min(1, sun)) * 100) : 0}%</div><small class="hint">Slots: upgrades, then a slot that charges items.</small>`;
         box.appendChild(el); return true; } },
     // Waystones: the stone is drawn by the mod (two blocks tall, meta & 8 = the lower half); the client opens the destination list itself and asks the server to teleport
+    dynamictrees: {   // branches drawn as BakedModelBlockBranchBasic builds them (a core of the branch's radius, a sleeve to each connected neighbour), leaves and rooty soil as the vanilla blocks they stand for
+      alias(n, meta) { const m = /^dynamictrees:leaves(\d+)$/.exec(n); if (m) { const t = DT_FAM[+m[1] * 4 + ((meta >> 2) & 3)] || 'oak'; return DT_LEAF[t]; }
+        if (/^dynamictrees:rooty(dirt|dirtspecies|dirtfake)$/.test(n)) return 3 << 4; if (n === 'dynamictrees:rootysand') return 12 << 4; return null; },
+      block(n, meta) { const r = dtRad(n, meta); if (!r) return null; S.dt = S.dt || 1; const c = Math.min(r, 8) / 16, T = dtTex(n); return { key: 'r' + r, tex: [T[0], T[1], T[0]], col: '#6b5232', boxes: [[.5 - c, .5 - c, .5 - c, .5 + c, .5 + c, .5 + c]] }; } },
+    firstaid: {   // per-limb health (channel "firstaid": 1 part update, 3 config + model NBT, 5 add health, 8 model NBT; client sends 2 = apply healing item to a part)
+      payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (old !== hp) F.flash = performance.now(); };
+        if (d === 1) { const id = r.u8(), mx = r.i32(); r.f32(); const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
+        else if (d === 3 || d === 8) { let t = {}; try { t = nbtRead(b, 1)[0] || {}; } catch (e) { /* bad tag */ } FA_KEYS.forEach((k, i) => { const q = t[k]; if (q) set(i, +q.health || 0, q.maxHealth | 0); }); F.on = 1; }
+        else if (d === 5) { for (let i = 0; i < 8; i++) { const v = r.d.getFloat32(r.p); r.p += 4; if (v) set(i, Math.min(F.parts[i].max, F.parts[i].hp + v), 0); } } } },
+      use(n) { if (!/^firstaid:(bandage|plaster)$/.test(n)) return false; faPick(); return true; },
+      tick() { faHud(); } },
+    simpledifficulty: {   // thirst and temperature: the server owns both (channel "simpledifficulty": 0 thirst NBT, 4 temperature NBT, client sends 1 = drink water)
+      payload: { simpledifficulty(b) { const d = b[0], t = nbtOf(b.subarray(1)), D = S.sd || (S.sd = {});
+        if (d === 0) { D.thirst = t.thirstLevel | 0; D.sat = +t.thirstSaturation || 0; D.on = 1; } else if (d === 4) { D.temp = t.temperatureLevel | 0; D.on = 1; } } },
+      tick() { sdHud(); } },
     waystones: {
       block(n, meta) { if (n !== 'waystones:waystone') return null; const lo = (meta & 8) !== 0; return { key: lo ? 'lo' : 'hi', noMesh: S.modRec && S.modRec.files['e/waystones:entity/waystone'] ? 1 : 0, tex: ['stonebrick', 'stonebrick', 'stonebrick'], col: '#8e8e92', boxes: lo ? [[0, 0, 0, 1, .25, 1], [.125, .25, .125, .875, 1, .875]] : [[.125, 0, .125, .875, .7, .875], [.0625, .7, .0625, .9375, .9, .9375]] }; },
       payload: { waystones(b) { const r = bbR(b, 0), d = r.u8(), entry = () => { const name = r.str(), dim = r.i32(), pos = unpos(r.i64()), global = r.bool(); return { name, dim, pos, global }; };
@@ -20485,6 +20501,84 @@ class LobDarklingsModel extends ModelCreatureObj {
       : B('ctl|4', 'Ability') + B('ctl|16', 'Attack') + B('ctl|8', 'Inventory') + B('ctl|2', 'Dismount'); }
   // mount control states, as Lycanites' KeyHandler sends them (17): jump, descend, ability, inventory, attack, dismount
   // Lycanites' inventory tabs (TabManager): Beastiary (soulgazer), Summoning (summoning staff), and the mount's inventory (saddle) while riding one of its creatures
+  // ---- Dynamic Trees ----
+  const DT_FAM = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'darkoak'];   // leaves/common.json order: four trees per leavesN block
+  const DT_LEAF = { oak: 18 << 4, spruce: 18 << 4 | 1, birch: 18 << 4 | 2, jungle: 18 << 4 | 3, acacia: 161 << 4, darkoak: 161 << 4 | 1 };
+  const DT_LOG = { oak: 'oak', spruce: 'spruce', birch: 'birch', jungle: 'jungle', acacia: 'acacia', darkoak: 'big_oak' };
+  function dtRad(n, meta) { const m = /^[^:]+:([a-z_]+?)branch(x?)$/.exec(n || ''); if (!m) return 0; if (m[2] || (S.forge && S.forge.byName.has(n + 'x'))) return Math.min(24, meta + (m[2] ? 17 : 1));   // BlockBranchThick (a family with a '...branchx' pair): radii 1-16 and 17-24
+    return (meta & 7) + 1; }   // BlockBranchBasic: meta = radius - 1
+  function dtTex(n) { const f = (/^[^:]+:([a-z_]+?)branchx?$/.exec(n) || [])[1] || 'oak', l = DT_LOG[f]; return l ? ['log_' + l, 'log_' + l + '_top'] : ['log_oak', 'log_oak_top']; }
+  function dtAt(X, y, Z) { const b = BLOCKS[world.get(X, y, Z)]; return b && b.modName ? dtRad(b.modName, b.modMeta | 0) : 0; }
+  function dtFix(X, y, Z) { const b = BLOCKS[world.get(X, y, Z)], n = b && b.modName, r = n ? dtRad(n, b.modMeta | 0) : 0; if (!r) return;
+    const D = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]], cn = D.map(([dx, dy, dz], i) => { const q = world.get(X + dx, y + dy, Z + dz), qb = BLOCKS[q]; if (!qb || !q) return 0;   // getSideConnectionRadius, clamped to this radius
+      if (qb.modName) { const rr = dtRad(qb.modName, qb.modMeta | 0); return Math.min(rr, r); } if (qb.leaves) return r === 1 ? 1 : 0; if (i === 0 && (q === B.DIRT || q === B.GRASS || q === B.SAND)) return Math.min(8, r); return 0; });   // rooty soil below: radius 8
+    let src = -1, big = 0; cn.forEach((c, i) => { if (c > big) { big = c; src = i; } }); if (big < r) src = -1; if (src < 0) src = 0; const nc = cn.filter(Boolean).length, ring = nc === 1 ? src ^ 1 : -1;   // getSourceDir; the cut end shows the rings
+    const T = dtTex(n), px = v => v / 16, R = Math.min(r, 8), box = [[px(8 - R), px(8 - R), px(8 - R), px(8 + R), px(8 + R), px(8 + R)]];
+    if (r < 8) cn.forEach((c, i) => { if (!c) return; const a = i >> 1, pos = i & 1, lo = [8 - c, 8 - c, 8 - c], hi = [8 + c, 8 + c, 8 + c], ax = a === 0 ? 1 : a === 1 ? 2 : 0;   // bakeSleeve: from the face to the core
+      if (pos) { lo[ax] = 8 + c; hi[ax] = 16; } else { lo[ax] = 0; hi[ax] = 8 - c; } box.push([px(lo[0]), px(lo[1]), px(lo[2]), px(hi[0]), px(hi[1]), px(hi[2])]); });
+    const top = ring === 1 ? T[1] : T[0], bot = ring === 0 ? T[1] : T[0], key = 'c' + r + ':' + cn.join('') + ':' + ring;
+    const id = modBlock(n, b.modMeta | 0, { key, tex: [T[0], top, bot], col: '#6b5232', boxes: box }); if (id !== world.get(X, y, Z)) setBlock(X, y, Z, id); }
+  function dtAround(X, y, Z) { dtFix(X, y, Z); for (const [dx, dy, dz] of [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]]) dtFix(X + dx, y + dy, Z + dz); }
+  function dtChunk(sx, sz, sections) { const ids = S.dtIds || (S.dtIds = new Set(Object.entries(S.forge.blocks).filter(([i, n]) => /branchx?$/.test(n) && dtRad(n, 0)).map(([i]) => +i))); if (!ids.size) return;
+    const X0 = sx * 16, Z0 = sz * 16, hit = []; for (const sec of sections) { const bl = sec.blocks; for (let j = 0; j < 4096; j++) if (ids.has(bl[j] >> 4)) hit.push([X0 + (j & 15), sec.y * 16 + (j >> 8), Z0 + ((j >> 4) & 15)]); }
+    if (hit.length) setTimeout(() => { if (!S || !S.world) return; for (const [x, y, z] of hit) dtAround(x, y, z); }, 0); }   // skullScan's chunk coordinates already include Strata's offset   // after the chunk is in the world
+  // First Aid's overlay (PlayerModelRenderer, top left): the body drawn part by part from simple_health.png, each in one of six health colours, flashing for a moment when a part changes; and its 'apply health' screen for bandages and plasters
+  const FA_KEYS = ['head', 'leftArm', 'leftLeg', 'leftFoot', 'body', 'rightArm', 'rightLeg', 'rightFoot'], FA_MAX = [4, 4, 4, 4, 6, 4, 4, 4];
+  const FA_DRAW = [[0, 8, 0, 16, 16], [4, 8, 16, 16, 24], [1, 0, 16, 8, 24], [5, 24, 16, 8, 24], [2, 8, 40, 8, 16], [6, 16, 40, 8, 16], [3, 8, 56, 8, 8], [7, 16, 56, 8, 8]];   // part, x, y, w, h
+  const faS = () => S.fa || (S.fa = { parts: FA_MAX.map(m => ({ hp: m, max: m })), flash: 0 });
+  const faState = p => p.hp <= .001 ? 5 : Math.abs(p.hp - p.max) < .001 ? 0 : (q => q > .75 ? 1 : q > .5 ? 2 : q > .25 ? 3 : 4)(p.hp / p.max);   // getState, six colours
+  const faImg = () => { if ('img' in faS()) return S.fa.img; const d = S.modRec && S.modRec.files['g/firstaid:gui/simple_health']; let c = null; if (d && window.StrataLyc) try { const D = StrataLyc.pngDecode(d); c = document.createElement('canvas'); c.width = D.w; c.height = D.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(D.data), D.w, D.h), 0, 0); } catch (e) { c = null; } return (S.fa.img = c); };
+  function faDraw(g, F, flash) { const im = faImg(); if (!im) return; const yo = flash ? 64 : 0; for (const [i, x, y, w, h] of FA_DRAW) g.drawImage(im, x + 32 * faState(F.parts[i]), y + yo, w, h, x, y, w, h); }
+  function faHud() { const F = S.fa; if (!F || !F.on) return; let c = document.getElementById('faHud'); const cre = world.meta.gameMode === 'creative';
+    if (!c) { c = document.createElement('canvas'); c.id = 'faHud'; c.width = 32; c.height = 64; c.style.cssText = 'position:absolute;left:calc(env(safe-area-inset-left) + 8px);top:calc(env(safe-area-inset-top) + 112px);width:48px;height:96px;image-rendering:pixelated;pointer-events:none;z-index:3;opacity:.8'; document.body.appendChild(c); }   // alpha 50 of 255 -> 80% opaque
+    c.hidden = cre; if (cre) return; const st = F.flash ? Math.floor((performance.now() - F.flash) / 150) + 1 : 0, fl = st > 0 && st < 8 && st % 2 === 0; if (st >= 8) F.flash = 0;   // FlashStateManager
+    const key = F.parts.map(p => p.hp + '/' + p.max).join() + fl; if (c.dataset.k === key) return; c.dataset.k = key; const g = c.getContext('2d'); g.clearRect(0, 0, 32, 64); faDraw(g, F, fl); }
+  function faPick() { const F = faS(), T = (S.modRec && S.modRec.lang && S.modRec.lang.firstaid) || {}; let el = document.getElementById('faPick'); if (el) el.remove();
+    el = document.createElement('div'); el.id = 'faPick'; el.style.cssText = 'position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:rgba(0,0,0,.45);font:13px system-ui;color:#fff';
+    const box = document.createElement('div'); box.style.cssText = 'background:rgba(24,33,42,.96);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 128px auto;gap:6px 10px;align-items:center';
+    const cv = document.createElement('canvas'); cv.width = 32; cv.height = 64; cv.style.cssText = 'width:128px;height:256px;image-rendering:pixelated;grid-row:2/span 4;grid-column:2'; faDraw(cv.getContext('2d'), F, false);
+    const ttl = document.createElement('b'); ttl.textContent = T['gui.apply_hint'] || 'Pick where to apply the item'; ttl.style.cssText = 'grid-column:1/-1;text-align:center';
+    box.appendChild(ttl); const order = [[0, 1, 2], [1, 1, 3], [2, 1, 4], [3, 1, 5], [4, 3, 2], [5, 3, 3], [6, 3, 4], [7, 3, 5]];   // part, column, row: GuiHealthScreen's two columns (head and left side, body and right side)
+    for (const [i, col, row] of order) { const p = F.parts[i], b = document.createElement('button'); b.className = 'ghost'; b.style.cssText = `grid-column:${col};grid-row:${row};padding:6px 10px;text-align:left`;
+      b.innerHTML = `${T['gui.' + FA_KEYS[i].replace(/[A-Z]/g, m => '_' + m.toLowerCase())] || FA_KEYS[i]}<br><small>${(Math.round(p.hp * 10) / 10)} / ${p.max}</small>`; b.disabled = p.hp >= p.max;
+      b.addEventListener('click', () => { try { S.client.api.modSend('firstaid', Uint8Array.from([2, i + 1, 1])); } catch (e) { /* offline */ } el.remove(); }); box.appendChild(b); }
+    box.appendChild(cv);
+    const x = document.createElement('button'); x.className = 'ghost'; x.textContent = 'Cancel'; x.style.cssText = 'grid-column:1/-1'; x.addEventListener('click', () => el.remove()); box.appendChild(x);
+    el.addEventListener('click', ev => { if (ev.target === el) el.remove(); }); el.appendChild(box); document.body.appendChild(el); }
+  // Simple Difficulty's HUD, drawn from its own sprite sheets: ThirstGui (ten 9px drops above the air bubbles, saturation overlay, shaking when dry) and TemperatureGui (the 16px core with its 32px 'feel' ring, shaking near the extremes, the change animation)
+  const sdImg = k => { const C = S.sdImg || (S.sdImg = {}); if (k in C) return C[k]; const d = S.modRec && S.modRec.files['g/simpledifficulty:gui/' + k]; let c = null;
+    if (d && window.StrataLyc) try { const D = StrataLyc.pngDecode(d); c = document.createElement('canvas'); c.width = D.w; c.height = D.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(D.data), D.w, D.h), 0, 0); } catch (e) { c = null; } return (C[k] = c); };
+  function sdHud() { const D = S.sd; if (!D || !D.on) return; const h = document.getElementById('hearts'), hu = document.getElementById('mcHunger') || h; if (!h) return; const now = performance.now();
+    D.tk = D.tk || now; while (now - D.tk >= 50) { D.tk += 50; D.n = (D.n || 0) + 1; if (D.fm >= 0) D.fm--; if (D.go) { D.fm = 14; D.go = false; } }   // the client tick counters
+    const cre = world.meta.gameMode === 'creative'; let c = document.getElementById('sdThirst'), t = document.getElementById('sdTemp');
+    if (!c) { c = document.createElement('canvas'); c.id = 'sdThirst'; c.style.cssText = 'display:block;margin-top:2px;image-rendering:pixelated'; hu.after(c); }
+    if (!t) { t = document.createElement('canvas'); t.id = 'sdTemp'; t.style.cssText = 'position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translateX(-50%);width:64px;height:64px;image-rendering:pixelated;pointer-events:none;z-index:3'; document.body.appendChild(t); }
+    c.hidden = h.hidden || cre || D.thirst == null; t.hidden = h.hidden || cre || D.temp == null; const Z = 14, R = Z / 9;
+    if (!c.hidden) { const im = sdImg('thirsthud'), th = D.thirst, sat = D.sat, sk = (D.n | 0) !== D.lastN; if (c.width !== 10 * Z * 2) { c.width = 10 * Z * 2; c.height = Z * 2 + 4; c.style.width = 10 * Z + 'px'; c.style.height = (Z + 2) + 'px'; }
+      if (sk || D.tdirty !== th + '/' + sat) { D.lastN = D.n; D.tdirty = th + '/' + sat; const g = c.getContext('2d'); g.setTransform(2 * R, 0, 0, 2 * R, 0, 0); g.imageSmoothingEnabled = false; g.clearRect(0, 0, 200, 40);
+        const thirsty = S.fx && Object.keys(S.fx).some(id => S.forge.potions && S.forge.potions[id] === 'simpledifficulty:thirsty'), xo = thirsty ? 36 : 0, bg = thirsty ? 117 : 0, n = D.n | 0;
+        let seed = n * 445; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % 3; };
+        if (im) for (let i = 0; i < 10; i++) { const k = i * 2 + 1, x = (9 - i) * 9, y = sat <= 0 && n % (th * 3 + 1) === 0 ? 1 + rnd() - 1 : 1;   // right to left, as Minecraft draws the right-hand bars
+          g.drawImage(im, bg, 0, 9, 9, x, y, 9, 9); if (k < th) g.drawImage(im, xo + 36, 0, 9, 9, x, y, 9, 9); else if (k === th) g.drawImage(im, xo + 45, 0, 9, 9, x, y, 9, 9);
+          const si = sat | 0; if (si > 0) { if (k < si) g.drawImage(im, 126, 0, 9, 9, x, 1, 9, 9); else if (k === si) g.drawImage(im, 135, 0, 9, 9, x, 1, 9, 9); } }
+        c.setAttribute('aria-label', 'Thirst ' + th + ' of 20'); } }
+    if (!t.hidden) { const im = sdImg('temphud'), T = D.temp, n = D.n | 0; if (D.old == null) D.old = T; if (D.old !== T) { D.rise = D.old < T; D.old = T; D.go = true; }
+      if (t.width !== 64) { t.width = t.height = 64; } const g = t.getContext('2d'); g.imageSmoothingEnabled = false; g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, 32, 32);
+      const en = T <= 5 ? 0 : T <= 10 ? 1 : T <= 14 ? 2 : T <= 19 ? 3 : 4; let fq = 0; if (en === 0) fq = T === 5 ? 0 : T > 3 ? 2 : 1; else if (en === 4) fq = T === 20 ? 0 : T >= 23 ? 1 : 2;   // getShakeFrequency (FREEZING 0-5, BURNING 20-25)
+      if (fq > 0 && n % fq === 0) D.side = Math.floor(n / fq) % 2 === 0; const xo = fq > 0 ? (D.side ? 1 : -1) : 0;
+      let core = T < 6 ? 0 : T >= 20 ? 192 : (Math.floor(T / 2) + 2) * 16; if (T < 6 || T >= 20) core += (T < 12 ? n % 5 : n % 4) * 16;
+      const fx = T >= 6 && T < 20 ? (Math.floor(T / 2) - 2) * 32 : 0, fy = T >= 20 ? 32 : 0;   // the 'feel' ring: the mod draws the surroundings' temperature here; Strata shows the body temperature it's heading to
+      if (im) { g.drawImage(im, fx, 16 + fy, 32, 32, xo, 0, 32, 32); g.drawImage(im, core, 0, 16, 16, 8 + xo, 8, 16, 16); if (D.fm >= 0) g.drawImage(im, (14 - D.fm) * 16, 144 + (D.rise ? 16 : 0), 16, 16, 8, 8, 16, 16); }
+      t.setAttribute('aria-label', 'Temperature ' + T); }
+    sdDrinkBtn(D); }
+  // drinking from water with an empty hand (ThirstHandler.onRightClickEmpty: sneaking, thirsty, water in reach): look at the water, then send the drink message the mod's client sends
+  function sdWater() { const ex = player.x, ey = player.y + 1.62, ez = player.z; let best = null, bd = 99;
+    for (let dx = -4; dx <= 4; dx++) for (let dy = -4; dy <= 1; dy++) for (let dz = -4; dz <= 4; dz++) { const x = Math.floor(ex) + dx, y = Math.floor(ey) + dy, z = Math.floor(ez) + dz; if (world.get(x, y, z) !== B.WATER) continue; const d = Math.hypot(x + .5 - ex, y + .9 - ey, z + .5 - ez); if (d < bd && d < 4.5) { bd = d; best = [x, y, z]; } } return best; }
+  function sdDrinkBtn(D) { let b = document.getElementById('sdDrink'); const h = held(), ok = D.thirst != null && D.thirst < 20 && !h && world.meta.gameMode !== 'creative' && (D.wn = ((D.wn | 0) + 1) % 10) === 0 ? (D.w = sdWater()) : D.w;
+    if (!b) { b = document.createElement('button'); b.id = 'sdDrink'; b.className = 'ghost'; b.textContent = '💧 Drink'; b.style.cssText = 'position:absolute;right:calc(env(safe-area-inset-right) + 12px);bottom:calc(env(safe-area-inset-bottom) + 210px);pointer-events:auto;z-index:4;font:600 13px system-ui;padding:8px 12px';
+      b.addEventListener('pointerdown', ev => { ev.preventDefault(); const w = S.sd && S.sd.w; if (!w) return; const dx = w[0] + .5 - player.x, dy = w[1] + .9 - (player.y + 1.62), dz = w[2] + .5 - player.z, yaw = -Math.atan2(dx, dz) * 180 / Math.PI, pitch = -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI;
+        const a = S.client.api; try { a.look(yaw, pitch, true); a.modSend('simpledifficulty', Uint8Array.from([1])); a.swing(); } catch (e) { /* offline */ } soundHere('entity.generic.drink'); }); document.body.appendChild(b); }
+    b.hidden = !(D.thirst != null && D.thirst < 20 && !h && D.w && world.meta.gameMode !== 'creative'); }
   function lyTabs() { const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-self:flex-start'; const F = S.modRec.files, L = LYS();
     const tab = (icon, title, fb, fn) => { const b = document.createElement('button'); b.className = 'ghost'; b.title = title; b.style.cssText = 'width:40px;height:36px;padding:4px;display:grid;place-items:center'; const d = F['i/' + icon];
       if (d) { const im = document.createElement('img'); im.src = URL.createObjectURL(new Blob([d], { type: 'image/png' })); im.style.cssText = 'width:24px;height:24px;image-rendering:pixelated'; b.appendChild(im); } else b.textContent = fb; b.addEventListener('click', () => { closeInv(); fn(); }); row.appendChild(b); };
@@ -20834,7 +20928,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook, faPick });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
@@ -20866,10 +20960,10 @@ class LobDarklingsModel extends ModelCreatureObj {
       anim(id, a) { const m = S.ents.get(id); if (m && a === 2) m.sleep = null; o.anim(id, a); },
       bed(eid, x, y, z) { if (S.world) bedPose(eid, x, y, z); },
       block(x, y, z, st) { o.block(x, y, z, st); if (!S.world) return; if (st >> 4 === 26) bedPaint(x + S.OX, y, z + S.OZ); if (st >> 4 === 144) skullMeta(x + S.OX, y, z + S.OZ, st & 15); else skullGone(x + S.OX, y, z + S.OZ);
-        if (S.forge) drawnSet(x + S.OX, y, z + S.OZ, st >> 4, st & 15);
+        if (S.forge) { drawnSet(x + S.OX, y, z + S.OZ, st >> 4, st & 15); if (S.dt) dtAround(x + S.OX, y, z + S.OZ); }
         const wb = S.forge && S.forge.byName.get('waystones:waystone'); if (wb != null && st >> 4 === wb) { wayTrack(x + S.OX, y, z + S.OZ, st & 15); const li = S.lastPlaceItem, ln = li && S.forge.items[li.id];
           if ((st & 8) && ln === 'waystones:waystone' && performance.now() - (S.lastPlace || 0) < 3000) { S.lastPlace = 0; setTimeout(() => wayName([x, y, z], ''), 200); } } },
-      multi(l) { o.multi(l); if (S.world) for (const b of l) { if (S.forge) drawnSet(b.x + S.OX, b.y, b.z + S.OZ, b.state >> 4, b.state & 15); if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
+      multi(l) { o.multi(l); if (S.world) for (const b of l) { if (S.forge) { drawnSet(b.x + S.OX, b.y, b.z + S.OZ, b.state >> 4, b.state & 15); if (S.dt) dtAround(b.x + S.OX, b.y, b.z + S.OZ); } if (b.state >> 4 === 144) skullMeta(b.x + S.OX, b.y, b.z + S.OZ, b.state & 15); else skullGone(b.x + S.OX, b.y, b.z + S.OZ); } },
       tile(x, y, z, a, raw) { o.tile(x, y, z, a, raw); if (!S.world) return; let tag; try { tag = nbtRead(raw, 0)[0]; } catch (e) { return; } if (!tag) return; if (x == null) { x = tag.x; y = tag.y; z = tag.z; } if (x == null) return;
         if (/bed$/i.test(String(tag.id || '')) && tag.color != null) bedColour(x, y, z, tag.color); if (/skull$/i.test(String(tag.id || ''))) skullTile(x + S.OX, y, z + S.OZ, tag); if (S.forge) for (const P of Object.values(PORTS)) if (P.tileAny) try { P.tileAny(x, y, z, tag); } catch (e) { /* odd tile */ } if (S.forge && PORTS.computercraft && (tag.instanceID != null || tag.xIndex != null || tag.direction != null)) try { PORTS.computercraft.tile(x, y, z, tag); } catch (e) { /* odd tile */ } },
       held(n) { S.block = false; o.held(n); },
