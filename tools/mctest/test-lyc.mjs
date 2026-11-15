@@ -1,0 +1,36 @@
+// Browser test (dev only): Lycanites Mobs on a real Forge 1.12.2 server. Imports the jar, summons creatures, checks that each is drawn from its own OBJ model
+// posed by the mod's model classes, with its textures and layers. Screenshots /tmp/lyc*.png
+// Run: JAR=lycanitesmobs.jar NODE_PATH=/opt/npm-tools/node_modules node test-lyc.mjs
+import { spawn } from 'node:child_process'; import { createRequire } from 'node:module';
+const { chromium } = createRequire(import.meta.url)('playwright'); const wait = ms => new Promise(r => setTimeout(r, ms));
+const DIR = process.env.FORGE_DIR || '/tmp/claude-0/forgesrv', SP = 25990, RP = 25992, JAR = process.env.JAR;
+const srv = spawn('/usr/lib/jvm/java-8-openjdk-amd64/bin/java', ['-Xmx3G', '-jar', 'server.jar', 'nogui'], { cwd: DIR, stdio: ['pipe', 'pipe', 'pipe'] }); let log = ''; srv.stdout.on('data', d => { log += d; });
+const cmd = c => srv.stdin.write(c + '\n'); for (let i = 0; i < 180 && !/Done \(/.test(log); i++) await wait(1000);
+const relay = spawn('node', ['../relay/relay.mjs'], { env: { ...process.env, PORT: String(RP) }, stdio: 'ignore' }); await wait(1200);
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const pg = await b.newPage({ viewport: { width: 900, height: 600 } }); const errs = []; pg.on('pageerror', e => errs.push(e.message + ' @ ' + (e.stack || '').split('\n').slice(1, 3).join('|')));
+pg.on('console', m => { const t = m.text(); if ((m.type() === 'error' || /^jvm:|objmobs|port fx/.test(t)) && !/ERR_TUNNEL|Failed to load/.test(t)) errs.push(t.slice(0, 300)); });
+let out = {};
+try {
+await pg.goto('file://' + process.cwd() + '/../../release/strata-standalone.html'); await pg.waitForSelector('#mpBtn');
+await pg.$eval('#mpBtn', e => e.click()); await pg.$eval('[data-mp=minecraft]', e => e.click());
+await pg.selectOption('#mcVer', { label: '1.12.2 (protocol 340)' }); await pg.fill('#mcRelay', 'ws://127.0.0.1:' + RP); await pg.dispatchEvent('#mcRelay', 'change');
+await pg.$eval('#mcForge', e => { e.checked = true; e.dispatchEvent(new Event('change')); }); await wait(300);
+await pg.$eval('#mcModsClr', e => e.click()); await wait(300); const t0 = Date.now(); await pg.setInputFiles('#mcModsIn', [JAR]);
+await pg.waitForFunction(() => /Imported|Could not/.test(document.getElementById('mcModsStat').textContent), null, { timeout: 600000 }); out.importS = Math.round((Date.now() - t0) / 1000); out.imported = await pg.$eval('#mcModsStat', e => e.textContent);
+await pg.fill('#mcHost', '127.0.0.1:' + SP); await pg.$eval('#mcGo', e => e.click());
+await pg.waitForFunction(() => typeof mode !== 'undefined' && mode === 'play', null, { timeout: 150000 }); await wait(5000);
+cmd('gamerule doMobSpawning false'); cmd('time set 6000'); cmd('tp @a 0 4 0'); await wait(1500);
+const mobs = ['afrit', 'warg', 'grue', 'cinder', 'jengu', 'reiver', 'wisp', 'sylph', 'roa', 'amalgalich', 'banshee', 'maka'];
+mobs.forEach((n, i) => cmd(`summon lycanitesmobs:${n} ${-6 + (i % 4) * 4} 4 ${5 + Math.floor(i / 4) * 4} {NoAI:1b,PersistenceRequired:1b}`));
+await wait(6000);
+out.r = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)); const r = {};
+  r.ocr = S.modRec && S.modRec.ocr ? Object.keys(S.modRec.ocr).length : 0; r.objFiles = S.modRec ? Object.keys(S.modRec.files).filter(k => k.startsWith('o/')).length : 0; r.classes = S.modRec ? Object.keys(S.modRec.files).filter(k => k.startsWith('j/')).length : 0;
+  r.mobs = S.mobs.filter(m => m.modEnt && /^lycanitesmobs:/.test(m.modEnt)).map(m => [m.modEnt, m.type, !!m.ly, m.md ? [m.md[14], m.md[20], m.md[23], m.md[24]] : null]);
+  await W(1500); r.tex = [...FX.T.keys()].filter(k => /lycanites/.test(k)); r.fly = Object.fromEntries([...(window.__lyFly || [])]);
+  return r; });
+await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 0 + S.OX; player.z = 8 + S.OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .5); }); await wait(2500); await pg.screenshot({ path: '/tmp/lyc.png' });
+await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .6); }); await wait(2000); await pg.screenshot({ path: '/tmp/lyc2.png' });
+} catch (e) { out.fail = String(e).slice(0, 400); }
+out.errs = errs.slice(0, 30); console.log(JSON.stringify(out, null, 1));
+await b.close(); relay.kill(); cmd('stop'); await wait(4000); srv.kill(); process.exit(0);
