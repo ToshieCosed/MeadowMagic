@@ -57,8 +57,12 @@ out.more = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => 
   const P = StrataMCE.dbgPort(); await W(400); try { closeInv(); } catch (e) { /* */ } await W(300);
   r.lasers = []; for (let q = 0; q < 40; q++) { await W(500); const L = S.mobs.filter(m => m.modEnt && /lycanitesmobs/.test(m.modEnt) && m.md && typeof m.md[7] === 'string'); if (L.length) { r.lasers = L.map(m => [m.modEnt, m.md[7], m.md[8], m.md[10]]); break; } }
   { const k2 = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === 'lycanitesmobs:equipment'); if (k2 >= 0) { inv.sel = k2 - 36; S.client.api.select(k2 - 36); invChanged(); } await W(1200); r.held3d = !!(StrataMCE.dbgPort && window.__fx3dItem); r.heldItem = ITEMS[inv.slots[inv.sel] && inv.slots[inv.sel].id] && ITEMS[inv.slots[inv.sel].id].lyEq; r.eqTex = [...FX.T.keys()].filter(k => /equipment\//.test(k)); }
+  await window.srvCmd('give @a lycanitesmobs:beastspawn 1 0 {CreatureInfoSpawnEgg:{creaturename:"warg"}}'); await window.srvCmd('lycanitesmobs mobevent start hellsfury 0'); await W(2500);
+  r.ev = [!!document.getElementById('lyEvent'), (document.getElementById('mcLog') || {}).innerText && document.getElementById('mcLog').innerText.split('\n').filter(l => /begun|event/i.test(l)).slice(-2)];
+  r.egg = Object.values(ITEMS).filter(it => it && /:gen\/egg_/.test(it.mcTex || '')).map(it => [it.name, it.mcTex, !!(PACK.img && PACK.img['i/' + it.mcTex])]);
+  r.glowTex = [...FX.T.keys()].filter(k => /cinderblade/.test(k));
   r.beamTex = [...FX.T.keys()].filter(k => /beam|laser/.test(k)); r.fxNames = [...document.querySelectorAll('#mcFx *, [id*=fx]')].map(e => e.textContent).join(' ').slice(0, 200); r.pos = [Math.round(player.x - S.OX), Math.round(player.z - S.OZ)]; return r; });
-await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .35); }); await wait(1500); await pg.screenshot({ path: '/tmp/lyc-laser.png' });
+await pg.screenshot({ path: '/tmp/lyc-event.png' }); await wait(9000); await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .35); }); await wait(1500); await pg.screenshot({ path: '/tmp/lyc-laser.png' }); await pg.evaluate(() => { openInv(); }); await wait(800); await pg.screenshot({ path: '/tmp/lyc-inv.png' }); await pg.evaluate(() => { closeInv(); });
 await pg.evaluate(() => { const P = StrataMCE.dbgPort(); P.lycBook('creatures', 'warg'); }); await wait(800); await pg.screenshot({ path: '/tmp/lyc-book.png' });
 await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 0 + S.OX; player.z = 8 + S.OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .5); }); await wait(2500); await pg.screenshot({ path: '/tmp/lyc.png' });
 await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .6); }); await wait(2000); await pg.screenshot({ path: '/tmp/lyc2.png' });

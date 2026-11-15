@@ -185,7 +185,7 @@
       return { $s: s, $is: n => is.has(n) || /^(Entity|EntityLiving|EntityLivingBase|EntityCreature|BaseCreatureEntity)$/.test(n),
         get onGround() { return !!s.onGround; }, get ticksExisted() { return s.ticks | 0; }, get hurtTime() { return s.hurt | 0; }, get deathTime() { return s.death | 0; }, onlyRenderTicks: -1,
         isInWater: () => !!s.inWater, isChild: () => !!s.child, isInvisible: () => !!s.invisible, isInvisibleToPlayer: () => !!s.invisible, getHealth: () => s.health || 20, getMaxHealth: () => s.maxHealth || 20,
-        getBrightnessForRender: () => 15728880, isBeingRidden: () => false, isRiding: () => false, getPassengers: () => Object.assign([], { isEmpty: () => true, size: () => 0 }), getControllingPassenger: () => null,
+        getBrightnessForRender: () => 15728880, isBeingRidden: () => s.riders > 0, isRiding: () => false, getPassengers: () => Object.assign(new Array(s.riders | 0).fill({}), { isEmpty: () => !(s.riders > 0), size: () => s.riders | 0 }), getControllingPassenger: () => s.riders > 0 ? {} : null,
         getRNG: () => ({ nextFloat: Math.random, nextInt: n => Math.floor(Math.random() * (n || 1)), nextBoolean: () => Math.random() < .5, nextDouble: Math.random }),
         isAttackOnCooldown: () => s.attackCooldown > 0, getAttackCooldown: () => s.attackCooldown | 0, getStealth: () => s.stealth || 0, getAttackPhase: () => s.attackPhase | 0,
         hasPickupEntity: () => !!(s.target & 32), hasAttackTarget: () => !!(s.target & 1), hasPerchTarget: () => !!(s.target & 64), hasRiderTarget: () => !!(s.target & 16), hasMaster: () => !!(s.target & 2), hasParent: () => !!(s.target & 4), hasAvoidTarget: () => !!(s.target & 8), isBlocking: () => !!(s.anim & 8), extraAnimation01: () => !!(s.anim & 32),
@@ -263,7 +263,7 @@
       const f = q.g.f, V = new Float32Array(f.length), M = q.M; for (let i = 0; i < f.length; i += 5) { const x = f[i], y = f[i + 1], z = f[i + 2]; V[i] = M[0] * x + M[4] * y + M[8] * z + M[12]; V[i + 1] = M[1] * x + M[5] * y + M[9] * z + M[13]; V[i + 2] = M[2] * x + M[6] * y + M[10] * z + M[14]; V[i + 3] = f[i + 3]; V[i + 4] = f[i + 4]; }
       list.push({ V, tex: t }); }
     return list.length ? rasterIcon(list, size) : null; }
-  L.equipPose = equipPose; L.equipIcon = equipIcon; L.rasterIcon = rasterIcon; L.pngDecode = pngDecode;
+  L.equipPose = equipPose; L.equipIcon = equipIcon; L.rasterIcon = rasterIcon; L.pngDecode = pngDecode; L.pngEncode = pngEncode;
   L.objIcon = objIcon; L.parseObj = parseObj;
   L.create = create; window.StrataObjMobs = { create };
 })();
