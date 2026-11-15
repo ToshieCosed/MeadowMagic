@@ -6514,7 +6514,8 @@ const isFlatItem=id=>{ const it=ITEMS[id]; if(!it) return false; if(!it.block) r
 // draws an item in model space 0..1 (16 px), centred like a Minecraft item model, through M
 // glint: the enchantment shimmer as a purple band sweeping across the item's pixels (held, dropped, worn by others)
 const glintC=(c,x,y)=>{ const b=Math.max(0,Math.sin((x+y)*.45-performance.now()/260)); const k=b*b*.6; return [c[0]+(190-c[0])*k|0,c[1]+(110-c[1])*k|0,c[2]+(255-c[2])*k|0]; };
-function emitItem(vb,id,M,gl){ if(isFlatItem(id)){ const T=(x,y,z)=>ap(M,x,y,z), t=1/16;
+function emitItem(vb,id,M,gl){ if(vb===dynVB&&typeof window.__fx3dItem==='function'&&window.__fx3dItem(id,M)) return;   // a compat port draws this item as a 3D model (effects layer)
+  if(isFlatItem(id)){ const T=(x,y,z)=>ap(M,x,y,z), t=1/16;
     for(const [x,y,w,c] of itemPixels(id)) emitBox(vb,[x*t,(15-y)*t,7.5*t],[(x+w)*t,(16-y)*t,8.5*t],gl?glintC(c,x,y):c,T); return; }
   const bd=BLOCKS[ITEMS[id].block], g2=c=>gl?glintC(c,4,4):c; emitBox(vb,[0,0,0],[1,1,1],g2(bd.side),(x,y,z)=>ap(M,x,y,z)); emitBox(vb,[-.004,.999,-.004],[1.004,1.004,1.004],g2(bd.top),(x,y,z)=>ap(M,x,y,z)); }
 // Minecraft item display transforms (translation in pixels, rotation in degrees, scale)
@@ -19989,7 +19990,7 @@ class LobDarklingsModel extends ModelCreatureObj {
   function modItem(n, mc) { if (S.forge.byName.has(n)) { const sid = modBlock(n, mc.damage | 0); if (!ITEMS[sid]) { ITEMS[sid] = { name: modName(n), stack: 64, block: sid, mcCompat: 1, cat: 'compat' }; S.items.push(sid); } return sid; }
     const P = portOf(n), vk = P && P.itemKey ? P.itemKey(n, mc) : null, key = vk ? n + '#' + vk.key : n;   // a port can split an item by its NBT (Lycanites' crafted equipment: one icon per set of parts)
     S.modIds = S.modIds || new Map(); let sid = S.modIds.get(key); if (sid) return sid; sid = 70000 + S.modIds.size; S.modIds.set(key, sid);
-    const R = S.modRec, tx = (vk && vk.tex) || (P && P.icons && P.icons[n]) || (R && R.items[n]); ITEMS[sid] = { name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }; S.items.push(sid); return sid; }
+    const R = S.modRec, tx = (vk && vk.tex) || (P && P.icons && P.icons[n]) || (R && R.items[n]); ITEMS[sid] = Object.assign({ name: modName(n), stack: 64, mcCompat: 1, cat: 'compat', mcTex: tx || n, mcName: n }, (vk && vk.extra) || {}); S.items.push(sid); return sid; }
   function modEntName(mod, tid) { const L = Object.entries(S.forge.ents).filter(([i, n]) => modOf(n) === mod).sort((a, b) => a[0] - b[0]).map(e => e[1]); { const P = PORTS[mod]; const n = P && P.entName && P.entName(tid, L); if (n) return n; } return L[tid] || L[tid - 1] || mod + ':entity' + tid; }
   function modSpawn(e) { if (!S.world || !S.forge) return; const nm = modEntName(e.mod, e.tid), x = e.x + S.OX, z = e.z + S.OZ;
     const m = { mc: 1, eid: e.eid, type: 'mcgeneric', x, y: e.y, z, tx: x, ty: e.y, tz: z, face: -e.yaw * PI / 180, tface: -e.yaw * PI / 180, hurtT: 0, moving: false, phase: 0, baby: false, wool: 0, sheared: false, col: 0, size: 0, flee: 0, magma: 0, eq: null, cname: modName(nm), modEnt: nm };
@@ -20161,9 +20162,10 @@ class LobDarklingsModel extends ModelCreatureObj {
           note('<b>' + (T['gui.pet.stance'] || 'Stance') + '</b>'); btns([['Passive', cmd(4)], ['Defensive', cmd(5)], ['Assist', cmd(6)], ['Aggressive', cmd(7)], ['PvP', cmd(2)]]); }
         return true; },
       tick() { if (!S.lyc) LYS(); lyHud(); lyControl(); },
-      itemKey(n, mc) { if (!/^[^:]+:equipment$/.test(n)) return null; const t = itemTag(mc) || {}, names = new Array(6).fill(null);   // ItemEquipment: NBT Items[{Slot, id}] -> parts
+      itemKey(n, mc) { const R = S.modRec, ns = n.split(':')[0], path = n.split(':')[1]; if (R && R.files['o/' + ns + ':equipment/' + path + '.obj']) return { key: 'part', tex: R.items[n], extra: { lyEq: [path] } };   // a single equipment part: its own model in the hand
+        if (!/^[^:]+:equipment$/.test(n)) return null; const t = itemTag(mc) || {}, names = new Array(6).fill(null);   // ItemEquipment: NBT Items[{Slot, id}] -> parts
         for (const it of t.Items || []) { const sl = it.Slot | 0; if (sl < 6 && it.id) names[sl] = String(it.id).split(':').pop(); } if (!names.some(Boolean)) return null;
-        const key = names.map(x => x || '-').join('.'), tex = n.split(':')[0] + ':gen/eq_' + key; lyEquipIcon(tex, names); return { key, tex }; },
+        const key = names.map(x => x || '-').join('.'), tex = n.split(':')[0] + ':gen/eq_' + key; lyEquipIcon(tex, names); return { key, tex, extra: { lyEq: names } }; },
       entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const ns = L.length ? L[0].split(':')[0] : 'lycanitesmobs', short = n => n.split(':')[1];
         if (!S.lyIds) { const cr = javaOrder(((R.ocrAll && R.ocrAll[ns]) || Object.values(C).filter(d => d.ns === ns).map(d => d.name)).slice().sort().reverse()), P = R.oprj || {}, pj = Object.keys(P).filter(k => k.startsWith(ns + ':')).map(short), have = new Set(L.map(short));
           const objp = Object.keys(R.files).filter(k => k.startsWith('o/' + ns + ':projectile/') && k.endsWith('.obj')).map(k => k.slice(('o/' + ns + ':projectile/').length, -4));
@@ -20328,7 +20330,23 @@ class LobDarklingsModel extends ModelCreatureObj {
     const T = fxTex(ns + ':items/' + nm); if (!T) return; const fr = Math.max(1, pj ? pj.frames : 1); st.f = (st.f + ticks) % fr;
     const w = .5 * (pj && fr > 1 ? pj.tscale : 1) * sc;
     FX.bill(T.key, m.x, m.y + w / 2 + (pj && fr > 1 ? pj.toff : 0) * sc, m.z, w, [0, st.f / fr, 1, (st.f + 1) / fr], [L[0], L[1], L[2], 1], glow ? 1 : 0); }
-  function lycFx() { const O = lycO(); if (!O || typeof FX === 'undefined') return; const now = performance.now(), p = player, R = S.modRec;
+  // equipment in a hand: EquipmentRenderer's transform (0.5, 0.2, 0.6; 90 about X; -100 about Z; down 1.5) on the hand's item matrix, then the parts as ModelEquipment joins them
+  window.__fx3dItem = (id, M) => { const it = ITEMS[id]; if (!S || !S.forge || !it || !it.lyEq) return false; (LY.held = LY.held || []).push({ names: it.lyEq, M: M.slice() }); return true; };
+  function lycHeld() { const H = LY.held; if (!H || !H.length) return; LY.held = []; const R = S.modRec, F = R.files, dec = new TextDecoder(), ns = 'lycanitesmobs', loop = performance.now() / 50;
+    const load = k => { const t = k.slice(0, k.indexOf(':')), p = k.slice(k.indexOf(':') + 1), d = t === 'obj' ? F['o/' + ns + ':' + p + '.obj'] : t === 'parts' ? F['o/' + ns + ':' + p + '_parts.json'] : t === 'anim' ? F['o/' + ns + ':' + p + '_animation.json'] : null; return d ? dec.decode(d) : null; };
+    for (const h of H) { const m = h.M, W = new Float32Array([m[0], m[4], m[8], 0, m[1], m[5], m[9], 0, m[2], m[6], m[10], 0, m[3], m[7], m[11], 1]);   // the row-major item matrix as a column-major one
+      StrataLyc.tr(W, .5, .2, .6); StrataLyc.rot(W, 90, 1, 0, 0); StrataLyc.rot(W, -100, 0, 0, 1); StrataLyc.tr(W, 0, -1.5, 0);
+      const ctr = h.M, L = litAt(ctr[3], ctr[7], ctr[11]), P = StrataLyc.equipPose(load, h.names, loop);
+      const byTex = new Map(); for (const q of P) { const tk = ns + ':equipment/' + q.model.name; if (!F['e/' + tk]) continue; (byTex.get(tk) || byTex.set(tk, []).get(tk)).push({ g: q.g, M: StrataLyc.mul(W, q.M), color: [1, 1, 1, 1], off: [0, 0], gl: { lit: 1, dst: 'ONE_MINUS_SRC_ALPHA', src: 'SRC_ALPHA' } }); }
+      for (const [tk, list] of byTex) lycDraw(list, tk, null, L, 0); } }
+  // carried and perched entities, snapped into place every frame as Lycanites' client does (ExtendedEntity.onUpdate, BaseCreatureEntity perching)
+  const LY_PICK = { quetzodracl: e => [0, 1 - e.h, 0], raiko: e => [0, 1 - e.h, 0], roc: e => [0, 1 - e.h, 0], skylus: () => [0, 0, 2], strider: () => [0, 5.5, 0] };   // getPickupOffset of the creatures that carry
+  function lyPlace() { const L = LYS(), ent = id => id === S.eid ? { me: 1, x: player.x, y: player.y, z: player.z, yaw: -player.face * 180 / Math.PI, w: .6, h: 1.8 } : (m => m && { m, x: m.x, y: m.y, z: m.z, yaw: -m.face * 180 / Math.PI, w: (MOB[m.type] || {}).w || .6, h: (MOB[m.type] || {}).h || 1.8 })(S.ents.get(id));
+    const put = (id, x, y, z) => { if (id === S.eid) { player.x = x; player.y = y; player.z = z; player.vx = player.vy = player.vz = 0; return; } const m = S.ents.get(id); if (m) { m.x = m.tx = x; m.y = m.ty = y; m.z = m.tz = z; } };
+    for (const [a, b] of Object.entries(L.pick || {})) { const by = ent(+b), me = ent(+a); if (!by || !me) continue; const nm = by.m && by.m.modEnt ? by.m.modEnt.split(':')[1] : '', off = LY_PICK[nm] ? LY_PICK[nm](me) : [0, 0, 0]; put(+a, by.x + off[0], by.y + off[1], by.z + off[2]); }
+    for (const [a, b] of Object.entries(L.perch || {})) { const on = ent(+a); if (!on) continue; const ang = on.yaw * Math.PI / 180 + 90, d = on.w * .7;   // ExtendedEntity.getPerchPosition (its + 90 is in radians, as in the mod)
+      put(+b, on.x + d * -Math.sin(ang), on.y + on.h * .78, on.z + d * Math.cos(ang)); } }
+  function lycFx() { const O = lycO(); if (!O || typeof FX === 'undefined') return; lycHeld(); lyPlace(); const now = performance.now(), p = player, R = S.modRec;
     LY.acc = Math.min(.25, LY.acc + (LY.last ? (now - LY.last) / 1000 : 0)); LY.last = now; let ticks = 0; while (LY.acc >= .05) { LY.acc -= .05; ticks++; } const part = LY.acc / .05;
     for (const m of S.mobs) { const nm = m.modEnt; if (!nm || !R.ocr) continue; const d = R.ocr[nm]; if (!d && !(R.oprj && /^[^:]+:/.test(nm) && Object.keys(R.ocr).some(k => k.startsWith(nm.split(':')[0] + ':')))) continue;
       m.fxOnly = 1; if (Math.hypot(m.x - p.x, m.z - p.z) > 64) continue;
@@ -20371,6 +20389,8 @@ class LobDarklingsModel extends ModelCreatureObj {
     else if (d === 5 || d === 21) { L.pets.delete([r.i64(), r.i64()].join(':')); lyRefresh(); }
     else if (d === 6 || d === 22) { const i = r.u8(); L.sets[i] = { type: r.str(), sub: r.i32(), variant: r.i32(), beh: r.u8() }; lyRefresh(); lyHud(); }
     else if (d === 7 || d === 23) { L.sel = r.u8(); lyRefresh(); lyHud(); }
+    else if (d === 8) { const a = r.i32(), b2 = r.i32(); L.pick = L.pick || {}; if (b2) L.pick[a] = b2; else delete L.pick[a]; }   // MessageEntityPickedUp: a is carried by b
+    else if (d === 9) { const a = r.i32(), b2 = r.i32(); L.perch = L.perch || {}; if (b2) L.perch[a] = b2; else delete L.perch[a]; }   // MessageEntityPerched: b perches on a
     else if (d === 10 || d === 11) { const nm = r.str(), pos = unpos(r.i64()), lvl = r.i32(); const T = lyL(); if (nm) { const t = T['mobevent.' + nm + '.name'] || nm.replace(/\b\w/g, c => c.toUpperCase()); toast((d === 10 ? 'World event: ' : 'Mob event: ') + t + (lvl > 1 ? ' (level ' + lvl + ')' : '')); } else toast('The ' + (d === 10 ? 'world' : 'mob') + ' event has ended'); }
     else if (d === 12) { const x = r.i32(), y = r.i32(), z = r.i32(); L.ped[x + ',' + y + ',' + z] = { capacity: r.i32(), progress: r.i32(), fuel: r.i32(), fuelMax: r.i32() }; if (S.win && /^forge:lycanitesmobs:/.test(S.win.type || '')) mcInvRender(); }
     else if (d === 13) { const id = r.vi(), mx = r.d.getInt16(r.p) / 8000, my = r.d.getInt16(r.p + 2) / 8000, mz = r.d.getInt16(r.p + 4) / 8000; if (id === S.eid && S.world) { player.vx = (player.vx || 0) + mx * 20; player.vy = (player.vy || 0) + my * 20; player.vz = (player.vz || 0) + mz * 20; } }
