@@ -162,7 +162,7 @@
       const col = n => { let c = null; try { c = inst.getPartColor(n, ent, layer, false, loop); } catch (e) { /* white */ } return c ? [c.x, c.y, c.z, c.w === undefined ? 1 : c.w] : [1, 1, 1, 1]; };
       const off = n => { let c = null; try { c = inst.getPartTextureOffset(n, ent, layer, false, loop); } catch (e) { /* none */ } return c ? [c.x || 0, c.y || 0] : [0, 0]; };
       if (!Mdl.old) { const P = inst.animationParts;
-        for (const g of Mdl.groups) { const part = P.get(g.name); if (!part) continue; inst.currentAnimationPart = part; try { inst.animatePart(g.name, ent, time, dist, loop, -lookY, lookX, scale); } catch (e) { warn(Mdl.name, e); } }
+        if (!s.noAnim) for (const g of Mdl.groups) { const part = P.get(g.name); if (!part) continue; inst.currentAnimationPart = part; try { inst.animatePart(g.name, ent, time, dist, loop, -lookY, lookX, scale); } catch (e) { warn(Mdl.name, e); } }
         for (const g of Mdl.groups) { const part = P.get(g.name); if (!part || !can(g.name)) continue; inst.currentAnimationPart = part;
           const M = CUR = Float32Array.from(base); rot(M, 180, 1, 0, 0); tr(M, 0, -1.5, 0);
           if (s.child) { inst.childScale(g.name); if (inst.bigChildHead && (g.name.includes('head') || g.name.includes('mouth'))) tr(M, -part.centerX / 2, -part.centerY / 2, -part.centerZ / 2); }
@@ -190,10 +190,28 @@
         isAttackOnCooldown: () => s.attackCooldown > 0, getAttackCooldown: () => s.attackCooldown | 0, getStealth: () => s.stealth || 0, getAttackPhase: () => s.attackPhase | 0,
         hasPickupEntity: () => !!(s.target & 32), hasAttackTarget: () => !!(s.target & 1), hasPerchTarget: () => !!(s.target & 64), hasRiderTarget: () => !!(s.target & 16), hasMaster: () => !!(s.target & 2), hasParent: () => !!(s.target & 4), hasAvoidTarget: () => !!(s.target & 8), isBlocking: () => !!(s.anim & 8), extraAnimation01: () => !!(s.anim & 32),
         isFlying: () => !!s.flying, isSitting: () => !!((s.tamed & 1) && (s.tamed & 2)), isTamed: () => !!(s.tamed & 1), isMinion: () => !!(s.anim & 16), getRenderScale: () => s.renderScale || 1,
-        canPull: () => !!(s.anim & 32), canWhirlpool: () => !!(s.anim & 32), hasFur: () => s.fur !== false, hasLatchTarget: () => !!s.latch, getConsumptionAnimation: () => s.consume || 0, getColor: () => s.color | 0, hasSaddle: () => false,
-        getEquipmentName: () => null, getEquipmentTexture: () => null, getVariant: () => s.varColor ? { color: s.varColor } : null, getTextureName: () => s.texName,
+        canPull: () => !!(s.anim & 32), canWhirlpool: () => !!(s.anim & 32), hasFur: () => s.fur !== false, hasLatchTarget: () => !!s.latch, getConsumptionAnimation: () => s.consume || 0, getColor: () => s.color | 0, hasSaddle: () => !!s.saddle,
+        getEquipmentName: t => s.equip && s.equip[t] ? t + s.equip[t] : null, getEquipmentTexture: n => n ? key(s.texName, n) : null, getVariant: () => s.varColor ? { color: s.varColor } : null, getTextureName: () => s.texName,
         getTexture: suf => key(s.texName, s.subName, s.varColor, suf), getSubTexture: suf => key(s.texName, s.subName, suf), texKey: n => opt.texKey(n) }; }
     return { model, pose, layerTex, layerOn, entity, mul, rot, tr, sc, ident, parseObj };
   }
+  // an inventory icon for a model-only item (Lycanites' equipment parts): the OBJ drawn at Minecraft's item angle into a small canvas, textured triangle by triangle
+  async function objIcon(text, png, size) { size = size || 64; const img = await createImageBitmap(new Blob([png], { type: 'image/png' })), G = parseObj(text), T = [];
+    const ya = -45 * Math.PI / 180, pa = 30 * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), sp = Math.sin(pa);
+    const P = (x, y, z) => { const x1 = x * cy - z * sy, z1 = x * sy + z * cy; return [x1, y * cp - z1 * sp, y * sp + z1 * cp]; };
+    for (const g of G) for (let i = 0; i < g.f.length; i += 15) T.push([0, 5, 10].map(k => [...P(g.f[i + k], g.f[i + k + 1], g.f[i + k + 2]), g.f[i + k + 3], g.f[i + k + 4]]));
+    if (!T.length) return null; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const t of T) for (const v of t) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); y0 = Math.min(y0, v[1]); y1 = Math.max(y1, v[1]); }
+    const k = size * .86 / Math.max(x1 - x0, y1 - y0, 1e-6), ox = size / 2 - (x0 + x1) / 2 * k, oy = size / 2 + (y0 + y1) / 2 * k, W = img.width, H = img.height;
+    const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) : Object.assign(document.createElement('canvas'), { width: size, height: size }), c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+    T.sort((a, b) => (a[0][2] + a[1][2] + a[2][2]) - (b[0][2] + b[1][2] + b[2][2]));   // far first
+    for (const t of T) { const s = t.map(v => [ox + v[0] * k, oy - v[1] * k]), u = t.map(v => [v[3] * W, (1 - v[4]) * H]);
+      const [[x_0, y_0], [x_1, y_1], [x_2, y_2]] = s, [[u0, v0], [u1, v1], [u2, v2]] = u, d = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1); if (Math.abs(d) < 1e-9) continue;
+      const a = (x_0 * (v1 - v2) + x_1 * (v2 - v0) + x_2 * (v0 - v1)) / d, b = (y_0 * (v1 - v2) + y_1 * (v2 - v0) + y_2 * (v0 - v1)) / d, cc = (x_0 * (u2 - u1) + x_1 * (u0 - u2) + x_2 * (u1 - u0)) / d, dd = (y_0 * (u2 - u1) + y_1 * (u0 - u2) + y_2 * (u1 - u0)) / d;
+      const e = (x_0 * (u1 * v2 - u2 * v1) + x_1 * (u2 * v0 - u0 * v2) + x_2 * (u0 * v1 - u1 * v0)) / d, f = (y_0 * (u1 * v2 - u2 * v1) + y_1 * (u2 * v0 - u0 * v2) + y_2 * (u0 * v1 - u1 * v0)) / d;
+      const n = ((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0])), mx = (x_0 + x_1 + x_2) / 3, my = (y_0 + y_1 + y_2) / 3, grow = q => [q[0] + (q[0] - mx) * .06, q[1] + (q[1] - my) * .06];
+      c.save(); c.beginPath(); const g0 = grow(s[0]), g1 = grow(s[1]), g2 = grow(s[2]); c.moveTo(g0[0], g0[1]); c.lineTo(g1[0], g1[1]); c.lineTo(g2[0], g2[1]); c.closePath(); c.clip(); c.setTransform(a, b, cc, dd, e, f); c.drawImage(img, 0, 0); c.setTransform(1, 0, 0, 1, 0, 0);
+      const shade = Math.max(0, Math.min(.45, .25 - Math.sign(n) * .1)); if (shade > .01) { c.fillStyle = 'rgba(0,0,0,' + shade + ')'; c.fill(); } c.restore(); }
+    const blob = cv.convertToBlob ? await cv.convertToBlob({ type: 'image/png' }) : await new Promise(r => cv.toBlob(r, 'image/png')); return new Uint8Array(await blob.arrayBuffer()); }
+  L.objIcon = objIcon; L.parseObj = parseObj;
   L.create = create; window.StrataObjMobs = { create };
 })();

@@ -10806,7 +10806,7 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
       const col = n => { let c = null; try { c = inst.getPartColor(n, ent, layer, false, loop); } catch (e) { /* white */ } return c ? [c.x, c.y, c.z, c.w === undefined ? 1 : c.w] : [1, 1, 1, 1]; };
       const off = n => { let c = null; try { c = inst.getPartTextureOffset(n, ent, layer, false, loop); } catch (e) { /* none */ } return c ? [c.x || 0, c.y || 0] : [0, 0]; };
       if (!Mdl.old) { const P = inst.animationParts;
-        for (const g of Mdl.groups) { const part = P.get(g.name); if (!part) continue; inst.currentAnimationPart = part; try { inst.animatePart(g.name, ent, time, dist, loop, -lookY, lookX, scale); } catch (e) { warn(Mdl.name, e); } }
+        if (!s.noAnim) for (const g of Mdl.groups) { const part = P.get(g.name); if (!part) continue; inst.currentAnimationPart = part; try { inst.animatePart(g.name, ent, time, dist, loop, -lookY, lookX, scale); } catch (e) { warn(Mdl.name, e); } }
         for (const g of Mdl.groups) { const part = P.get(g.name); if (!part || !can(g.name)) continue; inst.currentAnimationPart = part;
           const M = CUR = Float32Array.from(base); rot(M, 180, 1, 0, 0); tr(M, 0, -1.5, 0);
           if (s.child) { inst.childScale(g.name); if (inst.bigChildHead && (g.name.includes('head') || g.name.includes('mouth'))) tr(M, -part.centerX / 2, -part.centerY / 2, -part.centerZ / 2); }
@@ -10834,11 +10834,29 @@ StrataMC.recipes=[[1,2,4,[[[1,1],[1,1]],[[1,1],[1,1]]],null],[1,4,4,[[[1,3],[1,3
         isAttackOnCooldown: () => s.attackCooldown > 0, getAttackCooldown: () => s.attackCooldown | 0, getStealth: () => s.stealth || 0, getAttackPhase: () => s.attackPhase | 0,
         hasPickupEntity: () => !!(s.target & 32), hasAttackTarget: () => !!(s.target & 1), hasPerchTarget: () => !!(s.target & 64), hasRiderTarget: () => !!(s.target & 16), hasMaster: () => !!(s.target & 2), hasParent: () => !!(s.target & 4), hasAvoidTarget: () => !!(s.target & 8), isBlocking: () => !!(s.anim & 8), extraAnimation01: () => !!(s.anim & 32),
         isFlying: () => !!s.flying, isSitting: () => !!((s.tamed & 1) && (s.tamed & 2)), isTamed: () => !!(s.tamed & 1), isMinion: () => !!(s.anim & 16), getRenderScale: () => s.renderScale || 1,
-        canPull: () => !!(s.anim & 32), canWhirlpool: () => !!(s.anim & 32), hasFur: () => s.fur !== false, hasLatchTarget: () => !!s.latch, getConsumptionAnimation: () => s.consume || 0, getColor: () => s.color | 0, hasSaddle: () => false,
-        getEquipmentName: () => null, getEquipmentTexture: () => null, getVariant: () => s.varColor ? { color: s.varColor } : null, getTextureName: () => s.texName,
+        canPull: () => !!(s.anim & 32), canWhirlpool: () => !!(s.anim & 32), hasFur: () => s.fur !== false, hasLatchTarget: () => !!s.latch, getConsumptionAnimation: () => s.consume || 0, getColor: () => s.color | 0, hasSaddle: () => !!s.saddle,
+        getEquipmentName: t => s.equip && s.equip[t] ? t + s.equip[t] : null, getEquipmentTexture: n => n ? key(s.texName, n) : null, getVariant: () => s.varColor ? { color: s.varColor } : null, getTextureName: () => s.texName,
         getTexture: suf => key(s.texName, s.subName, s.varColor, suf), getSubTexture: suf => key(s.texName, s.subName, suf), texKey: n => opt.texKey(n) }; }
     return { model, pose, layerTex, layerOn, entity, mul, rot, tr, sc, ident, parseObj };
   }
+  // an inventory icon for a model-only item (Lycanites' equipment parts): the OBJ drawn at Minecraft's item angle into a small canvas, textured triangle by triangle
+  async function objIcon(text, png, size) { size = size || 64; const img = await createImageBitmap(new Blob([png], { type: 'image/png' })), G = parseObj(text), T = [];
+    const ya = -45 * Math.PI / 180, pa = 30 * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), sp = Math.sin(pa);
+    const P = (x, y, z) => { const x1 = x * cy - z * sy, z1 = x * sy + z * cy; return [x1, y * cp - z1 * sp, y * sp + z1 * cp]; };
+    for (const g of G) for (let i = 0; i < g.f.length; i += 15) T.push([0, 5, 10].map(k => [...P(g.f[i + k], g.f[i + k + 1], g.f[i + k + 2]), g.f[i + k + 3], g.f[i + k + 4]]));
+    if (!T.length) return null; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const t of T) for (const v of t) { x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); y0 = Math.min(y0, v[1]); y1 = Math.max(y1, v[1]); }
+    const k = size * .86 / Math.max(x1 - x0, y1 - y0, 1e-6), ox = size / 2 - (x0 + x1) / 2 * k, oy = size / 2 + (y0 + y1) / 2 * k, W = img.width, H = img.height;
+    const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) : Object.assign(document.createElement('canvas'), { width: size, height: size }), c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+    T.sort((a, b) => (a[0][2] + a[1][2] + a[2][2]) - (b[0][2] + b[1][2] + b[2][2]));   // far first
+    for (const t of T) { const s = t.map(v => [ox + v[0] * k, oy - v[1] * k]), u = t.map(v => [v[3] * W, (1 - v[4]) * H]);
+      const [[x_0, y_0], [x_1, y_1], [x_2, y_2]] = s, [[u0, v0], [u1, v1], [u2, v2]] = u, d = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1); if (Math.abs(d) < 1e-9) continue;
+      const a = (x_0 * (v1 - v2) + x_1 * (v2 - v0) + x_2 * (v0 - v1)) / d, b = (y_0 * (v1 - v2) + y_1 * (v2 - v0) + y_2 * (v0 - v1)) / d, cc = (x_0 * (u2 - u1) + x_1 * (u0 - u2) + x_2 * (u1 - u0)) / d, dd = (y_0 * (u2 - u1) + y_1 * (u0 - u2) + y_2 * (u1 - u0)) / d;
+      const e = (x_0 * (u1 * v2 - u2 * v1) + x_1 * (u2 * v0 - u0 * v2) + x_2 * (u0 * v1 - u1 * v0)) / d, f = (y_0 * (u1 * v2 - u2 * v1) + y_1 * (u2 * v0 - u0 * v2) + y_2 * (u0 * v1 - u1 * v0)) / d;
+      const n = ((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0])), mx = (x_0 + x_1 + x_2) / 3, my = (y_0 + y_1 + y_2) / 3, grow = q => [q[0] + (q[0] - mx) * .06, q[1] + (q[1] - my) * .06];
+      c.save(); c.beginPath(); const g0 = grow(s[0]), g1 = grow(s[1]), g2 = grow(s[2]); c.moveTo(g0[0], g0[1]); c.lineTo(g1[0], g1[1]); c.lineTo(g2[0], g2[1]); c.closePath(); c.clip(); c.setTransform(a, b, cc, dd, e, f); c.drawImage(img, 0, 0); c.setTransform(1, 0, 0, 1, 0, 0);
+      const shade = Math.max(0, Math.min(.45, .25 - Math.sign(n) * .1)); if (shade > .01) { c.fillStyle = 'rgba(0,0,0,' + shade + ')'; c.fill(); } c.restore(); }
+    const blob = cv.convertToBlob ? await cv.convertToBlob({ type: 'image/png' }) : await new Promise(r => cv.toBlob(r, 'image/png')); return new Uint8Array(await blob.arrayBuffer()); }
+  L.objIcon = objIcon; L.parseObj = parseObj;
   L.create = create; window.StrataObjMobs = { create };
 })();
 
@@ -18251,7 +18269,142 @@ class ModelZoataur extends ModelTemplateDragon {
       }
   }
 }
-  Object.assign(L.models, { ModelTemplateAquatic, ModelAbaia, ModelAbtu, ModelTemplateElemental, ModelAegis, ModelTemplateBiped, ModelAfrit, ModelTemplateQuadruped, ModelAglebemu, ModelAmalgalich, ModelArchvile, ModelArgus, ModelArisaur, ModelArix, ModelAsmodeus, ModelAspid, ModelAstaroth, ModelAstarothVoid, ModelBalayang, ModelBanshee, ModelBarghest, ModelBehemoth, ModelBeholder, ModelBelph, ModelBobeko, ModelCacodemon, ModelTemplateInsect, ModelCalpod, ModelCephignis, ModelChupacabra, ModelCinder, ModelClink, ModelTemplateDragon, ModelCockatrice, ModelConba, ModelConcapedeHead, ModelConcapedeSegment, ModelCrusk, ModelCryptkeeper, ModelDarkling, ModelDawon, ModelDjinn, ModelDweller, ModelEechetik, ModelEnt, ModelEpion, ModelErepede, ModelEttin, ModelEyewig, ModelFeradon, ModelFrostweaver, ModelGeist, ModelGeken, ModelGeonach, ModelGhoul, ModelGnekk, ModelGorger, ModelGorgomite, ModelGrell, ModelGrigori, ModelGrue, ModelTemplateArachnid, ModelHerma, ModelIgnibus, ModelIka, ModelIoray, ModelJabberwock, ModelJengu, ModelJoust, ModelJoustAlpha, ModelKhalk, ModelKobold, ModelKrake, ModelLacedon, ModelLobber, ModelLurker, ModelMaka, ModelMakaAlpha, ModelMaug, ModelMorock, ModelNecrovore, ModelNymph, ModelPinky, ModelPinkyMoloch, ModelPixen, ModelQuetzodracl, ModelQuillbeast, ModelRahovart, ModelRaiko, ModelReaper, ModelReiver, ModelRemobra, ModelRoa, ModelRoc, ModelSalamander, ModelSerpix, ModelShade, ModelShambler, ModelSilex, ModelSkylus, ModelSpectre, ModelSpriggan, ModelStrider, ModelSutiramu, ModelSylph, ModelTarantula, ModelThresher, ModelTpumpkyn, ModelTreant, ModelTremor, ModelTriffid, ModelTrite, ModelTriteVoid, ModelTroll, ModelUvaraptor, ModelVapula, ModelVentoraptor, ModelVespid, ModelVespidQueen, ModelVolcan, ModelVorach, ModelWarg, ModelWendigo, ModelWildkin, ModelWisp, ModelWraamon, ModelWraith, ModelXaphan, ModelYale, ModelZephyr, ModelZoataur });
+class AetherwaveModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("aetherwave", null, "projectile/aetherwave");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class ChaosOrbModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("chaosorb", null, "projectile/chaosorb");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, 0.0, loop * 8.0);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class CrystalShardModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("crystalshard", null, "projectile/crystalshard");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, 0.0, loop * 8.0);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class LightBallModel extends ModelCreatureObj {
+  ballGlowLayer = null;
+  constructor() { super();
+      this.initModel("lightball", null, "projectile/lightball");
+  }
+  addCustomLayers(renderer) {
+      super.addCustomLayers(renderer);
+      this.ballGlowLayer = new LayerCreatureEffect(renderer, "", true, BLEND.ADD, true);
+      renderer.addLayer(this.ballGlowLayer);
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(loop * 8.0, 0.0, 0.0);
+  }
+  canRenderPart(partName, entity, layer, trophy) {
+      return !(partName === "ball02") && !(partName === "ball03")?layer == null:layer == this.ballGlowLayer;
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+      GL.disableLighting();
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+      GL.enableLighting();
+  }
+}
+class LobDarklingsModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("lobdarklings", null, "projectile/lobdarklings");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, loop * 8.0, 0.0);
+  }
+}
+  Object.assign(L.models, { ModelTemplateAquatic, ModelAbaia, ModelAbtu, ModelTemplateElemental, ModelAegis, ModelTemplateBiped, ModelAfrit, ModelTemplateQuadruped, ModelAglebemu, ModelAmalgalich, ModelArchvile, ModelArgus, ModelArisaur, ModelArix, ModelAsmodeus, ModelAspid, ModelAstaroth, ModelAstarothVoid, ModelBalayang, ModelBanshee, ModelBarghest, ModelBehemoth, ModelBeholder, ModelBelph, ModelBobeko, ModelCacodemon, ModelTemplateInsect, ModelCalpod, ModelCephignis, ModelChupacabra, ModelCinder, ModelClink, ModelTemplateDragon, ModelCockatrice, ModelConba, ModelConcapedeHead, ModelConcapedeSegment, ModelCrusk, ModelCryptkeeper, ModelDarkling, ModelDawon, ModelDjinn, ModelDweller, ModelEechetik, ModelEnt, ModelEpion, ModelErepede, ModelEttin, ModelEyewig, ModelFeradon, ModelFrostweaver, ModelGeist, ModelGeken, ModelGeonach, ModelGhoul, ModelGnekk, ModelGorger, ModelGorgomite, ModelGrell, ModelGrigori, ModelGrue, ModelTemplateArachnid, ModelHerma, ModelIgnibus, ModelIka, ModelIoray, ModelJabberwock, ModelJengu, ModelJoust, ModelJoustAlpha, ModelKhalk, ModelKobold, ModelKrake, ModelLacedon, ModelLobber, ModelLurker, ModelMaka, ModelMakaAlpha, ModelMaug, ModelMorock, ModelNecrovore, ModelNymph, ModelPinky, ModelPinkyMoloch, ModelPixen, ModelQuetzodracl, ModelQuillbeast, ModelRahovart, ModelRaiko, ModelReaper, ModelReiver, ModelRemobra, ModelRoa, ModelRoc, ModelSalamander, ModelSerpix, ModelShade, ModelShambler, ModelSilex, ModelSkylus, ModelSpectre, ModelSpriggan, ModelStrider, ModelSutiramu, ModelSylph, ModelTarantula, ModelThresher, ModelTpumpkyn, ModelTreant, ModelTremor, ModelTriffid, ModelTrite, ModelTriteVoid, ModelTroll, ModelUvaraptor, ModelVapula, ModelVentoraptor, ModelVespid, ModelVespidQueen, ModelVolcan, ModelVorach, ModelWarg, ModelWendigo, ModelWildkin, ModelWisp, ModelWraamon, ModelWraith, ModelXaphan, ModelYale, ModelZephyr, ModelZoataur, AetherwaveModel, ChaosOrbModel, CrystalShardModel, LightBallModel, LobDarklingsModel });
   L.flying = {"aegis": 1, "afrit": 1, "argus": 1, "arix": 1, "balayang": 1, "banshee": 1, "beholder": 1, "cacodemon": 1, "cinder": 1, "cockatrice": 1, "djinn": 1, "eechetik": 1, "geonach": 1, "grell": 1, "grigori": 1, "grue": 1, "ignibus": 1, "jengu": 1, "morock": 1, "nymph": 1, "pixen": 1, "quetzodracl": 1, "raiko": 1, "reaper": 1, "reiver": 1, "remobra": 1, "roc": 1, "spectre": 1, "spriggan": 1, "sylph": 1, "tremor": 1, "vapula": 1, "vespid": 1, "vespidqueen": 1, "volcan": 1, "wisp": 1, "wraith": 1, "xaphan": 1, "zephyr": 1};
 })();
 
@@ -18733,6 +18886,7 @@ class ModelZoataur extends ModelTemplateDragon {
     'minecraft:dispenser': { kind: 'grid3' }, 'minecraft:dropper': { kind: 'grid3' }, 'minecraft:hopper': { kind: 'row' }, 'forge:baubles:0': { n: 16 } };   // Baubles: crafting, armour and 7 bauble slots before the player's inventory
   const WTITLE = { 'container.crafting': 'Crafting', 'container.furnace': 'Furnace', 'container.chest': 'Chest', 'container.chestDouble': 'Large Chest', 'container.enchant': 'Enchant', 'container.brewing': 'Brewing Stand', 'container.dispenser': 'Dispenser', 'container.dropper': 'Dropper', 'container.hopper': 'Item Hopper', 'container.repair': 'Repair & Name', 'container.beacon': 'Beacon', 'container.enderchest': 'Ender Chest' };
   const winOff = () => S.win ? (S.win.n || 0) : 9;                 // where the player's main inventory starts in the open window
+  const plMain = (W, i) => !W ? 9 + i : W.pl === 'first' ? 9 + i : W.pl === 'hot' ? -1 : (W.n || 0) + i, plHot = (W, h) => !W ? 36 + h : W.pl ? h : (W.n || 0) + 27 + h;   // vanilla windows end with the player's slots; some mods' start with them
   const slotOf = (W, k) => W ? W.slots[k] || null : S.slots[k] || null;
   // compat inventory look (like Strata's split view): one compact window in the middle, slots sized to fit the screen, no headings; the creative list is a side panel
   const MCVAN = 'body:has(#mcInv:not([hidden])) #mcTabBtn,body:has(#mcInv:not([hidden])) #peKeys{visibility:hidden}#mcInv{position:fixed;inset:0;z-index:7;background:rgba(0,0,0,.3);--sl:clamp(26px,min(calc((100vw - 40px)/9.6),calc((100vh - 240px)/7.4)),46px)}#mcInv.side{--sl:clamp(20px,min(calc((100vw - 34vw - 44px)/9.6),calc((100vh - 240px)/7.4)),42px)}'
@@ -18779,7 +18933,7 @@ class ModelZoataur extends ModelTemplateDragon {
     if (S.waitAct != null) { (S.clickQ = S.clickQ || []).push([k, how]); return; }   // a resync is on its way: queue until the server answers
     const W = S.win, wid = W ? W.id : 0, cre = world.meta.gameMode === 'creative', A = W ? W.slots : S.slots, t = how || S.tap || 'stack';
     if (cre && S.ccur) {   // a creative item in hand: set the slot directly (player inventory only)
-      const off = winOff(), inv0 = k >= off ? (k - off < 27 ? 9 + (k - off) : 36 + (k - off - 27)) : (!W && k >= 5 && k <= 8 ? k : -1);
+      let inv0 = !W && k >= 5 && k <= 8 ? k : -1; for (let i = 0; i < 27; i++) if (plMain(W, i) === k) inv0 = 9 + i; for (let i = 0; i < 9; i++) if (plHot(W, i) === k) inv0 = 36 + i;
       if (inv0 >= 0) { S.client.api.creative(inv0, withN(S.ccur, S.ccur.count)); if (t === 'one') S.ccur = withN(S.ccur, 1); else S.ccur = null; mcInvRender(); } return; }
     const before = A[k] || null, act = S.action++;
     if (W && (W.kind === 'anvil' || W.kind === 'trade' || W.kind === 'enchant' || W.kind === 'brew' || W.kind === 'furnace') && outSlots(W).includes(k) && t !== 'quick') {   // outputs with costs/rules we don't model: let the server answer with the whole window
@@ -18814,8 +18968,8 @@ class ModelZoataur extends ModelTemplateDragon {
     else if (kind === 'trade') { mcSlot(top, 0, { lbl: 'Pay' }); mcSlot(top, 1, { lbl: 'Pay' }); top.appendChild(arrow()); mcSlot(top, 2, { cls: 'out' }); }
     else { const g = grid(kind === 'grid3' ? 3 : Math.min(9, W.n)); for (let i = 0; i < W.n; i++) mcSlot(g, i); top.appendChild(g); }
     try { extInvRender(el, W, kind, top); if (W && /^forge:/.test(W.type || '')) portGui(W, el.querySelector('#mcExt')); } catch (e) { console.error('compat inv', e); }
-    const off = winOff(), mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = '';
-    for (let i = 0; i < 27; i++) mcSlot(mn, off + i); for (let i = 0; i < 9; i++) mcSlot(ht, off + 27 + i, { cls: i === inv.sel ? 'sel' : '' });
+    const mn = el.querySelector('#mcMain'), ht = el.querySelector('#mcHot'); mn.innerHTML = ''; ht.innerHTML = ''; if (mn.parentNode) mn.parentNode.style.display = W && W.pl === 'hot' ? 'none' : '';
+    for (let i = 0; i < 27; i++) { const k = plMain(W, i); if (k >= 0) mcSlot(mn, k); } for (let i = 0; i < 9; i++) mcSlot(ht, plHot(W, i), { cls: i === inv.sel ? 'sel' : '' });
   }
   function mcCatList() {   // every 1.8 item (and the colour variants of wool, dye, clay, glass) for the creative screen
     if (S.cat) return S.cat; const L = [], it = StrataMC.items18;
@@ -19436,7 +19590,7 @@ class ModelZoataur extends ModelTemplateDragon {
       gameState(rs, v) { if (rs === 3 && S.world) { world.meta.gameMode = v === 1 ? 'creative' : 'survival'; hudDirty = true; try { setMode(v === 1); } catch (e) { /* ui */ } } },
       held(n) { if (S.world) { inv.sel = n; invChanged(); popName(); } },
       items(wid, l) { if (wid === 0) { const n = V9() ? 46 : 45; S.slots = l.slice(0, n); while (S.slots.length < n) S.slots.push(null); syncInv(); }
-        else if (S.win && wid === S.win.id) { if (S.win.n == null) S.win.n = Math.max(0, l.length - 36); S.win.slots = l.slice(); if (S.pe) try { peOutputs(); } catch (e) { /* port */ } const o = S.win.n; for (let i = 0; i < 27; i++) S.slots[9 + i] = l[o + i] || null; for (let i = 0; i < 9; i++) S.slots[36 + i] = l[o + 27 + i] || null; syncInv(); }
+        else if (S.win && wid === S.win.id) { if (S.win.n == null) S.win.n = Math.max(0, l.length - 36); S.win.slots = l.slice(); if (S.pe) try { peOutputs(); } catch (e) { /* port */ } const W = S.win; for (let i = 0; i < 27; i++) { const k = plMain(W, i); if (k >= 0) S.slots[9 + i] = l[k] || null; } for (let i = 0; i < 9; i++) S.slots[36 + i] = l[plHot(W, i)] || null; syncInv(); }
         mcInvRender(); },
       openWin(wid, type, title, n) { mcWinOpen(wid, type, title, n); },
       trans(wid, act, ok) { onTrans(wid, act, ok); },
@@ -19618,6 +19772,7 @@ class ModelZoataur extends ModelTemplateDragon {
         const ic = it => { const s = it && toStack(it); return s ? `<span class="islot" style="width:34px;height:34px;display:inline-grid">${slotHTML({ ...s, n: it.count })}</span>` : ''; };
         b.innerHTML = ic(t.a) + (t.b ? '+' + ic(t.b) : '') + '→' + ic(t.out) + (t.off ? '<small>sold out</small>' : ''); b.title = mcName(t.out); b.addEventListener('click', () => tradeFill(i)); row.appendChild(b); });
       box.appendChild(row); }
+    if (kind === 'player' && S.forge && S.modRec && S.modRec.ocr && Object.values(S.forge.items).some(n => /^lycanitesmobs:/.test(n))) { const lb = document.createElement('button'); lb.className = 'ghost'; lb.textContent = '📖 Beastiary'; lb.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px'; lb.addEventListener('click', () => { closeInv(); lycBook(); }); box.appendChild(lb); }
     if (kind === 'player' && S.forge && (S.bauOK != null ? S.bauOK : (S.bauOK = Object.values(S.forge.items).some(n => /^baubles:/.test(n))))) { const bb = document.createElement('button'); bb.className = 'ghost'; bb.textContent = '💍 Baubles'; bb.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px'; bb.addEventListener('click', () => S.client.api.modSend('baubles', Uint8Array.of(0))); box.appendChild(bb); }   // the mod's own inventory button: packet 0 asks the server to open it
     if (kind === 'player' || kind === 'craft3') { const w = kind === 'player' ? 2 : 3, hd = document.createElement('button'); hd.className = 'ghost'; hd.textContent = S.rb ? '📖 Hide recipes' : '📖 Recipe book'; hd.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px';
       hd.addEventListener('click', () => { S.rb = !S.rb; mcInvRender(); }); box.appendChild(hd); if (!S.rb) return;
@@ -19767,7 +19922,7 @@ class ModelZoataur extends ModelTemplateDragon {
     if (L) { for (const k of ['tile.' + mod + '.' + path + '.name', 'tile.' + n + '.name', 'item.' + mod + '.' + path + '.name', 'item.' + n + '.name', 'tile.' + path + '.name', 'item.' + path + '.name', 'block.' + mod + '.' + path + '.name']) if (L[k]) return L[k];
       for (const pre of ['tile.', 'item.', '']) for (const k in L) if (k.startsWith(pre) && (k.endsWith('.' + path + '.name') || k.endsWith(':' + path + '.name'))) return L[k]; }
     return path.replace(/[_.]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
-  const LANG_KEEP = /^(botania\.(entry|page|category|tagline)\.|advancement\.)/;   // ports that show a mod's own book text keep those lang keys
+  const LANG_KEEP = /^(botania\.(entry|page|category|tagline)\.|advancement\.|entity\.[a-z0-9_]+\.(description|habitat|combat)$|element\.|creaturetype\.|gui\.|common\.|mobevent\.|message\.)/;   // ports that show a mod's own book text keep those lang keys
   const BOT_LEX = {"basics":["welcome","tutorial","flowers","apothecary","lexicon","wand","pureDaisy","runeAltar","terrasteel","blackLotus","flowerBag","gardenOfGlass","wrap"],"mana":["mIntro","spreader","pool","sparks","sparkUpgrades","rfGenerator","lens","distributor","manaVoid","manaTablet","manaMirror","manaDetector","redstoneSpreader","manastar","dreamwoodSpreader","elvenLenses","prism","poolCart","sparkChanger","bellows"],"generationFlowers":["gIntro","endoflame","hydroangeas","thermalily","arcanerose","munchdew","entropinnyum","kekimurus","gourmaryllis","narslimmus","spectrolus","rafflowsia","shulk_me_not","dandelifeon"],"functionalFlowers":["fIntro","flowerShrinking","flowerSpeed","jadedAmaranthus","bellethorne","dreadthorne","heiseiDream","tigerseye","orechid","orechid","orechidIgnem","fallenKanade","exoflame","agricarnation","hopperhock","tangleberrie","jiyuulia","rannuncarpus","hyacidus","pollidisiac","clayconia","loonium","daffomill","vinculotus","spectranthemum","medumone","marimorphosis","bubbell","solegnolia","bergamute"],"devices":["pylon","manaEnchanting","turntable","manaAlchemy","openCrate","forestEye","forestDrum","platform","manaConjuration","spectralPlatform","gatherDrum","craftCrate","brewery","flasks","complexBrews","incense","hourglass","ghostRail","canopyDrum","cocoon","cocoon","manaBomb","teruTeruBozu","avatar","felPumpkin","animatedTorch"],"tools":["manaBlaster","grassSeeds","dirtRod","terraformRod","manaGear","terrasteelArmor","grassHorn","terraSword","terraPick","waterRod","elfGear","openBucket","rainbowRod","tornadoRod","fireRod","vineBall","laputaShard","virus","skyDirtRod","glassPick","diviningRod","gravityRod","missileRod","craftingHalo","clip","cobbleRod","smeltRod","worldSeed","spellCloth","thornChakram","fireChakram","overgrowthSeed","livingwoodBow","crystalBow","temperanceStone","terraAxe","obedienceStick","slimeBottle","exchangeRod","manaweave","autocraftingHalo","sextant","astrolabe"],"baubles":["bIntro","cosmeticBaubles","tinyPlanet","manaRing","auraRing","travelBelt","knockbackBelt","icePendant","lavaPendant","waterRing","miningRing","magnetRing","divaCharm","pixieRing","superTravelBelt","reachRing","itemFinder","superLavaPendant","bloodPendant","judgementCloaks","monocle","swapRing","speedUpBelt","baubleBox","dodgeRing","invisibilityCloak","cloudPendant","superCloudPendant","thirdEye","goddessCharm"],"ender":["enderAir","enderEyeBlock","pistonRelay","enderHand","enderDagger","spawnerClaw","redString","flightTiara","corporea","corporeaIndex","corporeaFunnel","corporeaInterceptor","spawnerMover","keepIvy","blackHoleTalisman","corporeaCrystalCube","luminizerTransport","starSword","thunderSword","corporeaRetainer"],"alfhomancy":["aIntro","elfMessage","elfResources","gaiaRitual","gaiaRitualHardmode","elvenLore","relics","relicInfo","infiniteFruit","kingKey","flugelEye","thorRing","lokiRing","odinRing"],"misc":["decorativeBlocks","dispenserTweaks","shinyFlowers","tinyPotato","headCreating","azulejo","starfield","mushrooms","phantomInk","blazeBlock","challenges","cacophonium","pavement","preventingDecay","banners","bcIntegration","shedding","tcIntegration"]};
   window.__mcLang = k => { const L = S && S.modRec && S.modRec.lang; if (!L || !S.forge) return null; for (const m in L) if (L[m][k] != null) return String(L[m][k]); return null; };   // chat text that names mod lang keys (advancements)
   const DYE16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'silver', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
@@ -19793,7 +19948,7 @@ class ModelZoataur extends ModelTemplateDragon {
     if (!key) return null; const ty = 'mod:' + key; if (MOB[ty]) return ty; const E = __ENT[key], hum = E.w === 64 && (E.h === 64 || E.h === 32); if (!hum) return null;   // other layouts belong to the mod's own model code: keep the stand-in
     MOB[ty] = Object.assign({}, MOB.zombie, { name: modName(nm) }); __skins.MODELS[ty] = m => { const M = __skins.MODELS.zombie(m); M.tex = key; return M; }; __ENT[ty] = __ENT[key];   // Strata's modelFor checks the type has a texture
     (S.modTypes = S.modTypes || []).push(ty); return ty; }
-  function modGui(wid, mod, gid, gx, gy, gz) { if (S.cc) S.cc.gui = null; mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); Object.assign(S.win, { gx, gy, gz }); if (S.cc) S.cc.gui = null; mcInvRender(); }   // slot count comes with the window's items
+  function modGui(wid, mod, gid, gx, gy, gz) { if (S.cc) S.cc.gui = null; mcWinOpen(wid, 'forge:' + mod + ':' + gid, (S.modRec && S.modRec.modNames && S.modRec.modNames[mod]) || mod, null); Object.assign(S.win, { gx, gy, gz }); for (const P of Object.values(PORTS)) if (P.winInit) try { P.winInit(S.win, mod, gid); } catch (e) { /* port */ } if (S.cc) S.cc.gui = null; mcInvRender(); }   // slot count comes with the window's items
   // ---- mod ports: per-mod client halves (block looks the mod draws in code, its screens and its network messages) ----
   const nbtOf = b => { try { return nbtRead(b, 0)[0] || {}; } catch (e) { return {}; } };
   const bbR = (b, p) => { const d = new DataView(b.buffer, b.byteOffset, b.byteLength); return { b, p, d, u8() { return this.b[this.p++]; }, i32() { const v = this.d.getInt32(this.p); this.p += 4; return v; }, i64() { const v = this.d.getBigInt64(this.p); this.p += 8; return v; }, bool() { return this.b[this.p++] !== 0; },
@@ -19926,6 +20081,31 @@ class ModelZoataur extends ModelTemplateDragon {
     lycanitesmobs: {
       // CreatureManager / ProjectileManager hand out network ids (creatures from 100, projectiles from 1000) while iterating their HashMaps,
       // so the order is Java's HashMap order of the names, which Lycanites loads in reverse alphabetical order (every creature, the model-less 'fear' too): custom projectiles, then the old sprite ones, then the old model ones (those with an OBJ model)
+      payload: { lycanitesmobs(b) { return lyPayload(b); } },
+      // GuiHandler: 0 a tile entity's screen (x, y, z), 1 a creature's inventory (x = entity id). Lycanites' containers start with the player's slots.
+      winInit(W, mod, gid) { if (mod !== 'lycanitesmobs') return; const bn = gid === 0 ? ((BLOCKS[world.get(W.gx + S.OX, W.gy, W.gz + S.OZ)] || {}).modName || '') : '';
+        W.ly = gid === 1 ? 'creature' : /summoningpedestal/.test(bn) ? 'pedestal' : /equipmentforge/.test(bn) ? 'forge' : /infuser/.test(bn) ? 'infuser' : /station/.test(bn) ? 'station' : 'tile'; W.pl = W.ly === 'pedestal' ? 'hot' : 'first'; W.n = W.ly === 'pedestal' ? 9 : 36;
+        W.title = W.ly === 'creature' ? (((S.ents.get(W.gx) || {}).cname) || 'Creature') : W.ly === 'pedestal' ? 'Summoning Pedestal' : W.ly === 'forge' ? 'Equipment Forge' : W.ly === 'infuser' ? 'Equipment Infuser' : W.ly === 'station' ? 'Equipment Station' : W.title; },
+      gui(W, box) { if (!/^forge:lycanitesmobs:/.test(W.type || '') || !W.ly) return false; const top = document.querySelector('#mcInv #mcTop'); if (!top) return false; top.innerHTML = ''; const T = lyL(), Lx = LYS();
+        const lbl = (k, t) => mcSlot(top, k, { lbl: t }), note = (h, el) => { const d = document.createElement('div'); d.style.cssText = 'font-size:12px;opacity:.85;margin:4px 0;width:100%'; d.innerHTML = h; (el || box).appendChild(d); return d; };
+        const btns = (L2, on) => { const row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px'; for (const [t, f, act] of L2) { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = t; b.style.cssText = 'font-size:12px;padding:4px 8px;' + (act ? 'outline:2px solid #b48cff;' : ''); b.addEventListener('click', f); row.appendChild(b); } box.appendChild(row); };
+        top.style.flexWrap = 'wrap';
+        if (W.ly === 'forge') {   // EquipmentForgeContainer: 36 piece (out), 37 base, 38 head, 39 tip A, 40 tip B (above the head), 41 tip C (below), 42 pommel
+          const g = grid(4); g.style.gridTemplateRows = 'repeat(3,var(--sl))'; const at = (k, c, r, t) => { const b = mcSlot(g, k, { lbl: t }); b.style.gridColumn = c; b.style.gridRow = r; };
+          at(42, 1, 2, 'Pommel'); at(37, 2, 2, 'Base'); at(38, 3, 2, 'Head'); at(39, 4, 2, 'Tip'); at(40, 3, 1, 'Tip'); at(41, 3, 3, 'Tip'); top.appendChild(g); top.appendChild(arrow()); mcSlot(top, 36, { cls: 'out', lbl: 'Piece' });
+          note(T['gui.equipmentforge.info.empty'] || 'Insert a base equipment part, or a piece of equipment to take apart.'); }
+        else if (W.ly === 'infuser') { lbl(36, 'Charge'); top.appendChild(arrow()); lbl(37, 'Part'); const it = W.slots[37], t = it && itemTag(it); if (t && t.equipmentExperience != null) note('Experience ' + t.equipmentExperience + ' · level ' + (t.equipmentLevel || 1)); note('Infuse a charge item into an equipment part to give it experience.'); }
+        else if (W.ly === 'station') { lbl(36, 'Repair'); top.appendChild(arrow()); lbl(37, 'Equipment'); const it = W.slots[37], t = it && itemTag(it); if (t && (t.equipmentSharpness != null || t.equipmentMana != null)) note('Sharpness ' + (t.equipmentSharpness || 0) + ' · mana ' + (t.equipmentMana || 0)); note('Sharpen and recharge equipment with repair items.'); }
+        else if (W.ly === 'pedestal') { lbl(9, 'Fuel'); const P = Lx.ped[W.gx + ',' + W.gy + ',' + W.gz]; if (P) note(`Capacity ${P.capacity} · summoning ${Math.round(P.progress / Math.max(1, 300) * 100)}% · fuel ${P.fuel} / ${P.fuelMax}`);
+          const ss = W.pset = W.pset || { type: '', sub: 0, variant: 0, beh: 2 }, send = () => lySend(24, lyW().i32(W.gx).i32(W.gy).i32(W.gz).str(ss.type).i32(ss.sub).i32(ss.variant).u8(ss.beh));
+          const opts = lySummonable(); note('<b>Minion</b>'); btns(opts.length ? opts.map(n => [lyName(n), () => { ss.type = n; send(); mcInvRender(); }, ss.type === n]) : [['Study creatures in the Beastiary to summon them', () => lycBook('summoning')]]);
+          note('<b>Behaviour</b>'); btns(['sit', 'follow', 'passive', 'aggressive', 'pvp'].map(b2 => [b2[0].toUpperCase() + b2.slice(1), () => { ss.beh ^= LYB[b2]; send(); mcInvRender(); }, !!(ss.beh & LYB[b2])])); }
+        else if (W.ly === 'creature') { const n = Math.max(0, (W.slots.length || 0) - 36); const g = grid(5); for (let i = 0; i < n; i++) mcSlot(g, 36 + i); top.appendChild(g);   // equipment (saddle, bag, armour) then the bag
+          const cmd = c => () => lySend(14, lyW().i32(W.gx).u8(c));   // MessageEntityGUICommand: BaseCreatureEntity.PET_COMMAND_ID
+          note('<b>' + (T['gui.pet.movement'] || 'Movement') + '</b>'); btns([['Follow', cmd(8)], ['Wander', cmd(9)], ['Sit', cmd(10)]]);
+          note('<b>' + (T['gui.pet.stance'] || 'Stance') + '</b>'); btns([['Passive', cmd(4)], ['Defensive', cmd(5)], ['Assist', cmd(6)], ['Aggressive', cmd(7)], ['PvP', cmd(2)]]); }
+        return true; },
+      tick() { if (!S.lyc) LYS(); lyHud(); lyControl(); },
       entName(tid, L) { const R = S.modRec, C = R && R.ocr; if (!C) return null; const ns = L.length ? L[0].split(':')[0] : 'lycanitesmobs', short = n => n.split(':')[1];
         if (!S.lyIds) { const cr = javaOrder(((R.ocrAll && R.ocrAll[ns]) || Object.values(C).filter(d => d.ns === ns).map(d => d.name)).slice().sort().reverse()), P = R.oprj || {}, pj = Object.keys(P).filter(k => k.startsWith(ns + ':')).map(short), have = new Set(L.map(short));
           const objp = Object.keys(R.files).filter(k => k.startsWith('o/' + ns + ':projectile/') && k.endsWith('.obj')).map(k => k.slice(('o/' + ns + ':projectile/').length, -4));
@@ -20054,6 +20234,8 @@ class ModelZoataur extends ModelTemplateDragon {
       load: k => { const o = k.startsWith('obj:') ? F['o/' + ns + ':' + k.slice(4) + '.obj'] : k.startsWith('parts:') ? F['o/' + ns + ':' + k.slice(6) + '_parts.json'] : null; return o ? dec.decode(o) : null; } });
     return LY.O; }
   const lycFly = d => !!(window.StrataLyc && StrataLyc.flying && StrataLyc.flying[d.name]);   // the entity classes' isFlying() on the client (ported table)
+  // equipment the server syncs (BaseCreatureEntity 26 head, 27 chest, 28 legs, 29 feet): its grade names the texture (warg_chestiron)
+  const lyEquip = md => { const o = {}; ['head', 'chest', 'legs', 'feet'].forEach((t, i) => { const it = md[26 + i]; if (!it || !(it.id > 0)) return; const n = (S.forge && S.forge.items[it.id]) || ''; const g = (n.match(/(leather|iron|gold|golden|diamond|chain|netherite|emerald)/) || [])[1]; if (g) o[t] = g === 'golden' ? 'gold' : g; }); return o; };
   const LYL = [[.2, 1, -.7], [-.2, 1, .7]].map(v => { const l = Math.hypot(...v); return v.map(q => q / l); });   // Minecraft's two entity lights
   function lycDraw(P, tk, layer, L, hurt) { const T = fxTex(tk); if (!T) return;
     for (const q of P) { const gl = q.gl, full = !gl.lit || (gl.lm && gl.lm[0] >= 240), add = gl.dst === 'ONE', c = q.color, gc = gl.color || [1, 1, 1, 1], a = c[3] * gc[3]; if (a <= .004) continue;
@@ -20064,10 +20246,25 @@ class ModelZoataur extends ModelTemplateDragon {
         let sh = 1; if (!full) { const ux = V[3] - V[0], uy = V[4] - V[1], uz = V[5] - V[2], vx = V[6] - V[0], vy = V[7] - V[1], vz = V[8] - V[2]; let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
           sh = Math.min(1, .4 + .6 * (Math.max(0, nx * LYL[0][0] + ny * LYL[0][1] + nz * LYL[0][2]) + Math.max(0, nx * LYL[1][0] + ny * LYL[1][1] + nz * LYL[1][2]))); }
         for (let k = 0, j = 0; k < 15; k += 5, j += 3) A.push(V[j], V[j + 1], V[j + 2], f[i + k + 3] + ou, 1 - f[i + k + 4] - ov, cr * sh, cg * sh, cb * sh, a); } } }
-  function lycProj(m, ticks, part) { const md = m.md || {}, R = S.modRec, ns = m.modEnt.split(':')[0], nm = (typeof md[7] === 'string' && md[7]) || m.modEnt.split(':')[1], pj = R.oprj && R.oprj[ns + ':' + nm];   // RenderProjectileSprite: the item texture, frame-animated, facing the camera
-    const T = fxTex(ns + ':items/' + nm); if (!T) return; const st = m.ly || (m.ly = { f: 0 }), fr = Math.max(1, pj ? pj.frames : 1); st.f = (st.f + ticks) % fr;
-    const sc = (typeof md[6] === 'number' && md[6] > 0 ? md[6] : 1) * (pj ? pj.scale : 1), w = .5 * (pj && fr > 1 ? pj.tscale : 1) * sc, L = pj && pj.glow ? [1, 1, 1] : litAt(m.x, m.y + .3, m.z);
-    FX.bill(T.key, m.x, m.y + w / 2 + (pj && fr > 1 ? pj.toff : 0) * sc, m.z, w, [0, st.f / fr, 1, (st.f + 1) / fr], [L[0], L[1], L[2], 1], 0); }
+  // projectiles: RenderProjectileModel (an OBJ model: down 0.25, half size, turned to its yaw, scale 4 x its own; not a living entity, so never animated),
+  // RenderProjectileSprite.renderLaser (a beam of the projectile's <name>_beam texture from the thrower to its target or along its look), or the sprite (item texture, frame-animated)
+  function lycProj(m, ticks, part) { const md = m.md || {}, R = S.modRec, ns = m.modEnt.split(':')[0], nm = (typeof md[7] === 'string' && md[7]) || m.modEnt.split(':')[1], pj = R.oprj && R.oprj[ns + ':' + nm];
+    const st = m.ly || (m.ly = { f: 0, t: 0 }); st.t += ticks; const sc = (typeof md[6] === 'number' && md[6] > 0 ? md[6] : 1) * (pj ? pj.scale : 1), glow = !!(pj && pj.glow), L = glow ? [1, 1, 1] : litAt(m.x, m.y + .3, m.z), O = lycO();
+    if (pj && pj.laser) { const thr = S.ents.get(md[8]), tgt = S.ents.get(md[10]); const T = fxTex(ns + ':items/' + nm + '_beam') || fxTex(ns + ':items/' + nm); if (!T) return;
+      const ax = thr ? thr.x : m.x, ay = thr ? thr.y + ((MOB[thr.type] || {}).h || 1.8) * .5 : m.y, az = thr ? thr.z : m.z; let ex, ey, ez;
+      if (tgt) { ex = tgt.x; ey = tgt.y + ((MOB[tgt.type] || {}).h || 1.8) / 2; ez = tgt.z; } else { const yaw = thr ? -thr.face : -m.face, pit = thr && thr.pitch ? thr.pitch * Math.PI / 180 : 0; ex = ax - Math.sin(yaw) * Math.cos(pit) * pj.laser.range; ey = ay - Math.sin(pit) * pj.laser.range; ez = az + Math.cos(yaw) * Math.cos(pit) * pj.laser.range; }
+      for (let k = 1; k <= 64; k++) { const f = k / 64, x = ax + (ex - ax) * f, y = ay + (ey - ay) * f, z = az + (ez - az) * f, b = world.get(Math.floor(x), Math.floor(y), Math.floor(z)); if (b > 0 && BLOCKS[b] && BLOCKS[b].solid !== false && !tgt) { ex = x; ey = y; ez = z; break; } }   // stops at the first solid block
+      const dx = ex - ax, dy = ey - ay, dz = ez - az, len = Math.hypot(dx, dy, dz); if (len < .05) return; const w = pj.laser.width / 32, u = [dx / len, dy / len, dz / len], q = Math.abs(u[1]) < .9 ? [0, 1, 0] : [1, 0, 0];
+      const r1 = [u[1] * q[2] - u[2] * q[1], u[2] * q[0] - u[0] * q[2], u[0] * q[1] - u[1] * q[0]], rl = Math.hypot(...r1); r1.forEach((v, i) => r1[i] = v / rl * w); const r2 = [u[1] * r1[2] - u[2] * r1[1], u[2] * r1[0] - u[0] * r1[2], u[0] * r1[1] - u[1] * r1[0]];
+      const P = (s0, a2, b2) => [ax + dx * s0 + r1[0] * a2 + r2[0] * b2, ay + dy * s0 + r1[1] * a2 + r2[1] * b2, az + dz * s0 + r1[2] * a2 + r2[2] * b2], c = [L[0], L[1], L[2], 1], sc2 = (st.t + part) * .05;
+      for (const [a2, b2, a3, b3] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) FX.quad(T.key, [P(0, a2, b2), P(0, a3, b3), P(1, a3, b3), P(1, a2, b2)], [[0, sc2], [1, sc2], [1, sc2 + len], [0, sc2 + len]], c, glow ? 1 : 0); return; }
+    const mcls = pj && pj.model && O && StrataLyc.models[pj.model];
+    if (mcls && O) { const Mdl = O.model('proj:' + nm, pj.model); if (Mdl) { const tex = ns + ':projectile/' + nm; if (!S.modRec.files['e/' + tex]) return; const yaw = -m.face * 180 / Math.PI, B = O.ident(); O.tr(B, m.x, m.y - .25, m.z); O.sc(B, .5, .5, .5); O.rot(B, yaw, 0, 1, 0);
+        const s = st.s || (st.s = {}); Object.assign(s, { loop: part, limbSwing: 0, limbAmount: 0, renderScale: 4 * (typeof md[6] === 'number' && md[6] > 0 ? md[6] : 1), noAnim: 1, texName: nm }); const ent = st.e || (st.e = O.entity(s, ['BaseProjectileEntity', 'CustomProjectileEntity']));
+        lycDraw(O.pose(Mdl, ent, null, B), tex, null, L, 0); for (const l of Mdl.layers) { if (!O.layerOn(l, ent)) continue; const tk = O.layerTex(l, ent) || tex; if (S.modRec.files['e/' + tk]) lycDraw(O.pose(Mdl, ent, l, B), tk, l, L, 0); } return; } }
+    const T = fxTex(ns + ':items/' + nm); if (!T) return; const fr = Math.max(1, pj ? pj.frames : 1); st.f = (st.f + ticks) % fr;
+    const w = .5 * (pj && fr > 1 ? pj.tscale : 1) * sc;
+    FX.bill(T.key, m.x, m.y + w / 2 + (pj && fr > 1 ? pj.toff : 0) * sc, m.z, w, [0, st.f / fr, 1, (st.f + 1) / fr], [L[0], L[1], L[2], 1], glow ? 1 : 0); }
   function lycFx() { const O = lycO(); if (!O || typeof FX === 'undefined') return; const now = performance.now(), p = player, R = S.modRec;
     LY.acc = Math.min(.25, LY.acc + (LY.last ? (now - LY.last) / 1000 : 0)); LY.last = now; let ticks = 0; while (LY.acc >= .05) { LY.acc -= .05; ticks++; } const part = LY.acc / .05;
     for (const m of S.mobs) { const nm = m.modEnt; if (!nm || !R.ocr) continue; const d = R.ocr[nm]; if (!d && !(R.oprj && /^[^:]+:/.test(nm) && Object.keys(R.ocr).some(k => k.startsWith(nm.split(':')[0] + ':')))) continue;
@@ -20083,13 +20280,90 @@ class ModelZoataur extends ModelTemplateDragon {
       let hy = ((m.hyaw != null ? m.hyaw : yaw) - yaw) % 360; if (hy > 180) hy -= 360; if (hy < -180) hy += 360;
       const s = st.s || (st.s = {}); Object.assign(s, { loop: st.ticks + part, limbSwing: st.limb + st.amt * part, limbAmount: st.amt, onGround: !!(an & 2), inWater: !!(an & 4), anim: an, attackCooldown: st.cool, attackCooldownMax: md[15] | 0, progress: st.progress,
         stealth: +md[17] || 0, attackPhase: md[13] | 0, color: md[19] | 0, target: md[12] | 0, tamed: md[34] | 0, child: !!md[18], renderScale: (typeof md[20] === 'number' && md[20] > 0 ? md[20] : 1) * d.scale, sub: subI, subName: sb && sb.name, variant: varI, varColor: (vr && vr.c) || null,
-        texName: d.name, health: typeof md[7] === 'number' ? md[7] : d.health, maxHealth: d.health, flying: lycFly(d), perch: !!((md[12] | 0) & 64), headYaw: hy, headPitch: m.pitch || 0, hurt: m.hurtT > 0 ? 1 : 0, bright: 15728880, id: m.eid, yaw });
+        texName: d.name, saddle: !!(md[31] && md[31].id > 0), equip: lyEquip(md), health: typeof md[7] === 'number' ? md[7] : d.health, maxHealth: d.health, flying: lycFly(d), perch: !!((md[12] | 0) & 64), headYaw: hy, headPitch: m.pitch || 0, hurt: m.hurtT > 0 ? 1 : 0, bright: 15728880, id: m.eid, yaw });
       const cls = [d.ent.split('/').pop(), 'BaseCreatureEntity', 'AgeableCreatureEntity'].concat(d.tame ? ['TameableCreatureEntity'] : [], d.mount ? ['RideableCreatureEntity'] : []);
       const ent = st.e || (st.e = O.entity(s, cls));
       const B = O.ident(); O.tr(B, m.x, m.y, m.z); O.rot(B, 180 - yaw, 0, 1, 0); if (m.dead || m.deathT) { const dt = Math.min(1, Math.sqrt(Math.max(0, ((m.deathT || 20) - 1) / 20 * 1.6))); O.rot(B, dt * 90, 0, 0, 1); } O.sc(B, -1, -1, 1); O.tr(B, 0, -1.501, 0);   // RenderLivingBase
       const L = litAt(m.x, m.y + d.h / 2, m.z), base = ent.getTexture('') || (S.modRec.files['e/' + d.ns + ':entity/' + d.name] ? d.ns + ':entity/' + d.name : null);
       if (base) lycDraw(O.pose(M, ent, null, B), base, null, L, s.hurt);
       for (const l of M.layers) { if (!O.layerOn(l, ent)) continue; const tk = O.layerTex(l, ent); if (!tk || !S.modRec.files['e/' + tk]) continue; lycDraw(O.pose(M, ent, l, B), tk, l, L, 0); } } }
+  // ---- Lycanites Mobs client (channel "lycanitesmobs", SimpleNetworkWrapper discriminators from its PacketHandler) ----
+  // to the client: 0 beastiary, 1 creature, 2 creature knowledge, 3 player stats, 4|20 pet entry, 5|21 pet entry removed, 6|22 summon set, 7|23 summon set selection,
+  // 8 picked up, 9 perched, 10 world event, 11 mob event, 12 summoning pedestal stats, 13 entity velocity (classes registered twice travel under their second number)
+  // to the server: 14 entity GUI command, 15 sync request, 16 GUI request, 17 player control, 18 left click, 19 player attack, 20 pet entry, 21 pet entry removed,
+  // 22 summon set, 23 summon set selection, 24 summoning pedestal summon set, 25 tile entity button
+  const LYS = () => S.lyc = S.lyc || { know: {}, pets: new Map(), sets: {}, sel: 0, stats: null, ped: {}, ctl: 0, synced: false };
+  const lyL = () => (S.modRec && S.modRec.lang && S.modRec.lang.lycanitesmobs) || {};
+  const lyName = n => lyL()['entity.' + n + '.name'] || n.replace(/\b\w/g, c => c.toUpperCase());
+  const lyDef = n => S.modRec && S.modRec.ocr && S.modRec.ocr['lycanitesmobs:' + n];
+  const lyW = () => { const a = []; const o = { u8(x) { a.push(x & 255); return o; }, bool(x) { a.push(x ? 1 : 0); return o; }, i32(n) { a.push((n >> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255); return o; },
+    i64(v) { v = BigInt.asUintN(64, BigInt(v)); for (let i = 7; i >= 0; i--) a.push(Number((v >> BigInt(i * 8)) & 255n)); return o; },
+    str(t) { const u = new TextEncoder().encode(t || ''); let n = u.length; do { let b = n & 127; n >>>= 7; if (n) b |= 128; a.push(b); } while (n); a.push(...u); return o; }, out: () => Uint8Array.from(a) }; return o; };
+  const lySend = (d, w) => { try { S.client.api.modSend('lycanitesmobs', Uint8Array.from([d, ...(w ? w.out() : [])])); } catch (e) { /* offline */ } };
+  function lyPayload(b) { const r = bbR(b, 0), d = r.u8(), L = LYS(), unpos = v => { v = BigInt.asIntN(64, v); return [Number(v >> 38n), Number((v >> 26n) & 0xFFFn), Number(BigInt.asIntN(26, v))]; };
+    if (d === 0) { const n = Math.min(200, r.i32()); if (n === 200) return true; for (let i = 0; i < n; i++) { const nm = r.str(); L.know[nm] = { rank: r.i32(), exp: r.i32() }; } L.synced = true; lyRefresh(); }
+    else if (d === 2) { const nm = r.str(); const old = L.know[nm]; L.know[nm] = { rank: r.i32(), exp: r.i32() }; if (!old || old.rank !== L.know[nm].rank) toast('Beastiary: ' + lyName(nm) + ' (' + ['Unknown', 'Discovered', 'Studied', 'Mastered'][Math.min(3, L.know[nm].rank)] + ')'); lyRefresh(); }
+    else if (d === 3) { L.stats = { spirit: r.i32(), focus: r.i32(), study: r.i32() }; lyHud(); }
+    else if (d === 4 || d === 20) { const id = [r.i64(), r.i64()], e = { id, type: r.str(), active: r.bool(), tp: r.bool(), summon: r.str(), sub: r.i32(), variant: r.i32(), beh: r.u8(), eid: r.i32(), name: r.str(), respawn: r.i32(), respawnMax: r.i32(), level: r.i32(), exp: r.i32(), respawning: r.bool() }; L.pets.set(id.join(':'), e); lyRefresh(); }
+    else if (d === 5 || d === 21) { L.pets.delete([r.i64(), r.i64()].join(':')); lyRefresh(); }
+    else if (d === 6 || d === 22) { const i = r.u8(); L.sets[i] = { type: r.str(), sub: r.i32(), variant: r.i32(), beh: r.u8() }; lyRefresh(); lyHud(); }
+    else if (d === 7 || d === 23) { L.sel = r.u8(); lyRefresh(); lyHud(); }
+    else if (d === 10 || d === 11) { const nm = r.str(), pos = unpos(r.i64()), lvl = r.i32(); const T = lyL(); if (nm) { const t = T['mobevent.' + nm + '.name'] || nm.replace(/\b\w/g, c => c.toUpperCase()); toast((d === 10 ? 'World event: ' : 'Mob event: ') + t + (lvl > 1 ? ' (level ' + lvl + ')' : '')); } else toast('The ' + (d === 10 ? 'world' : 'mob') + ' event has ended'); }
+    else if (d === 12) { const x = r.i32(), y = r.i32(), z = r.i32(); L.ped[x + ',' + y + ',' + z] = { capacity: r.i32(), progress: r.i32(), fuel: r.i32(), fuelMax: r.i32() }; if (S.win && /^forge:lycanitesmobs:/.test(S.win.type || '')) mcInvRender(); }
+    else if (d === 13) { const id = r.vi(), mx = r.d.getInt16(r.p) / 8000, my = r.d.getInt16(r.p + 2) / 8000, mz = r.d.getInt16(r.p + 4) / 8000; if (id === S.eid && S.world) { player.vx = (player.vx || 0) + mx * 20; player.vy = (player.vy || 0) + my * 20; player.vz = (player.vz || 0) + mz * 20; } }
+    return true; }
+  const lyBeh = (b, bit) => !!(b & bit), LYB = { sit: 1, follow: 2, passive: 4, assist: 8, aggressive: 16, pvp: 32 };
+  function lySendPet(e) { lySend(20, lyW().i64(e.id[0]).i64(e.id[1]).str(e.type).bool(e.active).bool(e.tp).str(e.summon).i32(e.sub).i32(e.variant).u8(e.beh).i32(e.eid).str(e.name).i32(e.respawn).i32(e.respawnMax).i32(e.level).i32(e.exp).bool(e.respawning)); }
+  function lySendSet(i) { const t = LYS().sets[i] || { type: '', sub: 0, variant: 0, beh: 2 }; lySend(22, lyW().u8(i).str(t.type).i32(t.sub).i32(t.variant).u8(t.beh)); }
+  const lySummonable = () => Object.entries(LYS().know).filter(([n, k]) => k.rank >= 2 && (lyDef(n) || {}).summon).map(([n]) => n).sort();
+  // the Beastiary: Lycanites' book of creatures, pets, summoning and elements (its client screens, as one Strata panel)
+  function lycBook(tab, arg) { const L = LYS(), T = lyL(); let el = document.getElementById('lyBook'); if (!L.synced) lySend(15);
+    if (!el) { el = document.createElement('div'); el.id = 'lyBook'; el.style.cssText = 'position:fixed;inset:0;z-index:82;background:rgba(8,6,12,.82);display:flex;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top)) 10px 10px'; document.body.appendChild(el);
+      el.addEventListener('click', ev => { const t = ev.target.closest('[data-ly]'); if (!t) { if (ev.target === el) el.hidden = true; return; } const [a, b2, c] = t.dataset.ly.split('|'), Lx = LYS();
+        if (a === 'x') { el.hidden = true; return; } if (a === 'tab') return lycBook(b2); if (a === 'cr') return lycBook('creatures', b2);
+        if (a === 'pet') { const e = Lx.pets.get(b2); if (!e) return; if (c === 'active') e.active = !e.active; else if (c === 'tp') e.tp = !e.tp; else if (c === 'release') { lySend(21, lyW().i64(e.id[0]).i64(e.id[1])); Lx.pets.delete(b2); } else e.beh ^= LYB[c]; if (c !== 'release') lySendPet(e); return lycBook('pets'); }
+        if (a === 'set') { Lx.sel = +b2; lySend(23, lyW().u8(+b2)); lyHud(); return lycBook('summoning'); }
+        if (a === 'setb') { const t2 = Lx.sets[Lx.sel] = Lx.sets[Lx.sel] || { type: '', sub: 0, variant: 0, beh: 2 }; t2.beh ^= LYB[b2]; lySendSet(Lx.sel); return lycBook('summoning'); }
+        if (a === 'sett') { const t2 = Lx.sets[Lx.sel] = Lx.sets[Lx.sel] || { type: '', sub: 0, variant: 0, beh: 2 }; t2.type = b2; lySendSet(Lx.sel); lyHud(); return lycBook('summoning'); } }); }
+    el.hidden = false; tab = tab || el.dataset.tab || 'creatures'; el.dataset.tab = tab;
+    const yes = v => v ? 'on' : 'off', btn = (ly, txt, on) => `<button class="ghost" data-ly="${ly}" style="margin:2px;padding:5px 9px;font-size:13px;${on ? 'background:#5b3f8a;color:#fff;' : 'color:#2b2238;'}">${txt}</button>`, stars = n => '★'.repeat(n) + '☆'.repeat(Math.max(0, 3 - n));
+    let body = '';
+    if (tab === 'creatures') { const known = Object.keys(L.know).filter(n => lyDef(n)).sort((a, b2) => lyName(a).localeCompare(lyName(b2)));
+      if (arg && lyDef(arg)) { const d = lyDef(arg), k = L.know[arg] || { rank: 0, exp: 0 };
+        body = `<button class="ghost" data-ly="tab|creatures">‹ Creatures</button><h2 style="margin:8px 0 2px;font:700 20px Georgia,serif">${lyName(arg)}</h2><div style="color:#6a5a86">${stars(k.rank)} ${T['creaturetype.' + d.type + '.name'] || d.type}${d.els.length ? ' · ' + d.els.map(x => T['element.' + x + '.name'] || x).join(', ') : ''}</div>`
+          + ['description', 'habitat', 'combat'].filter(f => T['entity.' + arg + '.' + f] && (k.rank >= (f === 'description' ? 1 : 2))).map(f => `<p style="line-height:1.5;margin:8px 0"><b>${f[0].toUpperCase() + f.slice(1)}.</b> ${T['entity.' + arg + '.' + f]}</p>`).join('')
+          + (k.rank < 2 ? '<p style="color:#7a6a96"><i>Study this creature more (crouch and tap it with a Soulgazer) to learn its habitat and combat.</i></p>' : '')
+          + `<p style="color:#4a3a66">${[d.tame && 'Tameable', d.mount && 'Mountable', d.summon && 'Summonable (cost ' + d.cost + ')', d.boss && 'Boss'].filter(Boolean).join(' · ') || ''}</p>`; }
+      else body = `<p style="margin:4px 0 8px;color:#5a4a76">${known.length} of ${Object.values(S.modRec.ocr).filter(d => d.ns === 'lycanitesmobs').length} creatures discovered.</p>` + (known.length ? known.map(n => `<button class="ghost" data-ly="cr|${n}" style="display:block;width:100%;text-align:left;margin:3px 0;padding:8px 10px;color:#2b2238"><b>${lyName(n)}</b> <small style="color:#7a6a96">${stars(L.know[n].rank)}</small></button>`).join('') : '<p>No creatures discovered yet: look at one up close.</p>'); }
+    else if (tab === 'pets') { const groups = {}; for (const [k, e] of L.pets) (groups[e.type] = groups[e.type] || []).push([k, e]);
+      body = Object.keys(groups).length ? Object.entries(groups).map(([ty, es]) => `<h3 style="margin:10px 0 4px;font:700 16px Georgia,serif;text-transform:capitalize">${ty}s</h3>` + es.map(([k, e]) => `<div style="border:1px solid #cbbfdc;border-radius:8px;padding:6px 8px;margin:4px 0"><b>${e.name || lyName(e.summon)}</b> <small>${lyName(e.summon)} · level ${e.level}${e.respawning ? ' · respawning ' + Math.ceil(e.respawn / 20) + 's' : ''}</small><div>`
+        + btn(`pet|${k}|active`, 'Active: ' + yes(e.active), e.active) + btn(`pet|${k}|tp`, 'Teleport: ' + yes(e.tp), e.tp) + btn(`pet|${k}|sit`, 'Sit', lyBeh(e.beh, 1)) + btn(`pet|${k}|follow`, 'Follow', lyBeh(e.beh, 2)) + btn(`pet|${k}|passive`, 'Passive', lyBeh(e.beh, 4)) + btn(`pet|${k}|assist`, 'Assist', lyBeh(e.beh, 8)) + btn(`pet|${k}|aggressive`, 'Aggressive', lyBeh(e.beh, 16)) + btn(`pet|${k}|pvp`, 'PvP', lyBeh(e.beh, 32)) + btn(`pet|${k}|release`, 'Release', false) + '</div></div>').join('')).join('')
+        : '<p>No pets, mounts or familiars yet. Tame a creature with its favourite treat to bond with it.</p>'; }
+    else if (tab === 'summoning') { const t = L.sets[L.sel] || { type: '', beh: 2 }, opts = lySummonable();
+      body = '<div>' + [0, 1, 2, 3, 4].map(i => btn('set|' + i, (i + 1) + ': ' + (L.sets[i] && L.sets[i].type ? lyName(L.sets[i].type) : 'empty'), i === L.sel)).join('') + '</div>'
+        + `<h3 style="margin:10px 0 4px;font:700 16px Georgia,serif">Summon set ${L.sel + 1}: ${t.type ? lyName(t.type) : 'none'}</h3><div>` + ['sit', 'follow', 'passive', 'assist', 'aggressive', 'pvp'].map(b2 => btn('setb|' + b2, b2[0].toUpperCase() + b2.slice(1), lyBeh(t.beh, LYB[b2]))).join('') + '</div>'
+        + `<h3 style="margin:10px 0 4px;font:700 16px Georgia,serif">Minions</h3>` + (opts.length ? opts.map(n => btn('sett|' + n, lyName(n) + ' (' + (lyDef(n).cost) + ')', n === t.type)).join('') : '<p>Study creatures to rank 2 in the Beastiary to summon them with a staff.</p>')
+        + (L.stats ? `<p style="color:#5a4a76;margin-top:10px">Spirit ${L.stats.spirit} · Summon focus ${L.stats.focus}</p>` : ''); }
+    else if (tab === 'elements') { const els = [...new Set(Object.keys(T).filter(k => /^element\.[a-z]+\.name$/.test(k)).map(k => k.split('.')[1]))].sort();
+      body = els.map(x => `<div style="margin:8px 0"><b>${T['element.' + x + '.name']}</b>${T['element.' + x + '.description'] ? `<div style="line-height:1.45;color:#3a2e4a">${T['element.' + x + '.description']}</div>` : ''}</div>`).join('') || '<p>Import the Lycanites Mobs jar again to read the elements here.</p>'; }
+    const tabs = ['creatures', 'pets', 'summoning', 'elements'].map(x => btn('tab|' + x, x[0].toUpperCase() + x.slice(1), x === tab)).join('');
+    el.innerHTML = `<div style="background:#f3eef8;color:#241c30;border:3px solid #5b3f8a;border-radius:12px;width:min(580px,100%);max-height:100%;display:flex;flex-direction:column;box-shadow:0 10px 40px #0008"><div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:2px solid #5b3f8a;background:#e4dbef;border-radius:9px 9px 0 0;gap:6px;flex-wrap:wrap"><b style="font:700 17px Georgia,serif;color:#3b2763">Beastiary</b><span>${tabs}</span><button class="ghost" data-ly="x" style="color:#2b2238">Close</button></div><div id="lyBookB" style="overflow:auto;padding:8px 14px 16px;font:14px Georgia,serif">${body}</div></div>`; }
+  function lyRefresh() { const el = document.getElementById('lyBook'); if (el && !el.hidden) lycBook(el.dataset.tab); }
+  // holding a summoning staff: the minion selection (Lycanites' R wheel) and spirit / focus; riding a Lycanites mount: its controls
+  function lyHud() { if (!S || !S.world) return; const h = held(), hn = (h && h.mc && S.forge && S.forge.items[h.mc.id]) || '', staff = /^lycanitesmobs:.*staff/.test(hn) && /summon|staff_/.test(hn), L = LYS();
+    let el = document.getElementById('lyHud'); const mount = S.riding && S.riding.modEnt && lyDef(S.riding.modEnt.split(':')[1]);
+    if (!staff && !mount) { if (el) el.hidden = true; return; }
+    if (!el) { hud2(); el = document.createElement('div'); el.id = 'lyHud'; el.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 64px);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;pointer-events:auto;font:12px system-ui';
+      el.addEventListener('pointerdown', ev => { const t = ev.target.closest('[data-ly]'); if (!t) return; ev.preventDefault(); const [a, v] = t.dataset.ly.split('|');
+        if (a === 'sel') { LYS().sel = +v; lySend(23, lyW().u8(+v)); lyHud(); } else if (a === 'book') lycBook('summoning'); else if (a === 'ctl') { LYS().btn = (LYS().btn || 0) | +v; setTimeout(() => { LYS().btn &= ~+v; }, 250); } });
+      document.getElementById('mcHud2').appendChild(el); }
+    el.hidden = false; const B = (ly, t, on) => `<button data-ly="${ly}" style="pointer-events:auto;padding:5px 8px;border-radius:8px;border:1px solid #b9a0ff66;background:${on ? '#5b3f8acc' : 'rgba(20,12,34,.7)'};color:#efe6ff">${t}</button>`;
+    el.innerHTML = staff ? [0, 1, 2, 3, 4].map(i => B('sel|' + i, (i + 1) + ' ' + (L.sets[i] && L.sets[i].type ? lyName(L.sets[i].type) : '·'), i === L.sel)).join('') + B('book', '⚙') + (L.stats ? `<span style="align-self:center;padding:0 6px;color:#efe6ff">✦ ${L.stats.spirit} · ◎ ${L.stats.focus}</span>` : '')
+      : B('ctl|4', 'Ability') + B('ctl|16', 'Attack') + B('ctl|8', 'Inventory') + B('ctl|2', 'Dismount'); }
+  // mount control states, as Lycanites' KeyHandler sends them (17): jump, descend, ability, inventory, attack, dismount
+  function lyControl() { const L = LYS(); const mount = S.riding && S.riding.modEnt && lyDef(S.riding.modEnt.split(':')[1]); let c = 0;
+    if (mount) { if (input.jump) c |= 1; if (player.crouch) c |= 32; c |= (L.btn || 0); }
+    if (c !== L.ctl) { L.ctl = c; lySend(17, lyW().u8(c)); } }
   window.__fxFrame = () => { if (!S || !S.forge || !S.world) return; for (const P of Object.values(PORTS)) if (P.fx) try { P.fx(); } catch (e) { console.error('port fx', e); P.fx = null; } };
   const botS = () => S.bot = S.bot || { pools: new Map(), spread: new Map(), alt: new Map(), rune: new Map(), flow: new Map(), terra: new Map(), portal: new Map() };
   function botItemId(e) { if (!e || !e.id) return 0; const F = S.forge; F.byItem = F.byItem || new Map(Object.entries(F.items).map(([i, n]) => [n, +i])); const num = F.byItem.get(String(e.id)); if (num == null) return 0; const st = toStack({ id: num, count: 1, damage: e.Damage | 0 }); return st ? st.id : 0; }
@@ -20388,12 +20662,15 @@ class ModelZoataur extends ModelTemplateDragon {
     const json = async n => { let t; try { t = await rd(n); return JSON.parse(t); } catch (e) { try { return JSON.parse(String(t).replace(/^\s*\/\/[^\n]*/gm, '')); } catch (e2) { return null; } } }, models = {}, has = n => names.includes(n);
     if (names.some(n => /^assets\/[^/]+\/models\/entity\/[^/]+\.obj$/i.test(n))) {   // creatures modelled as OBJ files (Lycanites Mobs): their models and part pivots, for Strata's port of the mod's models (objmobs.js, lycmodels.js)
       for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/((?:entity|projectile)\/[^/]+?)(\.obj|_parts\.json)$/i); if (m) { const d = await z.read(n); if (d) rec.files['o/' + m[1] + ':' + m[2] + m[3]] = d; } }
+      if (window.StrataLyc && StrataLyc.objIcon) for (const n of names) { const m = n.match(/^assets\/([^/]+)\/models\/equipment\/([^/]+)\.obj$/i); if (!m) continue;   // equipment parts are model-only items: draw their icons once
+        const png = zr('assets/' + m[1] + '/textures/equipment/' + m[2] + '.png') || await z.read('assets/' + m[1] + '/textures/equipment/' + m[2] + '.png'), obj = await z.read(n); if (!png || !obj) continue;
+        try { const icon = await StrataLyc.objIcon(new TextDecoder().decode(obj), png, 64); if (icon) { const key = m[1] + ':gen/equip_' + m[2]; rec.files['i/' + key] = icon; rec.items[m[1] + ':' + m[2]] = key; } } catch (e) { /* no icon */ } }
       const C = rec.ocr = rec.ocr || {}, PJ = rec.oprj = rec.oprj || {};
       for (const n of names) { let m = n.match(/^assets\/([^/]+)\/creatures\/[^/]+\.json$/i); if (m) { const j = await json(n); if (j && j.name) { const A = rec.ocrAll = rec.ocrAll || {}, L = A[m[1]] = A[m[1]] || []; if (!L.includes(String(j.name))) L.push(String(j.name)); } if (!j || !j.modelClass || !j.name) continue;
           C[m[1] + ':' + String(j.name).toLowerCase()] = { ns: m[1], name: String(j.name).toLowerCase(), model: j.modelClass.replace(/\./g, '/'), ent: String(j.entityClass || '').replace(/\./g, '/'), w: +j.width || .6, h: +j.height || 1, scale: +j.sizeScale || 1, health: +j.health || 20,
-            tame: !!j.tameable, mount: !!j.mountable, sub: (j.subspecies || []).map(q => ({ i: q.index | 0, name: q.name ? String(q.name).toLowerCase() : null, v: (q.variants || []).map(v => ({ i: v.index | 0, c: String(v.color || v.name || '').toLowerCase() })) })) }; continue; }
-        m = n.match(/^assets\/([^/]+)\/projectiles\/[^/]+\.json$/i); if (m) { const j = await json(n); if (!j || !j.name) continue; PJ[m[1] + ':' + String(j.name).toLowerCase()] = { frames: +j.animationFrames || 1, scale: +j.scale || 1, tscale: +j.textureScale || 1, toff: +j.textureOffsetY || 0, glow: !!j.glow, roll: +j.rollSpeed || 0, w: +j.width || .5 }; } } }
-    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(entity|models?)\//.test(m[2]) && !/^models\/armor\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d; if (/^misc\//.test(m[2])) rec.files['x/' + key] = d;   /* effect sprites (wisps, sparkles) */   /* creature textures (Strata's skinned mob renderer) */
+            tame: !!j.tameable, mount: !!j.mountable, summon: !!j.summonable, cost: +j.summonCost || 1, type: j.creatureType || '', els: j.elements || (j.element ? [j.element] : []), boss: !!j.boss, sub: (j.subspecies || []).map(q => ({ i: q.index | 0, name: q.name ? String(q.name).toLowerCase() : null, v: (q.variants || []).map(v => ({ i: v.index | 0, c: String(v.color || v.name || '').toLowerCase() })) })) }; continue; }
+        m = n.match(/^assets\/([^/]+)\/projectiles\/[^/]+\.json$/i); if (m) { const j = await json(n); if (!j || !j.name) continue; const lz = (j.behaviours || []).find(q => q && q.type === 'laser'); PJ[m[1] + ':' + String(j.name).toLowerCase()] = { frames: +j.animationFrames || 1, scale: +j.scale || 1, tscale: +j.textureScale || 1, toff: +j.textureOffsetY || 0, glow: !!j.glow, roll: +j.rollSpeed || 0, w: +j.width || .5, model: j.modelClass ? String(j.modelClass).split('.').pop() : null, laser: lz ? { width: +lz.width || 4, range: +lz.range || 16 } : null }; } } }
+    for (const n of names) { let m = n.match(/^assets\/([^/]+)\/textures\/(.+)\.png$/i); if (m) { const key = m[1] + ':' + m[2], d = zr(n); if (!d) continue; if (/^(entity|models?|projectile)\//.test(m[2]) && !/^models\/armor\//.test(m[2])) rec.files['e/' + key] = d; if (/^gui\//.test(m[2])) rec.files['g/' + key] = d; if (/^misc\//.test(m[2])) rec.files['x/' + key] = d;   /* effect sprites (wisps, sparkles) */   /* creature textures (Strata's skinned mob renderer) */
         if (/^(blocks?|items?)\//.test(m[2])) { rec.files['b/' + key] = d; if (/^items?\//.test(m[2])) rec.files['i/' + key] = d; const mm = zr(n + '.mcmeta'); if (mm) rec.files['b/' + key + '.mcmeta'] = mm; } continue; }
       m = n.match(/^assets\/([^/]+)\/lang\/en_us\.lang$/i); if (m) { const L = rec.lang[m[1]] = rec.lang[m[1]] || {}; for (const ln of (await rd(n)).split(/\r?\n/)) { const i = ln.indexOf('='); if (i > 0 && (/\.name$/.test(ln.slice(0, i).trim()) || LANG_KEEP.test(ln.slice(0, i).trim()))) L[ln.slice(0, i).trim()] = ln.slice(i + 1).trim(); } } }
     { rec.mcsnd = rec.mcsnd || {}; rec.sndmap = rec.sndmap || {}; let bytes = 0;   // sounds: sounds.json events -> the ogg files (played by Minecraft mode's pack sound player)
@@ -20427,7 +20704,7 @@ class ModelZoataur extends ModelTemplateDragon {
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }

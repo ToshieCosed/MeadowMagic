@@ -30,6 +30,19 @@ out.r = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new
   await W(1500); r.tex = [...FX.T.keys()].filter(k => /lycanites/.test(k)); r.fly = Object.fromEntries([...(window.__lyFly || [])]);
   return r; });
 out.names = out.r.mobs.map(m => m[0].split(':')[1]).sort().join(' '); out.namesOk = mobs.every(n => out.names.split(' ').includes(n));
+const P0 = await pg.evaluate(() => { const S = StrataMCE.dbg(); return S.client && S.client.api ? 1 : 0; });
+cmd('setblock 2 4 -3 lycanitesmobs:equipmentforge_lesser'); cmd('setblock 4 4 -3 lycanitesmobs:equipment_infuser'); cmd('setblock 6 4 -3 lycanitesmobs:equipment_station'); cmd('setblock 8 4 -3 lycanitesmobs:summoningpedestal');
+cmd('give @a lycanitesmobs:stablesummoningstaff 1'); cmd('give @a lycanitesmobs:afritlung 1'); await wait(3000);
+out.ui = await pg.evaluate(async () => { const S = StrataMCE.dbg(), W = ms => new Promise(r => setTimeout(r, ms)), r = {}, F = S.forge.items;
+  r.icon = Object.keys(S.modRec.files).filter(k => k.startsWith('i/lycanitesmobs:gen/equip_')).length; r.iconItem = S.modRec.items['lycanitesmobs:afritlung'];
+  const sel = n => { const k = S.slots.findIndex((it, i) => i >= 36 && it && F[it.id] === n); if (k >= 0) { inv.sel = k - 36; S.client.api.select(k - 36); } return k; };
+  r.staffSlot = sel('lycanitesmobs:stablesummoningstaff'); await W(800); const h = document.getElementById('lyHud'); r.hud = h && !h.hidden ? h.innerText.replace(/\s+/g, ' ') : null;
+  const P = StrataMCE.dbgPort(); P.lycBook('creatures'); await W(1500); const b = document.getElementById('lyBook'); r.book = b && !b.hidden ? b.innerText.slice(0, 160).replace(/\s+/g, ' ') : null;
+  for (const t of ['pets', 'summoning', 'elements']) { P.lycBook(t); await W(200); r['book_' + t] = document.getElementById('lyBookB').innerText.slice(0, 100).replace(/\s+/g, ' '); } b.hidden = true;
+  r.wins = []; for (const [x, nm] of [[2, 'forge'], [4, 'infuser'], [6, 'station'], [8, 'pedestal']]) { S.client.api.place(x, 4, -3, 1, null, 8, 16, 8); for (let k = 0; k < 25 && !(S.win && S.win.ly); k++) await W(200);
+    r.wins.push([nm, S.win && S.win.ly, S.win && S.win.title, S.win && S.win.slots.length, [...document.querySelectorAll('#mcTop .lbl')].map(e => e.textContent).join(',')]); closeInv(); await W(600); }
+  return r; });
+await pg.screenshot({ path: '/tmp/lyc-ui.png' });
 await pg.evaluate(() => { const S = StrataMCE.dbg(); player.x = 0 + S.OX; player.z = 8 + S.OZ; cam.zoom = Math.max(ZMIN, cam.zoom * .5); }); await wait(2500); await pg.screenshot({ path: '/tmp/lyc.png' });
 await pg.evaluate(() => { cam.zoom = Math.max(ZMIN, cam.zoom * .6); }); await wait(2000); await pg.screenshot({ path: '/tmp/lyc2.png' });
 } catch (e) { out.fail = String(e).slice(0, 400); }

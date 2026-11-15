@@ -170,7 +170,7 @@ def convert(src):
 def main():
     d, outp = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
     classes = {}
-    for f in sorted(list((d / 'template').glob('*.java')) + list((d / 'creature').glob('*.java'))):
+    for f in sorted(list((d / 'template').glob('*.java')) + list((d / 'creature').glob('*.java')) + list((d / 'projectile').glob('*.java'))):
         n, sup, js = convert(f.read_text())
         classes[n] = (sup, js)
     order, seen = [], set()

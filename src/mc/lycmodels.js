@@ -7407,6 +7407,141 @@ class ModelZoataur extends ModelTemplateDragon {
       }
   }
 }
-  Object.assign(L.models, { ModelTemplateAquatic, ModelAbaia, ModelAbtu, ModelTemplateElemental, ModelAegis, ModelTemplateBiped, ModelAfrit, ModelTemplateQuadruped, ModelAglebemu, ModelAmalgalich, ModelArchvile, ModelArgus, ModelArisaur, ModelArix, ModelAsmodeus, ModelAspid, ModelAstaroth, ModelAstarothVoid, ModelBalayang, ModelBanshee, ModelBarghest, ModelBehemoth, ModelBeholder, ModelBelph, ModelBobeko, ModelCacodemon, ModelTemplateInsect, ModelCalpod, ModelCephignis, ModelChupacabra, ModelCinder, ModelClink, ModelTemplateDragon, ModelCockatrice, ModelConba, ModelConcapedeHead, ModelConcapedeSegment, ModelCrusk, ModelCryptkeeper, ModelDarkling, ModelDawon, ModelDjinn, ModelDweller, ModelEechetik, ModelEnt, ModelEpion, ModelErepede, ModelEttin, ModelEyewig, ModelFeradon, ModelFrostweaver, ModelGeist, ModelGeken, ModelGeonach, ModelGhoul, ModelGnekk, ModelGorger, ModelGorgomite, ModelGrell, ModelGrigori, ModelGrue, ModelTemplateArachnid, ModelHerma, ModelIgnibus, ModelIka, ModelIoray, ModelJabberwock, ModelJengu, ModelJoust, ModelJoustAlpha, ModelKhalk, ModelKobold, ModelKrake, ModelLacedon, ModelLobber, ModelLurker, ModelMaka, ModelMakaAlpha, ModelMaug, ModelMorock, ModelNecrovore, ModelNymph, ModelPinky, ModelPinkyMoloch, ModelPixen, ModelQuetzodracl, ModelQuillbeast, ModelRahovart, ModelRaiko, ModelReaper, ModelReiver, ModelRemobra, ModelRoa, ModelRoc, ModelSalamander, ModelSerpix, ModelShade, ModelShambler, ModelSilex, ModelSkylus, ModelSpectre, ModelSpriggan, ModelStrider, ModelSutiramu, ModelSylph, ModelTarantula, ModelThresher, ModelTpumpkyn, ModelTreant, ModelTremor, ModelTriffid, ModelTrite, ModelTriteVoid, ModelTroll, ModelUvaraptor, ModelVapula, ModelVentoraptor, ModelVespid, ModelVespidQueen, ModelVolcan, ModelVorach, ModelWarg, ModelWendigo, ModelWildkin, ModelWisp, ModelWraamon, ModelWraith, ModelXaphan, ModelYale, ModelZephyr, ModelZoataur });
+class AetherwaveModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("aetherwave", null, "projectile/aetherwave");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class ChaosOrbModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("chaosorb", null, "projectile/chaosorb");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, 0.0, loop * 8.0);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class CrystalShardModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("crystalshard", null, "projectile/crystalshard");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, 0.0, loop * 8.0);
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+  }
+}
+class LightBallModel extends ModelCreatureObj {
+  ballGlowLayer = null;
+  constructor() { super();
+      this.initModel("lightball", null, "projectile/lightball");
+  }
+  addCustomLayers(renderer) {
+      super.addCustomLayers(renderer);
+      this.ballGlowLayer = new LayerCreatureEffect(renderer, "", true, BLEND.ADD, true);
+      renderer.addLayer(this.ballGlowLayer);
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(loop * 8.0, 0.0, 0.0);
+  }
+  canRenderPart(partName, entity, layer, trophy) {
+      return !(partName === "ball02") && !(partName === "ball03")?layer == null:layer == this.ballGlowLayer;
+  }
+  getPartColor(partName, entity, layer, trophy, loop) {
+      let glowSpeed = 40.0;
+      let glow = loop * glowSpeed % 360.0;
+      let color = Math.cos(toRad(glow)) * 0.1 + 0.9;
+      return V4(color, color, color, 1.0);
+  }
+  onRenderStart(layer, entity, renderAsTrophy) {
+      super.onRenderStart(layer, entity, renderAsTrophy);
+      let i = 15728880;
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+      GL.disableLighting();
+  }
+  onRenderFinish(layer, entity, renderAsTrophy) {
+      super.onRenderFinish(layer, entity, renderAsTrophy);
+      let i = entity.getBrightnessForRender();
+      let j = i % 65536;
+      let k = i / 65536;
+      GL.lightmap(j, k);
+      GL.enableLighting();
+  }
+}
+class LobDarklingsModel extends ModelCreatureObj {
+  constructor() { super();
+      this.initModel("lobdarklings", null, "projectile/lobdarklings");
+  }
+  animatePart(partName, entity, time, distance, loop, lookY, lookX, scale) {
+      super.animatePart(partName, entity, time, distance, loop, lookY, lookX, scale);
+      this.rotate(0.0, loop * 8.0, 0.0);
+  }
+}
+  Object.assign(L.models, { ModelTemplateAquatic, ModelAbaia, ModelAbtu, ModelTemplateElemental, ModelAegis, ModelTemplateBiped, ModelAfrit, ModelTemplateQuadruped, ModelAglebemu, ModelAmalgalich, ModelArchvile, ModelArgus, ModelArisaur, ModelArix, ModelAsmodeus, ModelAspid, ModelAstaroth, ModelAstarothVoid, ModelBalayang, ModelBanshee, ModelBarghest, ModelBehemoth, ModelBeholder, ModelBelph, ModelBobeko, ModelCacodemon, ModelTemplateInsect, ModelCalpod, ModelCephignis, ModelChupacabra, ModelCinder, ModelClink, ModelTemplateDragon, ModelCockatrice, ModelConba, ModelConcapedeHead, ModelConcapedeSegment, ModelCrusk, ModelCryptkeeper, ModelDarkling, ModelDawon, ModelDjinn, ModelDweller, ModelEechetik, ModelEnt, ModelEpion, ModelErepede, ModelEttin, ModelEyewig, ModelFeradon, ModelFrostweaver, ModelGeist, ModelGeken, ModelGeonach, ModelGhoul, ModelGnekk, ModelGorger, ModelGorgomite, ModelGrell, ModelGrigori, ModelGrue, ModelTemplateArachnid, ModelHerma, ModelIgnibus, ModelIka, ModelIoray, ModelJabberwock, ModelJengu, ModelJoust, ModelJoustAlpha, ModelKhalk, ModelKobold, ModelKrake, ModelLacedon, ModelLobber, ModelLurker, ModelMaka, ModelMakaAlpha, ModelMaug, ModelMorock, ModelNecrovore, ModelNymph, ModelPinky, ModelPinkyMoloch, ModelPixen, ModelQuetzodracl, ModelQuillbeast, ModelRahovart, ModelRaiko, ModelReaper, ModelReiver, ModelRemobra, ModelRoa, ModelRoc, ModelSalamander, ModelSerpix, ModelShade, ModelShambler, ModelSilex, ModelSkylus, ModelSpectre, ModelSpriggan, ModelStrider, ModelSutiramu, ModelSylph, ModelTarantula, ModelThresher, ModelTpumpkyn, ModelTreant, ModelTremor, ModelTriffid, ModelTrite, ModelTriteVoid, ModelTroll, ModelUvaraptor, ModelVapula, ModelVentoraptor, ModelVespid, ModelVespidQueen, ModelVolcan, ModelVorach, ModelWarg, ModelWendigo, ModelWildkin, ModelWisp, ModelWraamon, ModelWraith, ModelXaphan, ModelYale, ModelZephyr, ModelZoataur, AetherwaveModel, ChaosOrbModel, CrystalShardModel, LightBallModel, LobDarklingsModel });
   L.flying = {"aegis": 1, "afrit": 1, "argus": 1, "arix": 1, "balayang": 1, "banshee": 1, "beholder": 1, "cacodemon": 1, "cinder": 1, "cockatrice": 1, "djinn": 1, "eechetik": 1, "geonach": 1, "grell": 1, "grigori": 1, "grue": 1, "ignibus": 1, "jengu": 1, "morock": 1, "nymph": 1, "pixen": 1, "quetzodracl": 1, "raiko": 1, "reaper": 1, "reiver": 1, "remobra": 1, "roc": 1, "spectre": 1, "spriggan": 1, "sylph": 1, "tremor": 1, "vapula": 1, "vespid": 1, "vespidqueen": 1, "volcan": 1, "wisp": 1, "wraith": 1, "xaphan": 1, "zephyr": 1};
 })();
