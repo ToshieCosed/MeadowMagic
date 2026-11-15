@@ -19845,6 +19845,7 @@ class LobDarklingsModel extends ModelCreatureObj {
         b.innerHTML = ic(t.a) + (t.b ? '+' + ic(t.b) : '') + '→' + ic(t.out) + (t.off ? '<small>sold out</small>' : ''); b.title = mcName(t.out); b.addEventListener('click', () => tradeFill(i)); row.appendChild(b); });
       box.appendChild(row); }
     if (kind === 'player' && S.forge && S.modRec && S.modRec.ocr && Object.values(S.forge.items).some(n => /^lycanitesmobs:/.test(n))) { box.appendChild(lyTabs()); }
+    if (kind === 'player' && S.fa && S.fa.on) { const fb = document.createElement('button'); fb.className = 'ghost'; fb.textContent = '🩹 First Aid settings'; fb.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px'; fb.addEventListener('click', () => { closeInv(); faSettings(); }); box.appendChild(fb); }
     if (kind === 'player' && S.forge && (S.bauOK != null ? S.bauOK : (S.bauOK = Object.values(S.forge.items).some(n => /^baubles:/.test(n))))) { const bb = document.createElement('button'); bb.className = 'ghost'; bb.textContent = '💍 Baubles'; bb.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px'; bb.addEventListener('click', () => S.client.api.modSend('baubles', Uint8Array.of(0))); box.appendChild(bb); }   // the mod's own inventory button: packet 0 asks the server to open it
     if (kind === 'player' || kind === 'craft3') { const w = kind === 'player' ? 2 : 3, hd = document.createElement('button'); hd.className = 'ghost'; hd.textContent = S.rb ? '📖 Hide recipes' : '📖 Recipe book'; hd.style.cssText = 'align-self:flex-start;font-size:12px;padding:4px 8px';
       hd.addEventListener('click', () => { S.rb = !S.rb; mcInvRender(); }); box.appendChild(hd); if (!S.rb) return;
@@ -20049,7 +20050,7 @@ class LobDarklingsModel extends ModelCreatureObj {
         if (/^dynamictrees:rooty(dirt|dirtspecies|dirtfake)$/.test(n)) return 3 << 4; if (n === 'dynamictrees:rootysand') return 12 << 4; return null; },
       block(n, meta) { const r = dtRad(n, meta); if (!r) return null; S.dt = S.dt || 1; const c = Math.min(r, 8) / 16, T = dtTex(n); return { key: 'r' + r, tex: [T[0], T[1], T[0]], col: '#6b5232', boxes: [[.5 - c, .5 - c, .5 - c, .5 + c, .5 + c, .5 + c]] }; } },
     firstaid: {   // per-limb health (channel "firstaid": 1 part update, 3 config + model NBT, 5 add health, 8 model NBT; client sends 2 = apply healing item to a part)
-      payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (old !== hp) F.flash = performance.now(); };
+      payload: { firstaid(b) { const r = bbR(b, 1), d = b[0], F = faS(), set = (i, hp, mx) => { const p = F.parts[i]; const old = p.hp; p.hp = hp; if (mx > 0) p.max = mx; if (Math.ceil(old) !== Math.ceil(hp)) F.flash = F.chg = performance.now(); };
         if (d === 1) { const id = r.u8(), mx = r.i32(); r.p += 4; const hp = r.d.getFloat32(r.p); r.p += 4; if (id >= 1 && id <= 8) set(id - 1, hp, mx); F.on = 1; }
         else if (d === 3 || d === 8) { let t = {}; try { t = nbtRead(b, 1)[0] || {}; } catch (e) { /* bad tag */ } FA_KEYS.forEach((k, i) => { const q = t[k]; if (q) set(i, +q.health || 0, q.maxHealth | 0); }); F.on = 1; }
         else if (d === 5) { for (let i = 0; i < 8; i++) { const v = r.d.getFloat32(r.p); r.p += 4; if (v) set(i, Math.min(F.parts[i].max, F.parts[i].hp + v), 0); } } } },
@@ -20545,15 +20546,55 @@ class LobDarklingsModel extends ModelCreatureObj {
   const FA_KEYS = ['head', 'leftArm', 'leftLeg', 'leftFoot', 'body', 'rightArm', 'rightLeg', 'rightFoot'], FA_MAX = [4, 4, 4, 4, 6, 4, 4, 4];
   const FA_DRAW = [[0, 8, 0, 16, 16], [4, 8, 16, 16, 24], [1, 0, 16, 8, 24], [5, 24, 16, 8, 24], [2, 8, 40, 8, 16], [6, 16, 40, 8, 16], [3, 8, 56, 8, 8], [7, 16, 56, 8, 8]];   // part, x, y, w, h
   const faS = () => S.fa || (S.fa = { parts: FA_MAX.map(m => ({ hp: m, max: m })), flash: 0 });
-  const faState = p => p.hp <= .001 ? 5 : Math.abs(p.hp - p.max) < .001 ? 0 : (q => q > .75 ? 1 : q > .5 ? 2 : q > .25 ? 3 : 4)(p.hp / p.max);   // getState, six colours
+  const faState = (p, four) => p.hp <= .001 ? 5 : Math.abs(p.hp - p.max) < .001 ? 0 : (q => !four && q > .75 ? 1 : q > .5 ? 2 : !four && q > .25 ? 3 : 4)(p.hp / p.max);   // getState: six colours, or four
   const faImg = () => { if ('img' in faS()) return S.fa.img; const d = S.modRec && S.modRec.files['g/firstaid:gui/simple_health']; let c = null; if (d && window.StrataLyc) try { const D = StrataLyc.pngDecode(d); c = document.createElement('canvas'); c.width = D.w; c.height = D.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(D.data), D.w, D.h), 0, 0); } catch (e) { c = null; } return (S.fa.img = c); };
-  function faDraw(g, F, flash) { const im = faImg(); if (!im) return; const yo = flash ? 64 : 0; for (const [i, x, y, w, h] of FA_DRAW) g.drawImage(im, x + 32 * faState(F.parts[i]), y + yo, w, h, x, y, w, h); }
-  function faHud() { const F = S.fa; if (!F || !F.on) return; let c = document.getElementById('faHud'); const cre = world.meta.gameMode === 'creative';
-    if (!c) { c = document.createElement('canvas'); c.id = 'faHud'; c.width = 32; c.height = 64; c.style.cssText = 'position:absolute;left:calc(env(safe-area-inset-left) + 8px);top:calc(env(safe-area-inset-top) + 112px);width:48px;height:96px;image-rendering:pixelated;pointer-events:none;z-index:3;opacity:.8'; document.body.appendChild(c); }   // alpha 50 of 255 -> 80% opaque
-    c.hidden = cre; if (cre) return; const st = F.flash ? Math.floor((performance.now() - F.flash) / 150) + 1 : 0, fl = st > 0 && st < 8 && st % 2 === 0; if (st >= 8) F.flash = 0;   // FlashStateManager
-    const key = F.parts.map(p => p.hp + '/' + p.max).join() + fl; if (c.dataset.k === key) return; c.dataset.k = key; const g = c.getContext('2d'); g.clearRect(0, 0, 32, 64); faDraw(g, F, fl); }
+  function faDraw(g, F, flash, four, old) { const im = old ? faImgK('simple_health_old') : faImg(); if (!im) return; const yo = flash ? 64 : 0; for (const [i, x, y, w, h] of FA_DRAW) g.drawImage(im, x + 32 * faState(F.parts[i], four), y + yo, w, h, x, y, w, h); }
+  // FirstAidConfig.overlay, kept per device: overlayMode, pos, xOffset, yOffset, alpha (0 opaque .. 200), displayMode (visibleDurationTicks, -1 = always; flash)
+  const FA_MODES = [['PLAYER_MODEL', 'Body (6 colours)'], ['PLAYER_MODEL_4_COLORS', 'Body (4 colours)'], ['PLAYER_MODEL_OLD_COLORS', 'Old body (6 colours)'], ['PLAYER_MODEL_OLD_4_COLORS', 'Old body (4 colours)'], ['HEARTS', 'Hearts per body part'], ['NUMBERS', 'Numbers per body part'], ['OFF', 'Off']];
+  const FA_POS = [['TOP_LEFT', 'Top left'], ['TOP_RIGHT', 'Top right'], ['BOTTOM_RIGHT', 'Bottom right'], ['BOTTOM_LEFT', 'Bottom left']];
+  const faCfg = () => { if (S.faCfg) return S.faCfg; let c = {}; try { c = JSON.parse(localStorage.getItem('strata.firstaid') || '{}'); } catch (e) { c = {}; } return (S.faCfg = Object.assign({ mode: 'PLAYER_MODEL', pos: 'TOP_LEFT', x: 0, y: 1, alpha: 50, ticks: -1, flash: true }, c)); };
+  const faSave = () => { try { localStorage.setItem('strata.firstaid', JSON.stringify(S.faCfg)); } catch (e) { /* private mode */ } };
+  const FA_LBL = ['Head', 'Left Arm', 'Left Leg', 'Left Foot', 'Body', 'Right Arm', 'Right Leg', 'Right Foot'], FA_ORDER = [0, 1, 2, 3, 4, 5, 6, 7];   // damageModel.iterator(): head, left arm, left leg, left foot, body, right arm, right leg, right foot
+  const faLabel = i => { const T = (S.modRec && S.modRec.lang && S.modRec.lang.firstaid) || {}; return T['gui.' + FA_KEYS[i].replace(/[A-Z]/g, m => '_' + m.toLowerCase())] || FA_LBL[i]; };
+  const faImgK = k => { const C = S.faImgs || (S.faImgs = {}); if (k in C) return C[k]; const d = S.modRec && S.modRec.files['g/firstaid:gui/' + k]; let c = null; if (d && window.StrataLyc) try { const D = StrataLyc.pngDecode(d); c = document.createElement('canvas'); c.width = D.w; c.height = D.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(D.data), D.w, D.h), 0, 0); } catch (e) { c = null; } return (C[k] = c); };
+  function faHeart(g, x, y, fill, half, hard, bg) { const P = () => { g.beginPath(); g.moveTo(x + 4.5, y + 8); g.bezierCurveTo(x - .5, y + 4.5, x + .5, y + .2, x + 4.5, y + 2.4); g.bezierCurveTo(x + 8.5, y + .2, x + 9.5, y + 4.5, x + 4.5, y + 8); g.closePath(); };
+    if (bg) { P(); g.fillStyle = bg === 2 ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.5)'; g.fill(); g.lineWidth = .8; g.strokeStyle = hard ? '#c9a227' : 'rgba(0,0,0,.75)'; g.stroke(); return; }
+    g.save(); if (half) { g.beginPath(); g.rect(x, y, 4.5, 9); g.clip(); } P(); g.fillStyle = fill; g.fill(); g.restore(); }
+  function faPart(g, i, p, mode, x, y, hl) { g.font = '7px system-ui, sans-serif'; g.textBaseline = 'top'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowOffsetX = g.shadowOffsetY = .7; g.fillText(faLabel(i), x, y + 1); g.shadowColor = 'transparent';
+    const lx = x + 46, mh = Math.ceil(p.max) + (Math.ceil(p.max) % 2) >> 1, cur = Math.ceil(p.hp), hard = i === 0 || i === 4;   // canCauseDeath parts (head, body) use the hardcore hearts
+    if (mode === 'NUMBERS' || mh > 12) { g.shadowColor = 'rgba(0,0,0,.8)'; g.fillStyle = '#fff'; g.fillText((Math.round(p.hp * 10) / 10).toFixed(1) + '/' + p.max, lx, y + 1); g.shadowColor = 'transparent'; return; }   // drawHealthString
+    const low = cur < 1.25; for (let k = 0; k < mh; k++) { const jy = y + (low ? (Math.random() < .5 ? 1 : 0) : 0), hx = lx + 9 * k; faHeart(g, hx, jy, null, false, hard, hl ? 2 : 1); const v = cur - k * 2; if (v > 0) faHeart(g, hx, jy, hard ? '#a5141b' : '#e8473b', v === 1, hard); } }
+  function faHud() { const F = S.fa; if (!F || !F.on) return; const C = faCfg(); let c = document.getElementById('faHud'); const cre = world.meta.gameMode === 'creative', model = /^PLAYER_MODEL/.test(C.mode);
+    if (!c) { c = document.createElement('canvas'); c.id = 'faHud'; c.style.cssText = 'position:absolute;image-rendering:pixelated;pointer-events:none;z-index:3'; document.body.appendChild(c); }
+    const now = performance.now(), age = F.chg ? (now - F.chg) / 50 : 1e9, vis = C.ticks < 0 ? -1 : C.ticks + 30, ticker = vis < 0 ? 0 : vis - age;   // HUDHandler: visible for visibleDurationTicks + 30 after a change, fading over the last 30
+    c.hidden = cre || C.mode === 'OFF' || (vis >= 0 && ticker < 0) || !!document.getElementById('faPick'); if (c.hidden) return;
+    let a = C.alpha; if (vis >= 0 && ticker < 30) a = Math.max(C.alpha, Math.min(250, (30 - ticker) * 255 / 30 | 0)); c.style.opacity = String(Math.max(0, 1 - a / 255));
+    const W = model ? 34 : 46 + 9 * 6 + 4, H = model ? 64 : 80, Z = 1.5, ox = C.x * Z, oy = C.y * Z, sa = 'env(safe-area-inset-', st = c.style;   // Position + xOffset/yOffset, in the mod's GUI pixels
+    const top = /^TOP/.test(C.pos), left = /LEFT$/.test(C.pos); st.left = left ? `calc(${sa}left) + 8px + ${ox}px)` : ''; st.right = left ? '' : `calc(${sa}right) + 8px + ${ox}px)`; st.top = top ? `calc(${sa}top) + 112px + ${oy}px)` : ''; st.bottom = top ? '' : `calc(${sa}bottom) + 76px + ${oy}px)`;
+    const fs = F.flash ? Math.floor((now - F.flash) / 150) + 1 : 0, fl = C.flash && fs > 0 && fs < 8 && fs % 2 === 0; if (fs >= 8) F.flash = 0;   // FlashStateManager
+    const key = C.mode + F.parts.map(p => p.hp + '/' + p.max).join() + fl + (model ? '' : (now / 200 | 0)); if (c.dataset.k === key) return; c.dataset.k = key;
+    const R = 2; c.width = W * R; c.height = H * R; st.width = W * Z + 'px'; st.height = H * Z + 'px'; const g = c.getContext('2d'); g.setTransform(R, 0, 0, R, 0, 0); g.imageSmoothingEnabled = false; g.clearRect(0, 0, W, H);
+    if (model) { g.translate(1, 0); faDraw(g, F, fl, /4_COLORS/.test(C.mode), /OLD/.test(C.mode)); }
+    else FA_ORDER.forEach((i, n) => faPart(g, i, F.parts[i], C.mode, 0, n * 10, fl)); }
+  function faSettings() { const C = faCfg(); let el = document.getElementById('faSet'); if (el) el.remove();
+    el = document.createElement('div'); el.id = 'faSet'; el.style.cssText = 'position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.45);font:13px system-ui;color:#fff';
+    const box = document.createElement('div'); box.style.cssText = 'background:rgba(24,33,42,.96);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center;min-width:min(340px,90vw)';
+    const row = (lab, ctl) => { const l = document.createElement('label'); l.textContent = lab; box.append(l, ctl); };
+    const sel = (opts, v, on) => { const s2 = document.createElement('select'); for (const [k, t] of opts) { const o = document.createElement('option'); o.value = k; o.textContent = t; s2.appendChild(o); } s2.value = v; s2.addEventListener('change', () => { on(s2.value); faSave(); faRe(); }); return s2; };
+    const rng = (min, max, v, fmt, on) => { const w = document.createElement('div'); w.style.cssText = 'display:flex;gap:8px;align-items:center'; const r = document.createElement('input'); r.type = 'range'; r.min = min; r.max = max; r.value = v; r.style.flex = '1'; const t = document.createElement('small'); t.style.minWidth = '64px'; t.textContent = fmt(+v);
+      r.addEventListener('input', () => { t.textContent = fmt(+r.value); on(+r.value); faSave(); faRe(); }); w.append(r, t); return w; };
+    const faRe = () => { const c = document.getElementById('faHud'); if (c) c.dataset.k = ''; S.fa && (S.fa.chg = performance.now()); };
+    const ttl = document.createElement('b'); ttl.textContent = 'First Aid overlay'; ttl.style.gridColumn = '1/-1'; box.appendChild(ttl);
+    row('Display', sel(FA_MODES, C.mode, v => C.mode = v));
+    row('Position', sel(FA_POS, C.pos, v => C.pos = v));
+    row('X offset', rng(0, 200, C.x, v => v + ' px', v => C.x = v)); row('Y offset', rng(0, 200, C.y, v => v + ' px', v => C.y = v));
+    row('Transparency', rng(0, 200, C.alpha, v => Math.round(v / 2.55) + '%', v => C.alpha = v));
+    row('Fade out after', rng(-1, 600, C.ticks, v => v < 0 ? 'Always shown' : (v / 20).toFixed(2).replace(/\.?0+$/, '') + ' s', v => C.ticks = v));
+    { const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = C.flash; ck.addEventListener('change', () => { C.flash = ck.checked; faSave(); }); row('Flash on change', ck); }
+    const x = document.createElement('button'); x.className = 'ghost'; x.textContent = 'Done'; x.style.gridColumn = '1/-1'; x.addEventListener('click', () => el.remove()); box.appendChild(x);
+    el.addEventListener('click', ev => { if (ev.target === el) el.remove(); }); el.appendChild(box); document.body.appendChild(el); }
   function faPick() { const F = faS(), T = (S.modRec && S.modRec.lang && S.modRec.lang.firstaid) || {}; let el = document.getElementById('faPick'); if (el) el.remove();
-    el = document.createElement('div'); el.id = 'faPick'; el.style.cssText = 'position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:rgba(0,0,0,.45);font:13px system-ui;color:#fff';
+    el = document.createElement('div'); el.id = 'faPick'; el.style.cssText = 'position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.45);font:13px system-ui;color:#fff';
     const box = document.createElement('div'); box.style.cssText = 'background:rgba(24,33,42,.96);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 128px auto;gap:6px 10px;align-items:center';
     const cv = document.createElement('canvas'); cv.width = 32; cv.height = 64; cv.style.cssText = 'width:128px;height:256px;image-rendering:pixelated;grid-row:2/span 4;grid-column:2'; faDraw(cv.getContext('2d'), F, false);
     const ttl = document.createElement('b'); ttl.textContent = T['gui.apply_hint'] || 'Pick where to apply the item'; ttl.style.cssText = 'grid-column:1/-1;text-align:center';
@@ -20947,7 +20988,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     for (const n of names) { const m = n.match(/^assets\/([^/]+)\/textures\/items?\/([^/]+)\.png$/i); if (m) { const reg = m[1] + ':' + m[2]; if (!rec.items[reg]) rec.items[reg] = m[1] + ':' + n.split('/textures/')[1].replace(/\.png$/, ''); } }
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
-  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook, faPick });   // tests
+  MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook, faPick, faSettings });   // tests
   MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
     for (const f of fileList) { const z = await unzipPack(await f.arrayBuffer()), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
       if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) done.push(...await readJar(rec, await unzipPack(d))); } } else done.push(...await readJar(rec, z)); }
