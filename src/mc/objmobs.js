@@ -216,21 +216,54 @@
     let a1 = 1, a2 = 0; for (const v of raw) { a1 = (a1 + v) % 65521; a2 = (a2 + a1) % 65521; } z.push(a2 >> 8, a2 & 255, a1 >> 8, a1 & 255);
     const out = [137, 80, 78, 71, 13, 10, 26, 10], chunk = (t, d) => { const L = d.length; out.push(L >>> 24, (L >> 16) & 255, (L >> 8) & 255, L & 255); const td = [...t].map(c => c.charCodeAt(0)).concat(d); let c = 0xffffffff; for (const v of td) c = CRC[(c ^ v) & 255] ^ (c >>> 8); c = (c ^ 0xffffffff) >>> 0; out.push(...td, c >>> 24, (c >> 16) & 255, (c >> 8) & 255, c & 255); };
     chunk('IHDR', [w >>> 24, (w >> 16) & 255, (w >> 8) & 255, w & 255, h >>> 24, (h >> 16) & 255, (h >> 8) & 255, h & 255, 8, 6, 0, 0, 0]); chunk('IDAT', z); chunk('IEND', []); return Uint8Array.from(out); }
-  function objIcon(text, png, size) { size = size || 64; const I = pngDecode(png instanceof Uint8Array ? png : new Uint8Array(png)), G = parseObj(text), W = I.w, H = I.h, tex = I.data;
-    const ya = -45 * Math.PI / 180, pa = 30 * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), sp = Math.sin(pa), V = [];
-    for (const g of G) for (let i = 0; i < g.f.length; i += 5) { const x = g.f[i], y = g.f[i + 1], z = g.f[i + 2], x1 = x * cy - z * sy, z1 = x * sy + z * cy; V.push(x1, y * cp - z1 * sp, y * sp + z1 * cp, g.f[i + 3], g.f[i + 4]); }
-    if (!V.length) return null; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < V.length; i += 5) { x0 = Math.min(x0, V[i]); x1 = Math.max(x1, V[i]); y0 = Math.min(y0, V[i + 1]); y1 = Math.max(y1, V[i + 1]); }
-    const k = size * .86 / Math.max(x1 - x0, y1 - y0, 1e-6), ox = size / 2 - (x0 + x1) / 2 * k, oy = size / 2 + (y0 + y1) / 2 * k;
+  // draw textured meshes ([{ V: x,y,z,u,v per vertex (triangles), tex: { w, h, data } }]) at Minecraft's item angle into a size x size PNG: a small z-buffered rasteriser, nearest texels
+  function rasterIcon(list, size) { size = size || 64; const ya = -45 * Math.PI / 180, pa = 30 * Math.PI / 180, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), sp = Math.sin(pa), Q = [];
+    for (const m of list) { const V = m.V, o = new Float32Array(V.length); for (let i = 0; i < V.length; i += 5) { const x = V[i], y = V[i + 1], z = V[i + 2], x1 = x * cy - z * sy, z1 = x * sy + z * cy; o[i] = x1; o[i + 1] = y * cp - z1 * sp; o[i + 2] = y * sp + z1 * cp; o[i + 3] = V[i + 3]; o[i + 4] = V[i + 4]; } Q.push({ V: o, tex: m.tex }); }
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const m of Q) for (let i = 0; i < m.V.length; i += 5) { x0 = Math.min(x0, m.V[i]); x1 = Math.max(x1, m.V[i]); y0 = Math.min(y0, m.V[i + 1]); y1 = Math.max(y1, m.V[i + 1]); }
+    if (x0 > x1) return null; const k = size * .86 / Math.max(x1 - x0, y1 - y0, 1e-6), ox = size / 2 - (x0 + x1) / 2 * k, oy = size / 2 + (y0 + y1) / 2 * k;
     const out = new Uint8ClampedArray(size * size * 4), zb = new Float32Array(size * size).fill(-1e9);
-    for (let i = 0; i < V.length; i += 15) { const P = [0, 5, 10].map(o => [ox + V[i + o] * k, oy - V[i + o + 1] * k, V[i + o + 2], V[i + o + 3], 1 - V[i + o + 4]]);
-      const ax = P[1][0] - P[0][0], ay = P[1][1] - P[0][1], bx = P[2][0] - P[0][0], by = P[2][1] - P[0][1], area = ax * by - ay * bx; if (Math.abs(area) < 1e-9) continue;
-      const shade = .72 + .28 * Math.min(1, Math.abs(area) / (Math.hypot(ax, ay) * Math.hypot(bx, by) + 1e-9));   // facing the viewer reads brighter
-      const minx = Math.max(0, Math.floor(Math.min(P[0][0], P[1][0], P[2][0]))), maxx = Math.min(size - 1, Math.ceil(Math.max(P[0][0], P[1][0], P[2][0]))), miny = Math.max(0, Math.floor(Math.min(P[0][1], P[1][1], P[2][1]))), maxy = Math.min(size - 1, Math.ceil(Math.max(P[0][1], P[1][1], P[2][1])));
-      for (let py = miny; py <= maxy; py++) for (let px = minx; px <= maxx; px++) { const qx = px + .5 - P[0][0], qy = py + .5 - P[0][1], b1 = (qx * by - qy * bx) / area, b2 = (ax * qy - ay * qx) / area, b0 = 1 - b1 - b2; if (b0 < -.001 || b1 < -.001 || b2 < -.001) continue;
-        const z = b0 * P[0][2] + b1 * P[1][2] + b2 * P[2][2], o = py * size + px; if (z <= zb[o]) continue;
-        const u = b0 * P[0][3] + b1 * P[1][3] + b2 * P[2][3], v = b0 * P[0][4] + b1 * P[1][4] + b2 * P[2][4], tx = Math.min(W - 1, Math.max(0, Math.floor((u - Math.floor(u)) * W))), ty = Math.min(H - 1, Math.max(0, Math.floor((v - Math.floor(v)) * H))), t = (ty * W + tx) * 4;
-        if (tex[t + 3] < 16) continue; zb[o] = z; out[o * 4] = tex[t] * shade; out[o * 4 + 1] = tex[t + 1] * shade; out[o * 4 + 2] = tex[t + 2] * shade; out[o * 4 + 3] = 255; } }
+    for (const { V, tex } of Q) { const W = tex.w, H = tex.h, T = tex.data;
+      for (let i = 0; i < V.length; i += 15) { const P = [0, 5, 10].map(o => [ox + V[i + o] * k, oy - V[i + o + 1] * k, V[i + o + 2], V[i + o + 3], 1 - V[i + o + 4]]);
+        const ax = P[1][0] - P[0][0], ay = P[1][1] - P[0][1], bx = P[2][0] - P[0][0], by = P[2][1] - P[0][1], area = ax * by - ay * bx; if (Math.abs(area) < 1e-9) continue;
+        const shade = .72 + .28 * Math.min(1, Math.abs(area) / (Math.hypot(ax, ay) * Math.hypot(bx, by) + 1e-9));
+        const minx = Math.max(0, Math.floor(Math.min(P[0][0], P[1][0], P[2][0]))), maxx = Math.min(size - 1, Math.ceil(Math.max(P[0][0], P[1][0], P[2][0]))), miny = Math.max(0, Math.floor(Math.min(P[0][1], P[1][1], P[2][1]))), maxy = Math.min(size - 1, Math.ceil(Math.max(P[0][1], P[1][1], P[2][1])));
+        for (let py = miny; py <= maxy; py++) for (let px = minx; px <= maxx; px++) { const qx = px + .5 - P[0][0], qy = py + .5 - P[0][1], b1 = (qx * by - qy * bx) / area, b2 = (ax * qy - ay * qx) / area, b0 = 1 - b1 - b2; if (b0 < -.001 || b1 < -.001 || b2 < -.001) continue;
+          const z = b0 * P[0][2] + b1 * P[1][2] + b2 * P[2][2], o = py * size + px; if (z <= zb[o]) continue;
+          const u = b0 * P[0][3] + b1 * P[1][3] + b2 * P[2][3], v = b0 * P[0][4] + b1 * P[1][4] + b2 * P[2][4], tx = Math.min(W - 1, Math.max(0, Math.floor((u - Math.floor(u)) * W))), ty = Math.min(H - 1, Math.max(0, Math.floor((v - Math.floor(v)) * H))), t = (ty * W + tx) * 4;
+          if (T[t + 3] < 16) continue; zb[o] = z; out[o * 4] = T[t] * shade; out[o * 4 + 1] = T[t + 1] * shade; out[o * 4 + 2] = T[t + 2] * shade; out[o * 4 + 3] = 255; } } }
     return pngEncode(size, size, out); }
+  function objIcon(text, png, size) { const G = parseObj(text); let n = 0; for (const g of G) n += g.f.length; const V = new Float32Array(n); let o = 0; for (const g of G) { V.set(g.f, o); o += g.f.length; }
+    return rasterIcon([{ V, tex: pngDecode(png instanceof Uint8Array ? png : new Uint8Array(png)) }], size); }
+  // ---- Lycanites equipment (ModelItemBase / ModelEquipmentPart / ModelEquipment): parts from models/equipment, their JSON part animations (ModelPartAnimation),
+  // joined the mod's way: the base, the head on the base's "head", tips A-C on the head's "tipa/tipb/tipc", the pommel on the base's "pommel" ----
+  function partAnims(json) { let J = null; try { J = JSON.parse(json || 'null'); } catch (e) { /* none */ } const A = []; if (!J) return { anims: A, layers: [] };
+    for (const a of J.partAnimations || []) A.push({ targets: (a.targetParts || []).map(t => String(t).toLowerCase()), source: a.timeSource || 'static', loop: a.loopType || 'reset', dur: +a.duration || 0, off: +a.offset || 0,
+      t: [+a.translateX || 0, +a.translateY || 0, +a.translateZ || 0], ang: [+a.angleX || 0, +a.angleY || 0, +a.angleZ || 0, +a.angleAmount || 0], r: [+a.rotateX || 0, +a.rotateY || 0, +a.rotateZ || 0], s: [+a.scaleX || 0, +a.scaleY || 0, +a.scaleZ || 0] });
+    return { anims: A, layers: J.textureLayers || [] }; }
+  function animateItemPart(model, partName, loop) { const part = model.parts.get(partName); if (!part) return;
+    for (const a of model.anims) { if (!a.targets.includes(partName)) continue; let p = loop + a.off * 20; const d = a.dur * 20;   // ModelPartAnimation.animatePart (time and distance sources are the loop for items)
+      if (d !== 0) { if (a.loop === 'reset') p %= d; else if (a.loop === 'reverse') { let c = p % d; const n = Math.round((p - c) / d); if (n % 2 !== 0) c = d - c; p = c; } }
+      part.$f.push(['translate', 1, a.t[0] * p, a.t[1] * p, a.t[2] * p], ['angle', a.ang[3] * p, a.ang[0], a.ang[1], a.ang[2]], ['rotate', 1, a.r[0] * p, a.r[1] * p, a.r[2] * p], ['scale', 1, 1 + a.s[0] * p, 1 + a.s[1] * p, 1 + a.s[2] * p]); } }
+  function applyItemFrames(M, q) { if (q.parent) applyItemFrames(M, q.parent);   // ModelObjPart.applyAnimationFrames, with the part it hangs from
+    if (q.offset) { applyItemFrames(M, q.offset); tr(M, q.centerX + q.offset.centerX, q.centerY + q.offset.centerY, q.centerZ + q.offset.centerZ); rot(M, -q.offset.rotationX, 1, 0, 0); rot(M, -q.offset.rotationY, 0, 1, 0); rot(M, -q.offset.rotationZ, 0, 0, 1); }
+    tr(M, q.centerX, q.centerY, q.centerZ); for (const f of q.$f) apply[f[0]](M, f); tr(M, -q.centerX, -q.centerY, -q.centerZ); }
+  const itemModels = new Map();
+  function itemModel(load, name) { if (itemModels.has(name)) return itemModels.get(name); const text = load('obj:equipment/' + name); let M = null;
+    if (text) { const A = partAnims(load('anim:equipment/' + name)); M = { name, groups: parseObj(text), parts: parts(load('parts:equipment/' + name)), anims: A.anims, layers: A.layers }; } itemModels.set(name, M); return M; }
+  // the parts of a piece of equipment posed for one loop: [{ model, g, M }]
+  function equipPose(load, names, loop) { const out = [], used = []; let base = null, head = null;
+    const put = (name, offset) => { const m = itemModel(load, name); if (!m) return null; for (const q of m.parts.values()) { q.$f.length = 0; q.offset = null; } const b = m.parts.get('base'); if (b) b.offset = offset || null;
+      for (const g of m.groups) animateItemPart(m, g.name, loop); for (const g of m.groups) { const q = m.parts.get(g.name); if (!q) continue; const T = ident(); rot(T, 180, 1, 0, 0); tr(T, 0, -1.5, 0); applyItemFrames(T, q); out.push({ model: m, g, M: T }); } used.push(m); return m; };
+    names.forEach((n, slot) => { if (!n) return; if (slot === 0) base = put(n, null); else if (slot === 1) { if (base && base.parts.containsKey('head')) head = put(n, base.parts.get('head')); }
+      else if (slot >= 2 && slot <= 4) { const t = ['tipa', 'tipb', 'tipc'][slot - 2]; if (head && head.parts.containsKey(t)) put(n, head.parts.get(t)); } else if (slot === 5 && base && base.parts.containsKey('pommel')) put(n, base.parts.get('pommel')); });
+    return out; }
+  // an inventory icon for a piece of equipment from its parts (textures: equipment/<part>.png)
+  function equipIcon(load, loadPng, names, size) { const P = equipPose(load, names, 0), list = [], texs = new Map();
+    for (const q of P) { let t = texs.get(q.model.name); if (t === undefined) { const png = loadPng(q.model.name); t = png ? pngDecode(png instanceof Uint8Array ? png : new Uint8Array(png)) : null; texs.set(q.model.name, t); } if (!t) continue;
+      const f = q.g.f, V = new Float32Array(f.length), M = q.M; for (let i = 0; i < f.length; i += 5) { const x = f[i], y = f[i + 1], z = f[i + 2]; V[i] = M[0] * x + M[4] * y + M[8] * z + M[12]; V[i + 1] = M[1] * x + M[5] * y + M[9] * z + M[13]; V[i + 2] = M[2] * x + M[6] * y + M[10] * z + M[14]; V[i + 3] = f[i + 3]; V[i + 4] = f[i + 4]; }
+      list.push({ V, tex: t }); }
+    return list.length ? rasterIcon(list, size) : null; }
+  L.equipPose = equipPose; L.equipIcon = equipIcon; L.rasterIcon = rasterIcon; L.pngDecode = pngDecode;
   L.objIcon = objIcon; L.parseObj = parseObj;
   L.create = create; window.StrataObjMobs = { create };
 })();
