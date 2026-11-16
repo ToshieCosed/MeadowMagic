@@ -10690,11 +10690,12 @@ window.__v42={buildLab,counterNetlist,placeNetlist,builder};
       const r = new R(new Uint8Array(e.data), 0); if (r.vi() !== 0) return; clearTimeout(t); let j = null; try { j = JSON.parse(r.str()); } catch (x) { /* bad */ } try { ws.close(); } catch (x) { /* closed */ } res(j); }; }); }
   // downloads through the relay outside a game (the browser can't fetch other sites itself): one socket, many requests
   function fetcher(relay) { let ws = null, ready = null, n = 0; const P = {};
-    const open = () => ready || (ready = new Promise((res, rej) => { try { ws = new WebSocket(relay); } catch (e) { rej(e); return; } ws.onopen = () => res(); ws.onerror = () => { rej(new Error('relay unreachable')); ready = null; };
+    const open = () => ready || (ready = new Promise((res, rej) => { try { ws = new WebSocket(relay); } catch (e) { rej(e); return; } ws.binaryType = 'arraybuffer'; ws.onopen = () => res(); ws.onerror = () => { rej(new Error('relay unreachable')); ready = null; };
       ws.onclose = () => { ready = null; for (const k of Object.keys(P)) { P[k].rej(new Error('relay closed')); delete P[k]; } };
-      ws.onmessage = e => { if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch (x) { return; } const q = P[m.id]; if (!q) return; delete P[m.id]; clearTimeout(q.t);
+      ws.onmessage = e => { if (typeof e.data !== 'string') { const u = new Uint8Array(e.data), n2 = u[0], id = new TextDecoder().decode(u.subarray(1, 1 + n2)), q = P[id]; if (q) { delete P[id]; clearTimeout(q.t); q.res(u.subarray(1 + n2)); } return; }   // binary reply: [id length][id][bytes]
+        let m; try { m = JSON.parse(e.data); } catch (x) { return; } const q = P[m.id]; if (!q) return; delete P[m.id]; clearTimeout(q.t);
         if (m.type === 'http_data') { const b = atob(m.data), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); q.res(u); } else q.rej(new Error(m.message || 'download failed')); }; }));
-    return { async get(url, headers) { await open(); return new Promise((res, rej) => { const id = 'f' + (++n); P[id] = { res, rej, t: setTimeout(() => { if (P[id]) { delete P[id]; rej(new Error('download timed out')); } }, 180000) }; ws.send(JSON.stringify({ type: 'http_get', id, url, headers })); }); },
+    return { async get(url, headers) { await open(); return new Promise((res, rej) => { const id = 'f' + (++n); P[id] = { res, rej, t: setTimeout(() => { if (P[id]) { delete P[id]; rej(new Error('download timed out')); } }, 180000) }; ws.send(JSON.stringify({ type: 'http_get', id, url, headers, binary: true })); }); },
       close() { try { ws && ws.close(); } catch (e) { /* closed */ } } }; }
   g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, status, comp, compHTML, fetcher, setIds: x => { IDS = x; }, W, R });
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -19933,7 +19934,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     S.srvRec = rec; S.srvPack = true; await window.applyPack(packMerge(pv, rec)); toast('Server resource pack loaded'); }
   function packMerge(pv, rec) { return pv ? Object.assign({}, rec, { name: rec.name, files: Object.assign({}, pv.files, rec.files), mcsnd: Object.assign({}, pv.mcsnd || {}, rec.mcsnd || {}), sounds: rec.sounds && Object.keys(rec.sounds).length ? rec.sounds : pv.sounds }) : rec; }
   async function userPack(rec) {   // a pack picked from the pause menu while connected: it becomes the base under the mod textures and any server pack, and stays after leaving
-    S.packPrev = rec; pdbT(PDB.put('mcpack', rec), true);   // and it's the current pack's resource pack from now on let r = packBase(); if (S.srvRec) r = packMerge(r, S.srvRec);
+    S.packPrev = rec; recPut(packKey(), rec);   // and it's the current pack's resource pack from now on let r = packBase(); if (S.srvRec) r = packMerge(r, S.srvRec);
     S.srvPack = true; PACK.worldId = 'mcompat-mods'; await window.applyPack(Object.assign({}, r, { name: rec.name, desc: rec.desc, stats: rec.stats })); PACK.worldId = 'mcompat-mods'; }
   // ---- chat: clickable commands, hover text and command suggestions (tab complete) ----
   function chatHooks() { const st = document.createElement('style'); st.id = 'mcExtCss'; st.textContent = '.mcCmd{pointer-events:auto;text-decoration:underline dotted}#mcLog [title]{pointer-events:auto}#mcSug{position:absolute;left:0;right:0;bottom:100%;margin-bottom:4px;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;pointer-events:auto}#mcSug:empty{display:none}#mcSug button{flex:0 0 auto;font-size:12px;padding:3px 8px;background:rgba(0,0,0,.72)}'; document.head.appendChild(st);
@@ -21156,7 +21157,7 @@ class LobDarklingsModel extends ModelCreatureObj {
     { rec.mcsnd = rec.mcsnd || {}; rec.sndmap = rec.sndmap || {}; let bytes = 0;   // sounds: sounds.json events -> the ogg files (played by Minecraft mode's pack sound player)
       for (const n of names) { const m = n.match(/^assets\/([^/]+)\/sounds\.json$/i); if (!m) continue; const j = await json(n); if (!j) continue;
         for (const [ev, def] of Object.entries(j)) { const L = []; for (const e of (def && def.sounds) || []) { const nm = typeof e === 'string' ? e : e && e.type !== 'event' && e.name; if (!nm) continue; const [ns, pth] = nm.includes(':') ? nm.split(':') : [m[1], nm]; const key = ns + ':' + pth;
-            if (!rec.mcsnd[key] && bytes < 90e6) { const d = await z.read('assets/' + ns + '/sounds/' + pth + '.ogg'); if (d) { rec.mcsnd[key] = d; bytes += d.byteLength; } } if (rec.mcsnd[key]) L.push(key); }
+            if (!rec.mcsnd[key] && bytes < 90e6 && (rec.sndBytes || 0) < SND_ALL) { const d = await z.read('assets/' + ns + '/sounds/' + pth + '.ogg'); if (d) { rec.mcsnd[key] = d; bytes += d.byteLength; rec.sndBytes = (rec.sndBytes || 0) + d.byteLength; } } if (rec.mcsnd[key]) L.push(key); }
           if (L.length) rec.sndmap[m[1] + ':' + ev] = L; } } }
     const modelOf = async (ref, kind) => { let [ns, p] = ref.includes(':') ? ref.split(':') : ['minecraft', ref]; if (!/^(block|item)s?\//.test(p)) p = kind + '/' + p; const k = ns + ':' + p; if (k in models) return models[k];
       const f = 'assets/' + ns + '/models/' + p + '.json'; models[k] = has(f) ? await json(f) : null; return models[k]; };
@@ -21189,32 +21190,40 @@ class LobDarklingsModel extends ModelCreatureObj {
     return mods; }
   const pdbT = (p, v) => Promise.race([p, new Promise(r => setTimeout(() => r(v), 4000))]);   // IndexedDB can stall (private windows, file://); PDB keeps a memory copy either way
   MCE.dbgPort = () => ({ PORTS, wayName, wayOpen, ccS, itemTag, mcName, mcInvRender, botS, botLexicon, BFX, lycBook, faPick, faSettings, rskOpen });   // tests
-  MCE.importMods = async (fileList, replace) => { const rec = (!replace && await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
-    rec.jars = rec.jars || [];
-    for (const f of fileList) { const buf = new Uint8Array(await f.arrayBuffer()), z = await unzipPack(buf.buffer), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
-      if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) { await jarKeep(rec, j.split('/').pop(), d); done.push(...await readJar(rec, await unzipPack(d))); } } } else { await jarKeep(rec, f.name || 'mod.jar', buf); done.push(...await readJar(rec, z)); } }
-    await pdbT(PDB.put('mcmods', rec), true); return { mods: Object.keys(rec.mods), added: done, blocks: Object.keys(rec.blocks).length, items: Object.keys(rec.items).length }; };
-  MCE.modsInfo = async () => { const r = await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null); return r ? { mods: Object.keys(r.mods), blocks: Object.keys(r.blocks).length, items: Object.keys(r.items).length } : null; };
-  MCE.clearMods = () => pdbT(PDB.put('mcmods', null), true);
-  // ---- packs: named sets of mod jars (kept as they were imported, so a pack can be rebuilt) and a resource pack; the working copy is 'mcmods' + 'mcpack' ----
-  const pdbRaw = { get: k => PDB.op('readonly', st => st.get(k)).then(r => r === true || r === undefined ? null : r), put: (k, v) => PDB.op('readwrite', st => st.put(v, k)), del: k => PDB.op('readwrite', st => st.delete(k)) };   // big records skip PDB's memory copy
+  const SND_ALL = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '') ? 220e6 : 600e6;   // all mods' sounds together: a whole modpack's would not fit in a phone's memory
+  // ---- packs: each pack's processed mods and resource pack live under its own keys ('mcmods@<id>', 'mcpack@<id>'; 'mcmods' / 'mcpack' with no pack picked), so switching copies nothing; the jars are kept as imported ('mcjar:...') so a pack can be rebuilt ----
+  const pdbRaw = { get: k => PDB.op('readonly', st => st.get(k)).then(r => r === true || r === undefined ? null : r), put: (k, v) => PDB.op('readwrite', st => st.put(v, k)), del: k => PDB.op('readwrite', st => st.delete(k)) };   // no memory copy of big records
+  const recGet = async k => { const r = await pdbT(pdbRaw.get(k), null); return r != null ? r : (PDB.mem.get(k) || null); };
+  const recPut = async (k, v) => { const ok = await pdbT(pdbRaw.put(k, v), undefined); if (ok === undefined || ok === null) PDB.mem.set(k, v); else PDB.mem.delete(k); };   // memory only when IndexedDB is unavailable (file://, private windows)
+  const cfgCur = () => { try { return localStorage.getItem('strata.mccfg') || null; } catch (e) { return null; } }, cfgSet = id => { try { if (id) localStorage.setItem('strata.mccfg', id); else localStorage.removeItem('strata.mccfg'); } catch (e) { /* private */ } };
+  const modsKey = id => { id = id === undefined ? cfgCur() : id; return id ? 'mcmods@' + id : 'mcmods'; }, packKey = id => { id = id === undefined ? cfgCur() : id; return id ? 'mcpack@' + id : 'mcpack'; };
+  MCE.modsRec = () => recGet(modsKey());
   const u8 = x => x instanceof Uint8Array ? x : new Uint8Array(x), ab = x => { const u = u8(x); return u.byteOffset === 0 && u.byteLength === u.buffer.byteLength ? u.buffer : u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength); };   // zip entries arrive as either
   async function jarKeep(rec, name, data) { data = u8(data); const key = 'mcjar:' + name + ':' + data.length; if (!rec.jars.some(j => j.key === key)) { await pdbRaw.put(key, data); rec.jars.push({ name, key }); } }
-  const cfgCur = () => { try { return localStorage.getItem('strata.mccfg') || null; } catch (e) { return null; } }, cfgSet = id => { try { if (id) localStorage.setItem('strata.mccfg', id); else localStorage.removeItem('strata.mccfg'); } catch (e) { /* private */ } };
+  MCE.importMods = async (fileList, replace) => { const K = modsKey(), rec = (!replace && await recGet(K)) || { mods: {}, modNames: {}, files: {}, blocks: {}, items: {}, lang: {} }; const done = [];
+    rec.jars = replace ? [] : (rec.jars || []);
+    for (const f of fileList) { const buf = new Uint8Array(await f.arrayBuffer()), z = await unzipPack(ab(buf)), jars = [...z.files.keys()].filter(n => /\.jar$/i.test(n));
+      if (jars.length) { for (const j of jars) { const d = await z.read(j); if (d) { await jarKeep(rec, j.split('/').pop(), d); done.push(...await readJar(rec, await unzipPack(ab(d)))); } } } else { await jarKeep(rec, f.name || 'mod.jar', buf); done.push(...await readJar(rec, z)); } }
+    await recPut(K, rec); cfgStats(); return { mods: Object.keys(rec.mods), added: done, blocks: Object.keys(rec.blocks).length, items: Object.keys(rec.items).length }; };
+  MCE.modsInfo = async () => { const r = await recGet(modsKey()); return r ? { mods: Object.keys(r.mods), blocks: Object.keys(r.blocks).length, items: Object.keys(r.items).length } : null; };
+  MCE.clearMods = async () => { await recPut(modsKey(), null); cfgStats(); };
   MCE.cfgList = async () => (await pdbRaw.get('mccfg:list')) || [];
   MCE.cfgCurrent = cfgCur;
-  async function cfgWrite(id, name) { const mods = await pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null), pack = await pdbT(PDB.get('mcpack'), PDB.mem.get('mcpack') || null), L = await MCE.cfgList();
-    await pdbRaw.put('mccfg:' + id, { mods, pack }); const e = { id, name, mods: Object.keys((mods && mods.mods) || {}), jars: ((mods && mods.jars) || []).length, pack: (pack && pack.name) || null, t: Date.now() };
-    const i = L.findIndex(q => q.id === id); if (i >= 0) L[i] = Object.assign(L[i], e, { name: name || L[i].name }); else L.push(e); await pdbRaw.put('mccfg:list', L); cfgSet(id); return e; }
-  MCE.cfgSaveAs = name => cfgWrite('c' + Date.now().toString(36), String(name || 'Pack').slice(0, 60));
-  MCE.cfgSave = async () => { const id = cfgCur(), L = await MCE.cfgList(), e = L.find(q => q.id === id); return e ? cfgWrite(id, e.name) : null; };
-  MCE.cfgLoad = async id => { const c = await pdbRaw.get('mccfg:' + id); if (!c) return false; await pdbT(PDB.put('mcmods', c.mods || null), true); await pdbT(PDB.put('mcpack', c.pack || null), true); cfgSet(id); return true; };
-  MCE.cfgDelete = async id => { const L = (await MCE.cfgList()).filter(q => q.id !== id), c = await pdbRaw.get('mccfg:' + id); await pdbRaw.put('mccfg:list', L); await pdbRaw.del('mccfg:' + id);
-    const keep = new Set(); for (const q of L) { const o = await pdbRaw.get('mccfg:' + q.id); for (const j of (o && o.mods && o.mods.jars) || []) keep.add(j.key); } { const w = await pdbT(PDB.get('mcmods'), null); for (const j of (w && w.jars) || []) keep.add(j.key); }
-    for (const j of (c && c.mods && c.mods.jars) || []) if (!keep.has(j.key)) await pdbRaw.del(j.key); if (cfgCur() === id) cfgSet(null); return true; };   // jars no other pack uses go too
-  MCE.cfgRebuild = async () => { const w = await pdbT(PDB.get('mcmods'), null), J = (w && w.jars) || []; if (!J.length) return null; const files = []; for (const j of J) { const d = await pdbRaw.get(j.key); if (d) files.push(new File([d], j.name)); } return MCE.importMods(files, true); };   // re-read the kept jars (after a Strata update)
-  MCE.setPack = async rec => { await pdbT(PDB.put('mcpack', rec || null), true); return rec ? rec.name : null; };
-  MCE.packInfo = async () => { const r = await pdbT(PDB.get('mcpack'), PDB.mem.get('mcpack') || null); return r ? r.name : null; };
+  async function cfgStats() { const id = cfgCur(); if (!id) return; const L = await MCE.cfgList(), e = L.find(q => q.id === id); if (!e) return; const mods = await recGet(modsKey(id)), pack = await recGet(packKey(id));
+    Object.assign(e, { mods: Object.keys((mods && mods.mods) || {}), jars: ((mods && mods.jars) || []).length, pack: (pack && pack.name) || null, t: Date.now() }); await pdbRaw.put('mccfg:list', L); }
+  async function cfgNew(name) { const id = 'c' + Date.now().toString(36), L = await MCE.cfgList(), e = { id, name: String(name || 'Pack').slice(0, 60), mods: [], jars: 0, pack: null, t: Date.now() }; L.push(e); await pdbRaw.put('mccfg:list', L); return e; }
+  MCE.cfgSaveAs = async name => { const from = cfgCur(), e = await cfgNew(name), m = await recGet(modsKey(from)), p = await recGet(packKey(from)); if (m) await recPut(modsKey(e.id), m); if (p) await recPut(packKey(e.id), p); cfgSet(e.id); await cfgStats(); return e; };   // the one copy: a new pack from what's loaded
+  MCE.cfgSave = async () => { await cfgStats(); const id = cfgCur(); return id ? (await MCE.cfgList()).find(q => q.id === id) || null : null; };   // a pack's changes are already in it
+  MCE.cfgLoad = async id => { if (!(await MCE.cfgList()).some(q => q.id === id)) return false;
+    if (!(await recGet(modsKey(id)))) { const old = await pdbRaw.get('mccfg:' + id); if (old) { if (old.mods) await recPut(modsKey(id), old.mods); if (old.pack) await recPut(packKey(id), old.pack); await pdbRaw.del('mccfg:' + id); } }   // packs saved by build 93 held a copy
+    cfgSet(id); return true; };
+  MCE.cfgUse = id => { cfgSet(id || null); };
+  MCE.cfgDelete = async id => { const L = (await MCE.cfgList()).filter(q => q.id !== id), mine = await recGet(modsKey(id)); await pdbRaw.put('mccfg:list', L);
+    const keep = new Set(); for (const k of [modsKey(null), ...L.map(q => modsKey(q.id))]) { const o = await recGet(k); for (const j of (o && o.jars) || []) keep.add(j.key); }
+    for (const j of (mine && mine.jars) || []) if (!keep.has(j.key)) await pdbRaw.del(j.key); await recPut(modsKey(id), null); await recPut(packKey(id), null); await pdbRaw.del('mccfg:' + id); if (cfgCur() === id) cfgSet(null); return true; };   // jars no other pack uses go too
+  MCE.cfgRebuild = async () => { const w = await recGet(modsKey()), J = (w && w.jars) || []; if (!J.length) return null; const files = []; for (const j of J) { const d = await pdbRaw.get(j.key); if (d) files.push(new File([d], j.name)); } return MCE.importMods(files, true); };   // re-read the kept jars (after a Strata update)
+  MCE.setPack = async rec => { await recPut(packKey(), rec || null); cfgStats(); return rec ? rec.name : null; };
+  MCE.packInfo = async () => { const r = await recGet(packKey()); return r ? r.name : null; };
   // ---- CurseForge modpacks: the pack's zip (manifest.json lists projectID / fileID; overrides/ holds extra jars and resource packs) ----
   async function cfFile(F, p, f, key) {   // one mod file: the official API with a key (honours authors who turned off third-party downloads), else CurseForge's public download link
     if (key) { const j = JSON.parse(new TextDecoder().decode(await F.get('https://api.curseforge.com/v1/mods/' + p + '/files/' + f, { 'x-api-key': key, Accept: 'application/json' }))).data || {};
@@ -21227,11 +21236,11 @@ class LobDarklingsModel extends ModelCreatureObj {
       say('Downloading ' + list.length + ' mods for ' + name + '...');
       const work = list.slice(); const one = async () => { while (work.length) { const q = work.shift(); try { const r = await cfFile(F, q.projectID, q.fileID, o.key); await jarKeep(rec, r.name, r.data); await readJar(rec, await unzipPack(ab(r.data))); }
         catch (e) { failed.push({ project: q.projectID, file: q.fileID, why: (e && e.message) || String(e) }); } say('Mods: ' + (++done) + ' of ' + list.length + (failed.length ? ' (' + failed.length + ' failed)' : '')); } };
-      await Promise.all([one(), one(), one(), one()]);
+      await Promise.all([one(), one()]);   // two at a time: phones run short of memory
       for (const n of z.files.keys()) { if (!n.startsWith(root)) continue; const rel = n.slice(root.length);
         if (/^mods\/[^/]+\.jar$/i.test(rel)) { const d = await z.read(n); if (d) { await jarKeep(rec, rel.split('/').pop(), d); try { await readJar(rec, await unzipPack(ab(d))); } catch (e) { /* not a mod */ } } }
         else if (!pack && /^resourcepacks\/[^/]+\.zip$/i.test(rel) && typeof importPack === 'function') { const d = await z.read(n); if (d) try { pack = await importPack(new File([d], rel.split('/').pop())); } catch (e) { /* not a pack */ } } }
-      await pdbT(PDB.put('mcmods', rec), true); await pdbT(PDB.put('mcpack', pack || null), true); const e = await MCE.cfgSaveAs(name);
+      const e = await cfgNew(name); await recPut(modsKey(e.id), rec); if (pack) await recPut(packKey(e.id), pack); cfgSet(e.id); await cfgStats();
       return { name, cfg: e.id, mods: Object.keys(rec.mods).length, total: list.length, failed, pack: pack && pack.name, mc: M.minecraft && M.minecraft.version }; }
     finally { F.close(); } };
   MCE.curseSearch = async (q, o) => { const F = StrataMC.fetcher(o.relay); try { const u = 'https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&sortField=2&sortOrder=desc&pageSize=20&searchFilter=' + encodeURIComponent(q) + (o.ver ? '&gameVersion=' + encodeURIComponent(o.ver) : '');
@@ -21314,8 +21323,8 @@ class LobDarklingsModel extends ModelCreatureObj {
     o.onClose = w => { prev && prev(w); };
     const cl = StrataMC.connect(o); S.client = cl; S.Hd = Hd;
     window.__mcPackImport = userPack; try { chatHooks(); ownHooks(true); } catch (e) { /* ui */ }
-    pdbT(PDB.get('mcpack'), PDB.mem.get('mcpack') || null).then(r => { if (!S || !r) return; S.packPrev = r; const go = () => { if (!S) return; if (!S.world) { setTimeout(go, 500); return; } userPack(r).catch(e => console.error('pack', e)); }; go(); });   // the current pack's resource pack
-    if (o.forge) pdbT(PDB.get('mcmods'), PDB.mem.get('mcmods') || null).then(r => { if (!S || !r) return; S.modRec = r; if (!r.sndmap) setTimeout(() => toast('Re-import your mod jars on the connect screen to hear the mods\' own sounds'), 4000); if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
+    recGet(packKey()).then(r => { if (!S || !r) return; S.packPrev = r; const go = () => { if (!S) return; if (!S.world) { setTimeout(go, 500); return; } userPack(r).catch(e => console.error('pack', e)); }; go(); });   // the current pack's resource pack
+    if (o.forge) recGet(modsKey()).then(r => { if (!S || !r) return; S.modRec = r; if (!r.sndmap) setTimeout(() => toast('Re-import your mod jars on the connect screen to hear the mods\' own sounds'), 4000); if (S.world) modPackApply().catch(e => console.error('mod textures', e)); });
     S.t1 = setInterval(tick, 33); S.tagRaf = requestAnimationFrame(tagLoop);
     { const el = document.getElementById('coords'); if (el) { let busy = false; S.mo = new MutationObserver(() => { if (busy || !S) return; const m = /^(-?\d+), (-?\d+), (-?\d+)/.exec(el.textContent); if (!m) return; busy = true; el.textContent = (+m[1] - S.OX) + ', ' + m[2] + ', ' + (+m[3] - S.OZ); setTimeout(() => { busy = false; }, 0); }); S.mo.observe(el, { childList: true, characterData: true, subtree: true }); } }
     S.t2 = setInterval(() => { if (S && S.world && S.riding) { rideTick(); return; } if (S && S.world && Hd.cur) {   // every tick, menus open or not, like vanilla (servers time out or flag clients that go quiet)
@@ -21434,7 +21443,7 @@ class LobDarklingsModel extends ModelCreatureObj {
   // packs (mod jars + resource pack), CurseForge modpacks, saved servers
   { const sel=$('mcCfg'), note=$('mcModsStat'), pst=$('mcPackStat'), refresh=async()=>{ const L=await StrataMCE.cfgList(), cur=StrataMCE.cfgCurrent(); sel.innerHTML='<option value="">(working set)</option>'+L.map(q=>'<option value="'+q.id+'">'+q.name.replace(/[<&]/g,'')+' ('+q.mods.length+' mods)</option>').join(''); sel.value=L.some(q=>q.id===cur)?cur:''; $('mcCfgSave').disabled=$('mcCfgDel').disabled=!sel.value; const pn=await StrataMCE.packInfo(); pst.textContent=pn?'Resource pack: '+pn:'No resource pack in this pack.'; };
     window.__mcCfgRefresh=refresh; refresh();
-    sel.onchange=async()=>{ if(!sel.value){ refresh(); return; } note.textContent='Loading pack...'; await StrataMCE.cfgLoad(sel.value); await refresh(); $('mcForge').dispatchEvent(new Event('change')); };
+    sel.onchange=async()=>{ if(!sel.value){ StrataMCE.cfgUse(null); await refresh(); $('mcForge').dispatchEvent(new Event('change')); return; } note.textContent='Loading pack...'; await StrataMCE.cfgLoad(sel.value); await refresh(); $('mcForge').dispatchEvent(new Event('change')); };
     $('mcCfgAs').onclick=()=>{ const b=$('mcCfgName'); b.hidden=!b.hidden; if(!b.hidden) $('mcCfgNameIn').focus(); };
     $('mcCfgNameOk').onclick=async()=>{ const n=$('mcCfgNameIn').value.trim(); if(!n) return; note.textContent='Saving pack...'; await StrataMCE.cfgSaveAs(n); $('mcCfgName').hidden=true; $('mcCfgNameIn').value=''; await refresh(); note.textContent='Saved "'+n+'".'; };
     $('mcCfgSave').onclick=async()=>{ note.textContent='Saving pack...'; const e=await StrataMCE.cfgSave(); await refresh(); note.textContent=e?'Saved "'+e.name+'".':'Pick a pack first.'; };

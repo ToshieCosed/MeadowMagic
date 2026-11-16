@@ -80,7 +80,10 @@ public final class Relay implements WsServer.Handler {
             case "tcp_close": tcpClose(x); break;
             case "mc_encrypt_begin": thread(() -> encryptBegin(x, m)); break;
             case "http_get": { final Object id = m.get("id"); final String url = Json.str(m, "url"); final Object hd = m.get("headers"); thread(() -> {
-                try { if (url == null || !url.matches("(?i)^https?://.*")) throw new IOException("bad url"); @SuppressWarnings("unchecked") Map<String, Object> hm = hd instanceof Map ? (Map<String, Object>) hd : null; send(x, Json.of("type", "http_data", "id", id, "data", Base64.getEncoder().encodeToString(Http.getBytes(url, hm)))); }
+                try { if (url == null || !url.matches("(?i)^https?://.*")) throw new IOException("bad url"); @SuppressWarnings("unchecked") Map<String, Object> hm = hd instanceof Map ? (Map<String, Object>) hd : null; byte[] body = Http.getBytes(url, hm);
+                    if (Boolean.TRUE.equals(m.get("binary"))) { byte[] ib = String.valueOf(id).getBytes(StandardCharsets.UTF_8), out = new byte[1 + ib.length + body.length]; out[0] = (byte) ib.length; System.arraycopy(ib, 0, out, 1, ib.length); System.arraycopy(body, 0, out, 1 + ib.length, body.length); body = null; x.ws.sendBinary(out); }   // raw bytes, no base64 copy
+                    else send(x, Json.of("type", "http_data", "id", id, "data", Base64.getEncoder().encodeToString(body))); }
+                catch (OutOfMemoryError e) { send(x, Json.of("type", "http_error", "id", id, "message", "not enough memory for this file")); }
                 catch (Exception e) { send(x, Json.of("type", "http_error", "id", id, "message", String.valueOf(e.getMessage()))); } }); break; }
             default: break;
         }
@@ -90,7 +93,7 @@ public final class Relay implements WsServer.Handler {
 
     @Override public void onClose(WsServer.Conn c) { Ctx x = (Ctx) c.attach; if (x != null) tcpClose(x); }
 
-    private static void thread(Runnable r) { Thread t = new Thread(r, "relay-task"); t.setDaemon(true); t.start(); }
+    private static void thread(Runnable r) { Thread t = new Thread(() -> { try { r.run(); } catch (Throwable e) { System.gc(); } }, "relay-task"); t.setDaemon(true); t.start(); }   // a task that runs out of memory must not take the app down
 
     private static void send(Ctx x, Map<String, Object> o) { x.ws.sendText(Json.write(o)); }
 

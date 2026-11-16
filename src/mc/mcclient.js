@@ -513,11 +513,12 @@
       const r = new R(new Uint8Array(e.data), 0); if (r.vi() !== 0) return; clearTimeout(t); let j = null; try { j = JSON.parse(r.str()); } catch (x) { /* bad */ } try { ws.close(); } catch (x) { /* closed */ } res(j); }; }); }
   // downloads through the relay outside a game (the browser can't fetch other sites itself): one socket, many requests
   function fetcher(relay) { let ws = null, ready = null, n = 0; const P = {};
-    const open = () => ready || (ready = new Promise((res, rej) => { try { ws = new WebSocket(relay); } catch (e) { rej(e); return; } ws.onopen = () => res(); ws.onerror = () => { rej(new Error('relay unreachable')); ready = null; };
+    const open = () => ready || (ready = new Promise((res, rej) => { try { ws = new WebSocket(relay); } catch (e) { rej(e); return; } ws.binaryType = 'arraybuffer'; ws.onopen = () => res(); ws.onerror = () => { rej(new Error('relay unreachable')); ready = null; };
       ws.onclose = () => { ready = null; for (const k of Object.keys(P)) { P[k].rej(new Error('relay closed')); delete P[k]; } };
-      ws.onmessage = e => { if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch (x) { return; } const q = P[m.id]; if (!q) return; delete P[m.id]; clearTimeout(q.t);
+      ws.onmessage = e => { if (typeof e.data !== 'string') { const u = new Uint8Array(e.data), n2 = u[0], id = new TextDecoder().decode(u.subarray(1, 1 + n2)), q = P[id]; if (q) { delete P[id]; clearTimeout(q.t); q.res(u.subarray(1 + n2)); } return; }   // binary reply: [id length][id][bytes]
+        let m; try { m = JSON.parse(e.data); } catch (x) { return; } const q = P[m.id]; if (!q) return; delete P[m.id]; clearTimeout(q.t);
         if (m.type === 'http_data') { const b = atob(m.data), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); q.res(u); } else q.rej(new Error(m.message || 'download failed')); }; }));
-    return { async get(url, headers) { await open(); return new Promise((res, rej) => { const id = 'f' + (++n); P[id] = { res, rej, t: setTimeout(() => { if (P[id]) { delete P[id]; rej(new Error('download timed out')); } }, 180000) }; ws.send(JSON.stringify({ type: 'http_get', id, url, headers })); }); },
+    return { async get(url, headers) { await open(); return new Promise((res, rej) => { const id = 'f' + (++n); P[id] = { res, rej, t: setTimeout(() => { if (P[id]) { delete P[id]; rej(new Error('download timed out')); } }, 180000) }; ws.send(JSON.stringify({ type: 'http_get', id, url, headers, binary: true })); }); },
       close() { try { ws && ws.close(); } catch (e) { /* closed */ } } }; }
   g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, status, comp, compHTML, fetcher, setIds: x => { IDS = x; }, W, R });
 })(typeof window !== 'undefined' ? window : globalThis);

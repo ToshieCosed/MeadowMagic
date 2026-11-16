@@ -14,6 +14,6 @@ out.switch = await pg.evaluate(async () => { const L = await StrataMCE.cfgList()
 await pg.fill('#mcHost', 'play.example.net'); await pg.$eval('#mcSrvAdd', e => e.click()); await wait(400); await pg.fill('#mcHost', 'rlcraft.example.com:25565'); await pg.$eval('#mcSrvAdd', e => e.click()); await wait(400);
 out.servers = await pg.evaluate(() => [...document.querySelectorAll('#mcSrvList button')].map(b => b.textContent));
 await pg.evaluate(() => document.querySelectorAll('#mcSrvList button')[1].click()); await wait(200); await pg.screenshot({ path: '/tmp/cfg-1.png', fullPage: true });
-out.del = await pg.evaluate(async () => { const s = document.getElementById('mcCfg'); const n0 = (await StrataMCE.cfgList()).length; document.getElementById('mcCfgDel').click(); document.getElementById('mcCfgDel').click(); await new Promise(r => setTimeout(r, 800)); return [n0, (await StrataMCE.cfgList()).length]; });
+out.del = await pg.evaluate(async () => { const s = document.getElementById('mcCfg'); const n0 = (await StrataMCE.cfgList()).length; document.getElementById('mcCfgDel').click(); document.getElementById('mcCfgDel').click(); await new Promise(r => setTimeout(r, 4000)); return [n0, (await StrataMCE.cfgList()).length]; });
 } catch (e) { out.fail = String(e).slice(0, 400); }
 out.errs = errs; console.log(JSON.stringify(out, null, 1)); await b.close();

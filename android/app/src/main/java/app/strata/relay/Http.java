@@ -43,7 +43,7 @@ final class Http {
             int st = c.getResponseCode();
             if (st >= 300 && st < 400 && c.getHeaderField("Location") != null) { url = new URL(new URL(url), c.getHeaderField("Location")).toString(); c.disconnect(); continue; }
             if (st >= 400) { c.disconnect(); throw new IOException("HTTP " + st); }
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            int len = c.getContentLength(); ByteArrayOutputStream bo = new ByteArrayOutputStream(len > 0 && len < (100 << 20) ? len : 1 << 16);   // sized up front: no doubling copies
             try (InputStream in = c.getInputStream()) { byte[] buf = new byte[16384]; int n; while ((n = in.read(buf)) > 0) { bo.write(buf, 0, n); if (bo.size() > 100 << 20) throw new IOException("pack too large"); } }
             c.disconnect(); return bo.toByteArray();
         }

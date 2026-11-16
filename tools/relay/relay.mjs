@@ -145,7 +145,7 @@ wss.on('connection', ws => {
     else if (m.type === 'tcp_open') tcpOpen(ws, send, ctx, String(m.host), +m.port);
     else if (m.type === 'tcp_close') tcpClose(ctx);
     else if (m.type === 'mc_encrypt_begin') encryptBegin(ctx, send, m);
-    else if (m.type === 'http_get') httpGet(String(m.url || ''), m.headers).then(b => send({ type: 'http_data', id: m.id, data: b.toString('base64') }), e => send({ type: 'http_error', id: m.id, message: e.message }));
+    else if (m.type === 'http_get') httpGet(String(m.url || ''), m.headers).then(b => { if (m.binary) { const id = Buffer.from(String(m.id)); if (ws.readyState === 1) ws.send(Buffer.concat([Buffer.from([id.length]), id, b]), { binary: true }); } else send({ type: 'http_data', id: m.id, data: b.toString('base64') }); }, e => send({ type: 'http_error', id: m.id, message: e.message }));
   });
   ws.on('close', () => tcpClose(ctx));
   send({ type: 'hello', relay: 'strata-minecraft-compat', version: 2 });
