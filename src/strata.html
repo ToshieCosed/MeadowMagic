@@ -18651,7 +18651,8 @@ class LobDarklingsModel extends ModelCreatureObj {
     if (e.k === 'skip') return 0;
     return register(e);
   }
-  const lookup = (st, below) => { let v; if ((st & 8) && (isDoorId(st >> 4) || st >> 4 === 175)) v = stateToId(st, below); /* upper halves depend on the block below */ else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) { S.mcb[v] = st >> 4; if (v >= 8192) MAT_OF[v] = mcMat(st >> 4); } return v; };
+  const lookup = (st, below) => { let v; if ((st & 8) && (isDoorId(st >> 4) || st >> 4 === 175)) v = stateToId(st, below); /* upper halves depend on the block below */ else { v = S.lut[st]; if (v < 0) v = S.lut[st] = stateToId(st, 0); } if (v && !S.mcb[v]) { const al = mcAlias(st); S.mcb[v] = al >> 4; if (v >= 8192) MAT_OF[v] = mcMat(al >> 4); } return v; };
+  const mcAlias = st => { const fb = S.forge && S.forge.blocks[st >> 4]; if (!fb || fb.startsWith('minecraft:')) return st; const P = portOf(fb), al = P && P.alias ? P.alias(fb, st & 15) : null; return al != null ? al : st; };   // a modded block shown as a vanilla one breaks like it too
 
   // Strata sound material (index into MATS_S) for a Minecraft block id: stone grass dirt gravel sand wood leaves metal glass wool snow slime plant
   const MATSETS = [[1, 4, 14, 15, 16, 21, 22, 24, 43, 44, 45, 48, 49, 52, 56, 61, 62, 67, 73, 74, 87, 89, 97, 98, 108, 109, 112, 114, 116, 121, 128, 139, 152, 155, 156, 159, 172, 173, 179, 180, 181, 182], [2, 31], [3, 60, 110, 3], [13], [12, 88], [5, 17, 25, 47, 50, 53, 54, 58, 63, 64, 65, 68, 72, 84, 85, 96, 107, 125, 126, 134, 135, 136, 146, 162, 163, 164, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197], [18, 161], [41, 42, 57, 71, 101, 145, 147, 148, 154, 133, 66, 27, 28, 157], [20, 95, 102, 160, 79], [35, 171], [78, 80], [165], [6, 32, 37, 38, 39, 40, 59, 83, 81, 86, 103, 104, 105, 106, 111, 115, 127, 141, 142, 175, 176]];
@@ -19592,16 +19593,23 @@ class LobDarklingsModel extends ModelCreatureObj {
   function tipOf(el) { const t = el.closest && el.closest('.slot'); if (!t || t.title) return; const l = t.getAttribute('aria-label'); if (l) t.title = l; }
   let nameT = 0; function popName() { const h = held(); let el = document.getElementById('mcItemName'); if (!el) { el = document.createElement('div'); el.id = 'mcItemName'; el.style.cssText = 'position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;color:#fff;font:600 14px sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .4s;opacity:0'; document.body.appendChild(el); }
     el.textContent = h ? ITEMS[h.id].name : ''; el.style.opacity = h ? 1 : 0; clearTimeout(nameT); nameT = setTimeout(() => { el.style.opacity = 0; }, 1800); }
+  // a modded block's hardness isn't sent to clients, so guess it from its name the way its material usually goes (the server still decides, and finishes a break on its own once the time is really up)
+  function modHard(b) { const bd = BLOCKS[b]; if (!bd) return null; const n = String(bd.modName || (S.forge && S.forge.blocks[S.mcb[b]]) || bd.name || '').toLowerCase();
+    if (!bd.modName && !(S.forge && S.forge.blocks[S.mcb[b]])) return null;
+    if (bd.leaves || /leaves|leaf|foliage/.test(n)) return { h: .2, tl: 'hoe' }; if (bd.plant || /flower|grass_plant|tallgrass|mushroom|sapling|crop|seed|vine|fern|bush|shrub|torch|button|lever|carpet|rug/.test(n)) return { h: 0 };
+    if (/obsidian/.test(n)) return { h: 50, tl: 'pick' }; if (/ore\b|_ore|ore_|crystal/.test(n)) return { h: 3, tl: 'pick' }; if (/log|branch|wood|plank|bark|trunk|stump|chest|table|crate|barrel|door|fence/.test(n)) return { h: 2, tl: 'axe' };
+    if (/dirt|grass|sand|gravel|soil|mud|clay|rooty|snow|silt|peat|farmland|mycelium|podzol|ash/.test(n)) return { h: .6, tl: 'shovel' }; if (/glass|ice|lamp/.test(n)) return { h: .3 }; if (/wool|cloth|bed|cushion|hay|thatch/.test(n)) return { h: .8 };
+    if (/stone|rock|brick|cobble|marble|basalt|slate|granite|andesite|diorite|limestone|tile|pillar|furnace|anvil|metal|iron|block|machine|frame|casing/.test(n)) return { h: 1.5, tl: 'pick' }; return { h: 1, tl: '' }; }
   const IMPL = {
-    mineBlock(r) { const [x, y, z] = r.hit, f = faceOf(r), a = S.client.api, k = r.hit.join(','); if (!S.dig || S.dig.key !== k) a.dig(0, x - S.OX, y, z - S.OZ, f); a.dig(2, x - S.OX, y, z - S.OZ, f); S.dig = null; a.swing(); flash = { c: [x, y, z], t: .2 }; },
+    mineBlock(r) { const [x, y, z] = r.hit, f = faceOf(r), a = S.client.api, k = r.hit.join(','); if (!S.dig || S.dig.key !== k) a.dig(0, x - S.OX, y, z - S.OZ, f); a.dig(2, x - S.OX, y, z - S.OZ, f); S.dig = null; S.fin = { key: k, t: performance.now() }; a.swing();   /* a second 'start' would reset the server's progress: let it finish this one */ flash = { c: [x, y, z], t: .2 }; },
     stepMining(dt) {
       S.saved.stepMining(dt); const a = S.client.api, k = mining && mining.key || null;
       if (S.dig && S.dig.key !== k) { a.dig(1, S.dig.x, S.dig.y, S.dig.z, S.dig.f); S.dig = null; }
-      if (k && !S.dig && mining.target) { const r = mining.target, f = faceOf(r); S.dig = { key: k, x: r.hit[0] - S.OX, y: r.hit[1], z: r.hit[2] - S.OZ, f }; a.dig(0, S.dig.x, S.dig.y, S.dig.z, f); a.swing(); }
+      if (k && !S.dig && mining.target && !(S.fin && S.fin.key === k && performance.now() - S.fin.t < 2500)) { const r = mining.target, f = faceOf(r); S.dig = { key: k, x: r.hit[0] - S.OX, y: r.hit[1], z: r.hit[2] - S.OZ, f }; a.dig(0, S.dig.x, S.dig.y, S.dig.z, f); a.swing(); }
     },
     mineTime(b) {   // Minecraft's own break-time formula, so cracks and the server's check agree
       if (b <= 0) return Infinity; if (world.meta.gameMode === 'creative') return .05;
-      const e = StrataMC.blocks18[S.mcb[b]]; if (!e || e.h == null) return Infinity; if (e.h >= 100 || e.h < 0) return Infinity; if (e.h === 0) return .05;
+      const e = StrataMC.blocks18[S.mcb[b]] || modHard(b); if (!e || e.h == null) return Infinity; if (e.h >= 100 || e.h < 0) return Infinity; if (e.h === 0) return .05;
       const h = held(), nm = h && h.mc && StrataMC.items18[h.mc.id] ? StrataMC.items18[h.mc.id][0] : '', m = /^(wooden|stone|iron|golden|diamond)_(pickaxe|axe|shovel|sword|hoe)$/.exec(nm);
       const TT2 = { pickaxe: 'pick', axe: 'axe', shovel: 'shovel' }, SP = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 }, good = m && TT2[m[2]] === e.tl;
       const speed = good ? SP[m[1]] : 1, harvest = !(e.tl === 'pick' && !(m && m[2] === 'pickaxe'));
