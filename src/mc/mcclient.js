@@ -511,5 +511,13 @@
     ws.onerror = () => { clearTimeout(t); rej(new Error('relay unreachable')); };
     ws.onmessage = e => { if (typeof e.data === 'string') { let m; try { m = JSON.parse(e.data); } catch (x) { return; } if (m.type === 'tcp_open_ok') { ws.send(new W().vi(0).vi(o.protocol).str(o.host + (o.forge ? '\0FML\0' : '')).u16(o.port).vi(1).out()); ws.send(new W().vi(0).out()); } else if (m.type === 'tcp_error' || m.type === 'tcp_closed') { clearTimeout(t); rej(new Error(m.message || 'closed')); } return; }
       const r = new R(new Uint8Array(e.data), 0); if (r.vi() !== 0) return; clearTimeout(t); let j = null; try { j = JSON.parse(r.str()); } catch (x) { /* bad */ } try { ws.close(); } catch (x) { /* closed */ } res(j); }; }); }
-  g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, status, comp, compHTML, setIds: x => { IDS = x; }, W, R });
+  // downloads through the relay outside a game (the browser can't fetch other sites itself): one socket, many requests
+  function fetcher(relay) { let ws = null, ready = null, n = 0; const P = {};
+    const open = () => ready || (ready = new Promise((res, rej) => { try { ws = new WebSocket(relay); } catch (e) { rej(e); return; } ws.onopen = () => res(); ws.onerror = () => { rej(new Error('relay unreachable')); ready = null; };
+      ws.onclose = () => { ready = null; for (const k of Object.keys(P)) { P[k].rej(new Error('relay closed')); delete P[k]; } };
+      ws.onmessage = e => { if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch (x) { return; } const q = P[m.id]; if (!q) return; delete P[m.id]; clearTimeout(q.t);
+        if (m.type === 'http_data') { const b = atob(m.data), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); q.res(u); } else q.rej(new Error(m.message || 'download failed')); }; }));
+    return { async get(url, headers) { await open(); return new Promise((res, rej) => { const id = 'f' + (++n); P[id] = { res, rej, t: setTimeout(() => { if (P[id]) { delete P[id]; rej(new Error('download timed out')); } }, 180000) }; ws.send(JSON.stringify({ type: 'http_get', id, url, headers })); }); },
+      close() { try { ws && ws.close(); } catch (e) { /* closed */ } } }; }
+  g.StrataMC = g.StrataMC || {}; Object.assign(g.StrataMC, { connect, status, comp, compHTML, fetcher, setIds: x => { IDS = x; }, W, R });
 })(typeof window !== 'undefined' ? window : globalThis);

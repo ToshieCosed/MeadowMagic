@@ -32,11 +32,14 @@ final class Http {
     static Res get(String url, String bearer) throws IOException { return send("GET", url, null, null, bearer); }
 
     /** Download raw bytes (server resource packs), following up to 5 redirects, capped at 100 MB. */
-    static byte[] getBytes(String url) throws IOException {
+    static byte[] getBytes(String url) throws IOException { return getBytes(url, null); }
+    /** The same, with extra request headers (a CurseForge API key; only x-api-key and Accept are passed on). */
+    static byte[] getBytes(String url, java.util.Map<String, Object> headers) throws IOException {
         for (int hop = 0; hop < 6; hop++) {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setInstanceFollowRedirects(false); c.setConnectTimeout(15000); c.setReadTimeout(60000);
             c.setRequestProperty("User-Agent", "Strata-Compat");
+            if (headers != null && hop == 0) for (java.util.Map.Entry<String, Object> h : headers.entrySet()) if (h.getKey().equalsIgnoreCase("x-api-key") || h.getKey().equalsIgnoreCase("Accept")) c.setRequestProperty(h.getKey(), String.valueOf(h.getValue()));
             int st = c.getResponseCode();
             if (st >= 300 && st < 400 && c.getHeaderField("Location") != null) { url = new URL(new URL(url), c.getHeaderField("Location")).toString(); c.disconnect(); continue; }
             if (st >= 400) { c.disconnect(); throw new IOException("HTTP " + st); }
