@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
         byte[] r = new byte[16]; new SecureRandom().nextBytes(r); StringBuilder sb = new StringBuilder(); for (byte x : r) sb.append(String.format("%02x", x)); token = sb.toString();
         try {
             Relay.Config c = new Relay.Config(); c.token = token; c.store = new File(getFilesDir(), "relay-auth.json");
+            c.onPlaying = n -> runOnUiThread(() -> { Intent k = new Intent(this, KeepService.class); try { if (n > 0) { if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(k); else startService(k); } else stopService(k); } catch (Exception e) { Log.e("Strata", "keep service", e); } });   // in a game: keep running in the background
             server = new WsServer(0, new Relay(c)); server.start();
         } catch (Exception e) { Log.e("Strata", "relay failed", e); }
         web = new WebView(this);
@@ -68,7 +69,10 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
     }
 
+    @Override protected void onPause() { super.onPause(); Relay.setBackground(true); }
+    @Override protected void onResume() { super.onResume(); Relay.setBackground(false); if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED && !asked) { asked = true; requestPermissions(new String[] { "android.permission.POST_NOTIFICATIONS" }, 7702); } }   // the connection notice
+    private boolean asked;
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) hideBars(); }
     @Override public void onBackPressed() { if (web.canGoBack()) web.goBack(); else super.onBackPressed(); }
-    @Override protected void onDestroy() { if (server != null) server.stop(); web.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() { stopService(new Intent(this, KeepService.class)); if (server != null) server.stop(); web.destroy(); super.onDestroy(); }
 }

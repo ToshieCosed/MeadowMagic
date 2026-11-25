@@ -175,7 +175,7 @@
     const status = t => { try { o.onStatus && o.onStatus(t); } catch (e) { /* ui */ } };
     // connection diagnostics: when a drop gives no reason, say how long we were in, when the server last spoke, and whether the app was in the background
     const T0 = Date.now(); let lastRx = T0, lastKA = 0, hidT = 0, hidMax = 0;
-    const vis = () => { if (typeof document === 'undefined') return; if (document.hidden) hidT = Date.now(); else if (hidT) { hidMax = Math.max(hidMax, Date.now() - hidT); hidT = 0; } };
+    let kaTold = false; const vis = () => { if (typeof document === 'undefined') return; if (document.hidden) hidT = Date.now(); else if (hidT) { hidMax = Math.max(hidMax, Date.now() - hidT); hidT = 0; } try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'bg', on: document.hidden })); } catch (e) { /* closed */ } };
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', vis);
     const diag = () => { const n = Date.now(), s = ms => Math.round(ms / 1000) + 's', bg = hidT ? n - hidT : hidMax;
       return ' (connected ' + s(n - T0) + ', last server packet ' + s(n - lastRx) + ' ago' + (lastKA ? ', last keep-alive ' + s(n - lastKA) + ' ago' : '') + (bg > 3000 ? ', app was in the background for ' + s(bg) : '') + ')'; };
@@ -255,7 +255,7 @@
       const nbtRaw = () => { const p0 = r.p, t = r.b(); if (t) { r.skip(r.u16()); r.tag(t); } return r.u.slice(p0, r.p); };
       switch (name) {
         case 'kick_disconnect': return end(P >= 765 ? comp(r.nbt()) : comp(r.str()));
-        case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); return;
+        case 'keep_alive': out('keep_alive', body.subarray(idLen)); lastKA = Date.now(); if (!kaTold) { kaTold = true; try { ws.send(JSON.stringify({ type: 'ka', in: new R(body, 0).vi(), out: (ids.ps || {}).keep_alive })); } catch (e) { /* closed */ } } return;   // the relay answers these itself while the app is in the background
         case 'transaction': if (LEG) { const wid = r.i8(), act = r.i16(), ok = r.bool(); if (!ok) out('transaction', new W().b(wid & 255).b((act >> 8) & 255).b(act & 255).bool(true)); if (H && H.trans) H.trans(wid, act, ok); } return;   // a refused click must be acknowledged, or the server ignores that window from then on
         case 'ping': out('pong', new W().i32(r.i32())); return;
         case 'login': if (!joined) { joined = true; status('Joined the world'); }

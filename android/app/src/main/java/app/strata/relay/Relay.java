@@ -34,6 +34,7 @@ import java.security.spec.X509EncodedKeySpec;
 public final class Relay implements WsServer.Handler {
     public static final class Config {
         public String clientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb"; public File store; public String token = "";
+        /** Told how many game connections are open (to keep the app running in the background while one is). */ public java.util.function.IntConsumer onPlaying;
         public final Map<String, String> ep = new LinkedHashMap<>();
         public Config() {
             ep.put("devicecode", "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode");
@@ -56,6 +57,7 @@ public final class Relay implements WsServer.Handler {
     /** Per-connection state. */
     private static final class Ctx {
         WsServer.Conn ws; Socket sock; OutputStream sout; volatile Cipher enc, dec; volatile int compress = -1; volatile boolean login = true; volatile byte[] pending;
+        volatile int kaIn = -1, kaOut = -1; volatile boolean hidden, playing;   // the play state's keep-alive packet ids (the page says which), and whether the page is hidden
         byte[] buf = new byte[0]; int len = 0;
     }
 
@@ -78,6 +80,8 @@ public final class Relay implements WsServer.Handler {
             case "auth_logout": session = null; saveRefresh(null); send(x, Json.of("type", "auth_none")); break;
             case "tcp_open": { final String host = Json.str(m, "host"); final int port = (int) Json.num(m, "port", 25565); thread(() -> tcpOpen(x, host, port)); break; }
             case "tcp_close": tcpClose(x); break;
+            case "ka": x.kaIn = (int) Json.num(m, "in", -1); x.kaOut = (int) Json.num(m, "out", -1); break;
+            case "bg": x.hidden = Boolean.TRUE.equals(m.get("on")); break;
             case "mc_encrypt_begin": thread(() -> encryptBegin(x, m)); break;
             case "http_get": { final Object id = m.get("id"); final String url = Json.str(m, "url"); final Object hd = m.get("headers"); thread(() -> {
                 try { if (url == null || !url.matches("(?i)^https?://.*")) throw new IOException("bad url"); @SuppressWarnings("unchecked") Map<String, Object> hm = hd instanceof Map ? (Map<String, Object>) hd : null; byte[] body = Http.getBytes(url, hm);
@@ -231,18 +235,26 @@ public final class Relay implements WsServer.Handler {
                         if (dl[0] == 0) body = Arrays.copyOfRange(x.buf, start + dl[1], end);
                         else { Inflater inf = new Inflater(); inf.setInput(x.buf, start + dl[1], end - start - dl[1]); body = new byte[dl[0]]; int got = 0; while (got < body.length) { int k = inf.inflate(body, got, body.length - got); if (k == 0 && (inf.finished() || inf.needsInput())) break; got += k; } inf.end(); }
                     } else body = Arrays.copyOfRange(x.buf, start, end);
+                    if (!x.login && x.kaIn >= 0 && x.kaOut >= 0 && (background || x.hidden)) { int[] id = readVi(body, 0, body.length);   // the app is in the background: answer the server's keep-alive here, so it doesn't time the player out
+                        if (id != null && id[0] == x.kaIn) { byte[] o = vi(x.kaOut), r = new byte[o.length + body.length - id[1]]; System.arraycopy(o, 0, r, 0, o.length); System.arraycopy(body, id[1], r, o.length, body.length - id[1]); tcpSend(x, r); continue; } }
                     x.ws.sendBinary(body);
-                    if (x.login) { int[] id = readVi(body, 0, body.length); if (id != null) { if (id[0] == 3) { int[] t = readVi(body, id[1], body.length); x.compress = t[0]; } else if (id[0] == 2) x.login = false; } }
+                    if (x.login) { int[] id = readVi(body, 0, body.length); if (id != null) { if (id[0] == 3) { int[] t = readVi(body, id[1], body.length); x.compress = t[0]; } else if (id[0] == 2) { x.login = false; playing(x, true); } } }
                 }
                 if (pos > 0) { System.arraycopy(x.buf, pos, x.buf, 0, x.len - pos); x.len -= pos; }
             }
         } catch (Exception e) {
             if (x.sock == s) send(x, Json.of("type", "tcp_error", "message", "bad packet stream: " + e.getMessage()));
         }
-        boolean mine; synchronized (x) { mine = x.sock == s; if (mine) x.sock = null; }
+        playing(x, false); boolean mine; synchronized (x) { mine = x.sock == s; if (mine) x.sock = null; }
         try { s.close(); } catch (IOException ignored) {}
         if (mine) send(x, Json.of("type", "tcp_closed"));
     }
+
+    private static volatile boolean background;
+    /** The app went to the background (or came back): keep-alives are answered by the relay meanwhile. */ public static void setBackground(boolean b) { background = b; }
+    private final java.util.concurrent.atomic.AtomicInteger inGame = new java.util.concurrent.atomic.AtomicInteger();
+    private void playing(Ctx x, boolean on) { if (x.playing == on) return; x.playing = on; int n = on ? inGame.incrementAndGet() : inGame.decrementAndGet(); if (!on) { x.kaIn = x.kaOut = -1; } try { if (cfg.onPlaying != null) cfg.onPlaying.accept(n); } catch (Exception e) { /* ui */ } }
+    private static byte[] vi(int v) { java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(5); do { int b = v & 127; v >>>= 7; o.write(v != 0 ? b | 128 : b); } while (v != 0); return o.toByteArray(); }
 
     private void tcpClose(Ctx x) { Socket s; synchronized (x) { s = x.sock; x.sock = null; } if (s != null) try { s.close(); } catch (IOException ignored) {} }
 

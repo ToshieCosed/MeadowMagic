@@ -83,6 +83,7 @@ const readVi = (b, o) => { let v = 0, s = 0, i = o; for (;;) { if (i >= b.length
 const mcDigest = buf => { let h = crypto.createHash('sha1').update(buf).digest(); const neg = h[0] & 0x80; if (neg) { h = Buffer.from(h); let c = 1; for (let i = h.length - 1; i >= 0; i--) { const x = (~h[i] & 0xff) + c; h[i] = x & 0xff; c = x >> 8; } } const hex = h.toString('hex').replace(/^0+/, '') || '0'; return (neg ? '-' : '') + hex; };
 
 function tcpOpen(ws, send, ctx, host, port) {
+  ctx.kaIn = ctx.kaOut = -1;
   tcpClose(ctx);
   const sock = net.connect({ host, port }); sock.setNoDelay(true);
   Object.assign(ctx, { sock, enc: null, dec: null, compress: -1, login: true, pending: null, buf: Buffer.alloc(0) });
@@ -97,6 +98,7 @@ function tcpOpen(ws, send, ctx, host, port) {
         const r = readVi(ctx.buf, 0); if (!r || ctx.buf.length < r.len + r.v) break;
         let body = ctx.buf.subarray(r.len, r.len + r.v); ctx.buf = ctx.buf.subarray(r.len + r.v);
         if (ctx.compress >= 0) { const dl = readVi(body, 0), rest = body.subarray(dl.len); body = dl.v === 0 ? rest : zlib.inflateSync(rest); }
+        if (!ctx.login && ctx.hidden && ctx.kaIn >= 0 && ctx.kaOut >= 0) { const id = readVi(body, 0); if (id.v === ctx.kaIn) { tcpSend(ctx, Buffer.concat([vi(ctx.kaOut), body.subarray(id.len)])); continue; } }   // the page is hidden: answer the server's keep-alive here
         if (ws.readyState === 1) ws.send(body, { binary: true });
         if (ctx.login) { const id = readVi(body, 0); if (id.v === 3) { const t = readVi(body, id.len); ctx.compress = t.v | 0; } else if (id.v === 2) ctx.login = false; }
       }
@@ -144,6 +146,8 @@ wss.on('connection', ws => {
     else if (m.type === 'auth_logout') { session = null; saveStore({}); send({ type: 'auth_none' }); }
     else if (m.type === 'tcp_open') tcpOpen(ws, send, ctx, String(m.host), +m.port);
     else if (m.type === 'tcp_close') tcpClose(ctx);
+    else if (m.type === 'ka') { ctx.kaIn = +m.in; ctx.kaOut = +m.out; }
+    else if (m.type === 'bg') ctx.hidden = !!m.on;
     else if (m.type === 'mc_encrypt_begin') encryptBegin(ctx, send, m);
     else if (m.type === 'http_get') httpGet(String(m.url || ''), m.headers).then(b => { if (m.binary) { const id = Buffer.from(String(m.id)); if (ws.readyState === 1) ws.send(Buffer.concat([Buffer.from([id.length]), id, b]), { binary: true }); } else send({ type: 'http_data', id: m.id, data: b.toString('base64') }); }, e => send({ type: 'http_error', id: m.id, message: e.message }));
   });
